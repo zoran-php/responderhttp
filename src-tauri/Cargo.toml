@@ -1,7 +1,7 @@
 [package]
 name = "responderhttp"
 version = "1.0.0"
-description = "A Postman-style API client — single binary, libcurl statically linked, no system dependencies"
+description = "API client — single binary, libcurl statically linked, no system dependencies"
 edition = "2021"
 
 [lib]

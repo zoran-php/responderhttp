@@ -1,7 +1,7 @@
 // http_client/src/features/request-builder/SendButton.tsx
 //
 // Split button: Send on the left, a chevron on the right opening the
-// variants. Postman's shape, and the reason it is a split rather than two
+// variants. The reason it is a split rather than two
 // buttons is that Send is what you want nine times out of ten — the variant
 // should cost a second click, not half the width of the primary action.
 //

@@ -1,6 +1,6 @@
 -- 0006_examples.sql
 --
--- Saved responses ("examples" in Postman's language): a named response kept
+-- Saved responses: a named response kept
 -- under the request that produced it, which is what makes a request node in
 -- the sidebar expandable. Committed and shipped: never edit this file, add a
 -- new numbered one (CLAUDE.md section 11, rule 5).

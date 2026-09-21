@@ -7,6 +7,7 @@ use crate::domain::models::Folder;
 use crate::domain::ports::FolderRepository;
 use crate::persistence::database::{to_storage_error, Database};
 use crate::persistence::repositories::collections::missing_if_zero;
+use crate::persistence::repositories::docs::{read_docs, write_docs, DocsTable};
 use crate::persistence::repositories::saved_requests::now_iso8601;
 
 pub struct SqliteFolderRepository {
@@ -78,6 +79,16 @@ impl FolderRepository for SqliteFolderRepository {
             .execute("DELETE FROM folders WHERE id = ?1", params![id])
             .map_err(to_storage_error)?;
         missing_if_zero(changed, id, "folder")
+    }
+
+    fn docs(&self, id: &str) -> Result<String, AppError> {
+        let guard = self.database.lock();
+        read_docs(&guard, DocsTable::Folders, id)
+    }
+
+    fn set_docs(&self, id: &str, markdown: &str) -> Result<(), AppError> {
+        let guard = self.database.lock();
+        write_docs(&guard, DocsTable::Folders, id, markdown)
     }
 }
 

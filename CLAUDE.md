@@ -6,7 +6,7 @@ Guidance for Claude Code (and any AI assistant) working in this repository.
 
 ## 1. Project Overview
 
-**ResponderHTTP** is a desktop API client (a "Postman clone") that ships as **one single executable with zero external dependencies**.
+**ResponderHTTP** is a desktop API client that ships as **one single executable with zero external dependencies**.
 
 The app is a **UI shell over an embedded cURL engine**. It collects request parameters from the UI (URL, HTTP method, headers, query params, body, authentication), passes them to the cURL engine, and formats the response (status code, timing, response headers, response body) back to the user.
 

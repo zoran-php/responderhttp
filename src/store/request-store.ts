@@ -1,6 +1,6 @@
 // http_client/src/store/request-store.ts
 //
-// Session state for every open request tab (Postman-style). Each tab holds
+// Session state for every open request tab. Each tab holds
 // what request-store.ts used to hold for the single request that existed
 // before: what the user typed, and what came back. The work itself belongs
 // to services/.
@@ -42,8 +42,10 @@ import { substituteRequestInput } from "@/lib/variables";
 // every caller, keeps `currentInput()` the raw template that Save stores.
 import { useEnvironmentsStore } from "@/store/environments-store";
 import { useHistoryStore } from "@/store/history-store";
+import { itemDocs, setItemDocs } from "@/services/docs";
 import { cancelRequest, sendAndDownload, sendRequest } from "@/services/http-client";
 import type { SavedRequest } from "@/types/collections";
+import { sameDocsTarget, type DocsTarget } from "@/types/docs";
 import {
   AUTH_NONE,
   DEFAULT_SETTINGS,
@@ -138,7 +140,35 @@ export interface ExampleTab {
   exampleId: string;
 }
 
-export type Tab = RequestTab | EnvironmentTab | ExampleTab;
+/** Which pane a Docs tab is showing. */
+export type DocsView = "edit" | "preview" | "split";
+
+/**
+ * An item's Markdown documentation, open for editing (PLAN.md Phase 12).
+ *
+ * Unlike EnvironmentTab and ExampleTab this carries its own text, because the
+ * editor needs a draft that is not yet what storage holds. It still holds
+ * only the *target* rather than the item's name, so renaming a collection in
+ * the sidebar retitles its Docs tab for free — the same reason the other two
+ * hold only an id.
+ */
+export interface DocsTab {
+  kind: "docs";
+  id: string;
+  target: DocsTarget;
+  /** What the editor shows. */
+  markdown: string;
+  /** What storage last confirmed, so dirty is a string comparison. */
+  savedMarkdown: string;
+  view: DocsView;
+  /** False until the first fetch lands; the editor stays read-only until then
+   * so a keystroke cannot be overwritten by the arriving text. */
+  loaded: boolean;
+  /** A save that failed, shown rather than swallowed (CLAUDE.md section 7). */
+  saveError: string | null;
+}
+
+export type Tab = RequestTab | EnvironmentTab | ExampleTab | DocsTab;
 
 interface TabsState {
   tabs: Tab[];
@@ -155,6 +185,14 @@ interface TabsState {
   openSavedRequest: (saved: SavedRequest) => void;
   openEnvironment: (environmentId: string) => void;
   openExample: (exampleId: string) => void;
+  /** Focuses the Docs tab already open for this item, if there is one;
+   * otherwise opens one and fetches its text. */
+  openDocs: (target: DocsTarget) => void;
+  setDocsMarkdown: (tabId: string, markdown: string) => void;
+  setDocsView: (tabId: string, view: DocsView) => void;
+  /** Writes a Docs tab now, cancelling any pending autosave for it. Awaited
+   * by tests; callers in the UI fire and forget. */
+  saveDocs: (tabId: string) => Promise<void>;
   /** Opens a history entry's request in a new, unsaved tab. Always a new
    * tab: the entry is a record of something already sent, so re-running it
    * must not overwrite whatever the user has in front of them. */
@@ -202,6 +240,36 @@ let nextTabId = 0;
 function newTabId(): string {
   nextTabId += 1;
   return `tab-${nextTabId}`;
+}
+
+/**
+ * How long after the last keystroke a Docs tab writes itself.
+ *
+ * Long enough that a sentence is one write rather than forty, short enough
+ * that the dot on the tab never sits there long enough to worry anyone.
+ */
+export const DOCS_AUTOSAVE_MS = 800;
+
+/**
+ * Pending autosaves, by tab id.
+ *
+ * Module-level rather than in the store because a timer handle is not state
+ * anything renders — putting it in the store would mean every keystroke
+ * published a new object to every subscriber for no visible reason.
+ */
+const pendingDocsSaves = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleDocsSave(tabId: string, save: () => void): void {
+  cancelDocsSave(tabId);
+  pendingDocsSaves.set(tabId, setTimeout(save, DOCS_AUTOSAVE_MS));
+}
+
+function cancelDocsSave(tabId: string): void {
+  const pending = pendingDocsSaves.get(tabId);
+  if (pending !== undefined) {
+    clearTimeout(pending);
+    pendingDocsSaves.delete(tabId);
+  }
 }
 
 function buildBlankTab(): RequestTab {
@@ -334,8 +402,17 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   isDirty: (tabId) => {
     const tab = get().tabs.find((candidate) => candidate.id === tabId);
+    if (tab === undefined) {
+      return false;
+    }
+    // A Docs tab autosaves, so this is true only for the moment between a
+    // keystroke and the write landing — which is exactly what the dot on the
+    // tab is for. A failed save keeps it lit.
+    if (tab.kind === "docs") {
+      return tab.markdown !== tab.savedMarkdown;
+    }
     // An environment tab saves explicitly, so it is never "unsaved".
-    if (tab === undefined || tab.kind !== "request") {
+    if (tab.kind !== "request") {
       return false;
     }
     return !requestInputsEqual(inputFromTab(tab), tab.savedSnapshot);
@@ -383,14 +460,128 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     set((state) => ({ tabs: [...state.tabs, tab], activeTabId: tab.id }));
   },
 
+  openDocs: (target) => {
+    const existing = get().tabs.find(
+      (tab) => tab.kind === "docs" && sameDocsTarget(tab.target, target),
+    );
+    if (existing) {
+      set({ activeTabId: existing.id });
+      return;
+    }
+
+    const tab: DocsTab = {
+      kind: "docs",
+      id: newTabId(),
+      target,
+      markdown: "",
+      savedMarkdown: "",
+      view: "split",
+      loaded: false,
+      saveError: null,
+    };
+    set((state) => ({ tabs: [...state.tabs, tab], activeTabId: tab.id }));
+
+    void itemDocs(target).then((result) => {
+      set((state) => ({
+        tabs: state.tabs.map((candidate) => {
+          // Only fills a tab that is still empty and unloaded: the fetch is
+          // slower than a fast typist, and text that arrives late must not
+          // overwrite what was typed while it was in flight.
+          if (candidate.id !== tab.id || candidate.kind !== "docs" || candidate.loaded) {
+            return candidate;
+          }
+          if (!result.ok) {
+            return { ...candidate, loaded: true, saveError: result.error.message };
+          }
+          return {
+            ...candidate,
+            markdown: result.value,
+            savedMarkdown: result.value,
+            loaded: true,
+          };
+        }),
+      }));
+    });
+  },
+
+  setDocsMarkdown: (tabId, markdown) => {
+    const tab = get().tabs.find((candidate) => candidate.id === tabId);
+    // Ignored until the stored text has arrived. The editor is read-only for
+    // that moment, so nothing typed is lost here — and without this rule a
+    // keystroke landing first would autosave an empty draft over
+    // documentation the user has not seen yet.
+    if (tab === undefined || tab.kind !== "docs" || !tab.loaded) {
+      return;
+    }
+
+    set((state) => ({
+      tabs: state.tabs.map((candidate) =>
+        candidate.id === tabId && candidate.kind === "docs"
+          ? { ...candidate, markdown, saveError: null }
+          : candidate,
+      ),
+    }));
+    scheduleDocsSave(tabId, () => void get().saveDocs(tabId));
+  },
+
+  setDocsView: (tabId, view) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === tabId && tab.kind === "docs" ? { ...tab, view } : tab,
+      ),
+    }));
+  },
+
+  saveDocs: async (tabId) => {
+    cancelDocsSave(tabId);
+    const tab = get().tabs.find((candidate) => candidate.id === tabId);
+    if (tab === undefined || tab.kind !== "docs" || !tab.loaded) {
+      return;
+    }
+    if (tab.markdown === tab.savedMarkdown) {
+      return;
+    }
+
+    // Captured before the await: the user keeps typing while the write is in
+    // flight, and what was written is what may be marked saved.
+    const written = tab.markdown;
+    const result = await setItemDocs(tab.target, written);
+
+    set((state) => ({
+      tabs: state.tabs.map((candidate) => {
+        if (candidate.id !== tabId || candidate.kind !== "docs") {
+          return candidate;
+        }
+        if (!result.ok) {
+          return { ...candidate, saveError: result.error.message };
+        }
+        return { ...candidate, savedMarkdown: written, saveError: null };
+      }),
+    }));
+  },
+
   openHistoryEntry: (request) => {
     const tab = buildTabFromRequest(request);
     set((state) => ({ tabs: [...state.tabs, tab], activeTabId: tab.id }));
   },
 
-  setActiveTab: (id) => set({ activeTabId: id }),
+  setActiveTab: (id) => {
+    // Leaving a Docs tab is a save point: the user has stopped looking at it,
+    // and waiting out the debounce would mean a write landing after they have
+    // moved on.
+    const leaving = get().activeTabId;
+    if (leaving !== id) {
+      void get().saveDocs(leaving);
+    }
+    set({ activeTabId: id });
+  },
 
   closeTab: (id) => {
+    // Flushed before the tab goes: the pending write holds the tab's id, and
+    // once it is gone there is nothing for the save to write back into.
+    // Fire-and-forget, because closing must not wait on a disk write.
+    void get().saveDocs(id);
+
     set((state) => {
       const index = state.tabs.findIndex((tab) => tab.id === id);
       if (index === -1) {

@@ -4,6 +4,7 @@
 pub mod app_settings;
 pub mod collections;
 pub mod cookies;
+pub mod docs;
 pub mod environments;
 pub mod examples;
 pub mod folders;

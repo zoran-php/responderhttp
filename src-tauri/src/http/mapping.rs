@@ -93,8 +93,8 @@ pub fn build_url(base: &str, params: &[KeyValue], encode: bool) -> String {
 }
 
 /// Percent-encodes what libcurl would reject or send raw in the path, query
-/// and fragment, and nothing else — what Postman calls "encode URL
-/// automatically". Measured against libcurl 8.21 on 2026-09-17: a space is
+/// and fragment, and nothing else.
+/// Measured against libcurl 8.21 on 2026-09-17: a space is
 /// refused outright ("Malformed input to a URL function"), while `ö` or `"`
 /// go out as raw bytes that servers answer with 400.
 ///

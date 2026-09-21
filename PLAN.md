@@ -4179,6 +4179,428 @@ bundles built (`ResponderHTTP_1.0.0_x64-setup.exe` and
 
 ---
 
+## Phase 12 — Item-level Markdown documentation
+
+Docs for a collection, a folder or a request: a Markdown tab opened from the
+sidebar's right-click menu, edited in Monaco, previewed rendered, stored with
+the item and carried through OpenAPI export and import.
+
+Docs are the one thing a collection cannot currently record. The endpoint is
+saved, its headers are saved, an example response is saved — why it exists,
+what the payload means, which error the third call returns, all of that lives
+in someone's head or in a wiki nobody opens. This phase gives it a home
+beside the request.
+
+### What the codebase already gives us
+
+Read before planning, so the estimate is against the real code and not a guess:
+
+- **Tabs are already a discriminated union.** `Tab = RequestTab |
+  EnvironmentTab | ExampleTab` in `store/request-store.ts`. `DocsTab` is a
+  fourth arm, not a new mechanism. `EnvironmentTab` and `ExampleTab` hold only
+  an id and read the name from their store, which is how a sidebar rename
+  reaches the tab label for free — docs follow that for the label and carry
+  their own text for the body.
+- **The context menu exists**, with a `menuItems(target)` in
+  `CollectionsSidebar.tsx` already branching on collection / folder / example /
+  request. Three of those four arms gain one entry.
+- **Monaco already speaks Markdown.** `CodeEditor` takes
+  `{value, language, readOnly, onChange}` and `LazyCodeEditor` wraps it in
+  Suspense. Edit mode is `language="markdown"` and nothing else.
+- **The split view's arithmetic is written.** `lib/split-pane.ts` serves both
+  axes and is tested; `ResizeHandle` is the component. Split view reuses them
+  rather than growing a third divider implementation.
+- **`Tag` already carries `description`** (`openapi/document.rs`), and
+  `from_collection.rs` sets it to `None` on every folder today. Folder docs
+  drop straight in.
+- **Ctrl+S is taken and Ctrl+Shift+D is free.** `lib/shortcuts.ts`'s
+  `isSaveShortcut` deliberately rejects Ctrl+Shift+S, so the modifier
+  discipline is already there to copy.
+
+And two things it does not give us:
+
+- **`Operation` has no `description` field at all.** It must be added to the
+  struct, with `skip_serializing_if = "Option::is_none"` like its neighbours.
+- **Import throws operation descriptions away.** `to_collection.rs` reads
+  `description` only for responses; a request's name comes from summary →
+  operationId → route and the description is dropped on the floor. So this
+  phase also stops discarding the documentation in every spec ever imported,
+  which is arguably the larger win.
+
+### Decisions taken 2026-09-21
+
+**Renderer: `marked` + `dompurify`.** Two packages, both zero-dependency,
+about 45 KB together. The alternative considered was `react-markdown` +
+`remark-gfm`, which renders to React elements and so cannot inject HTML at
+all; it was turned down for the ~40-package `unified`/`micromark` tree behind
+it. The cost of the choice is explicit and is written down here so it is not
+forgotten: **we own the `innerHTML` call site, and sanitising is not optional
+there.** One function in `lib/`, one test that a `<script>` and a
+`javascript:` href do not survive it, and no second place in the app that
+renders Markdown.
+
+**Saving: debounced autosave plus explicit Ctrl+S.** Autosave ~800 ms after
+typing stops and on tab blur and close; Ctrl+S forces it immediately because
+users who reach for it expect it to mean something. The dirty dot shows only
+while a save is pending or has failed — with autosave there is nothing to
+prompt about on close, so a Docs tab never raises the close dialog that a
+dirty request tab does. Losing prose is worse than losing a form field, and
+that asymmetry is the whole reason for the divergence.
+
+**Docs travel through OpenAPI, in this phase.** Collection docs ↔
+`info.description`, folder docs ↔ tag `description`, request docs ↔ operation
+`description`. It is the only way the spec's third acceptance criterion —
+export, re-import, docs intact — can pass, since OpenAPI is this app's only
+export format.
+
+### Data model
+
+Migration `0009_item_docs.sql`, three columns, one per owning table:
+
+```sql
+ALTER TABLE collections ADD COLUMN docs_md TEXT NOT NULL DEFAULT '';
+ALTER TABLE folders      ADD COLUMN docs_md TEXT NOT NULL DEFAULT '';
+ALTER TABLE requests     ADD COLUMN docs_md TEXT NOT NULL DEFAULT '';
+```
+
+`MIGRATIONS` in `database.rs` becomes `[&str; 9]`.
+
+A single polymorphic `docs (item_type, item_id, markdown)` table was
+considered and rejected: SQLite cannot enforce a foreign key whose target
+table varies, so deleting a collection would leave its docs behind as orphan
+rows, and every other table in this schema gets `ON DELETE CASCADE` for free.
+A column on the owning table inherits the cascade and needs no new index.
+
+**Verified, and worth a regression test:** the `requests` upsert in
+`persistence/repositories/saved_requests.rs` names its `DO UPDATE SET` columns
+one by one and does not touch `docs_md`, so pressing Save in the request
+builder cannot wipe a request's documentation. That is true by accident of how
+the statement is written, which is exactly the kind of thing that stops being
+true during a later edit — hence the test.
+
+Docs are stored **in plain text and exported verbatim**. They are prose the
+user writes, not a credential, so they do not go through the Phase 9 sealing
+path. The consequence is worth stating plainly: a token pasted into a Docs tab
+will appear in the exported OpenAPI file. `domain/secrets.rs` stays the one
+place that decides what is secret, and `docs_md` is not on that list.
+
+A size cap, mirroring the existing request-body cap (`MAX_BODY_BYTES` and its
+`a_body_past_the_cap_is_refused_before_it_reaches_storage` test): a named
+constant, checked in the domain service before storage, with the same
+at-the-cap and past-the-cap pair of tests.
+
+### Ports, services, commands
+
+Two methods on each of the three existing traits in `domain/ports.rs`, rather
+than one new `DocsRepository`:
+
+```rust
+fn docs(&self, id: &str) -> Result<String, AppError>;
+fn set_docs(&self, id: &str, markdown: &str) -> Result<(), AppError>;
+```
+
+This is what §7's interface segregation asks for — a repository trait per
+aggregate — and it costs three mock updates in the existing test suites.
+
+`domain/services/docs.rs` holds the rule that belongs to nobody else: trim
+nothing (leading whitespace is meaningful in Markdown), enforce the cap, and
+dispatch on target kind to the right repository. `commands/docs.rs` is the
+usual thin pair, `item_docs` and `set_item_docs`, over a
+`DocsTargetDto { kind, id }` in `commands/dto.rs`, mirrored in
+`src/types/docs.ts` and wrapped in `src/services/docs.ts`.
+
+### Frontend
+
+- `DocsTab { kind: "docs"; id; target: { kind: "collection" | "folder" |
+  "request"; id: string }; markdown: string; savedMarkdown: string; view:
+  "edit" | "preview" | "split" }`. The target id gives the label its name from
+  the collections store, so a rename in the sidebar retitles the tab; the two
+  text fields make `isDirty` a string comparison, as `savedSnapshot` already
+  does for requests.
+- `openDocs(target)` focuses an existing tab for the same target before
+  opening a new one — the spec's single-instance rule, and the same shape as
+  the existing `openEnvironment` / `openExample`.
+- `ContextMenuItem` gains an optional `icon`, since the spec asks for a
+  document icon and the type currently has no room for one. `FileText` from
+  lucide-react, which is already the app's only icon set.
+- `features/docs/DocsEditor.tsx` — toolbar (mode switcher, then bold, italic,
+  code, link, list, heading), `LazyCodeEditor` on the left, preview on the
+  right. The formatting buttons are a pure function in
+  `lib/markdown-format.ts` (`applyFormat(text, selection, action) → {text,
+  selection}`) so the wrapping and unwrapping rules are unit-testable without
+  a DOM, and the component only moves the cursor.
+- `lib/markdown.ts` — `renderMarkdown(md): string`, `marked` then DOMPurify,
+  the single sanitising chokepoint.
+- Ctrl+Shift+D opens docs for the selected item; a matcher in
+  `lib/shortcuts.ts` beside `isSaveShortcut`, with the same
+  modifier-exactness tests.
+
+### Rendering safety
+
+An imported OpenAPI document's descriptions are **third-party text that will
+be rendered into a webview holding Tauri IPC**. That makes the preview pane a
+genuine attack surface rather than a theoretical one, and it decides three
+things:
+
+1. **Sanitise, in one place.** DOMPurify with a restrictive allowlist; no
+   `<script>`, no event handlers, no `javascript:` or `data:` hrefs.
+2. **Links must not navigate the app.** A plain `<a href="https://…">` click
+   inside the app replaces the whole UI with the remote page, with no way
+   back. Preview intercepts clicks on anchors and prevents the default. What
+   happens next is the one open question below.
+3. **Remote images do not load by default.** `![](https://tracker/x.png)` in
+   an imported description is a beacon that fires the moment the pane renders
+   — and the Store listing promises no telemetry and no analytics. Remote
+   image sources are stripped, with a per-tab "load images" toggle if the user
+   wants them.
+
+Syntax highlighting inside preview code blocks uses **Monaco's
+`editor.colorize`**, which is already bundled. No `highlight.js`, no second
+grammar set, no third dependency.
+
+### OpenAPI mapping
+
+| Item | OpenAPI field | Note |
+|---|---|---|
+| Collection | `info.description` | Currently holds a generated "Exported from the ResponderHTTP collection …" sentence. Docs replace it when present; the generated line stays only when there are no docs. |
+| Folder | `tags[].description` | Already `Option<String>`, always `None` today. |
+| Request | `operation.description` | Field does not exist yet; add it. `summary` keeps carrying the request name. |
+
+Edge cases that need naming rather than discovering later:
+
+- **Flat export has nowhere to put folder docs.** When the grouping is not
+  tag-based, a folder's documentation has no OpenAPI home. It becomes an
+  `ExportNote` — the user is told what was left out, the way credential
+  omission is reported today — rather than being dropped silently.
+- **Nested folders are nested tags.** Docs follow the tag that the existing
+  parent-nesting already produces; no new mapping.
+- **Import by path grouping invents folders** that never had docs. They import
+  with empty docs, which is correct and needs no special case.
+- **Round-trip is not lossless in one direction:** re-importing an exported
+  collection recreates docs from the descriptions, but a folder whose docs
+  were dropped by a flat export cannot come back. The export note is the only
+  honest answer.
+
+### Order of work
+
+1. Migration `0009`, `MIGRATIONS` count, and a schema test that the three
+   columns exist.
+2. Repository methods and their tests, including the regression test that
+   `save` leaves `docs_md` alone.
+3. `domain/services/docs.rs` with the cap, against mock repositories.
+4. Commands, DTO, TS types, TS service wrapper.
+5. `lib/markdown.ts` and `lib/markdown-format.ts` with their tests — pure,
+   highest coverage, written before the component that uses them.
+6. `DocsTab` in the store, `openDocs`, dirty handling, autosave.
+7. `DocsEditor`, toolbar, split view, context menu entry, shortcut.
+8. `Operation.description`, export mapping, export note for flat grouping.
+9. Import mapping for all three levels, plus the ignored-features tally.
+10. Component tests, then the full `verify.bat` / `release.bat` pass.
+
+### Tests
+
+- Rust: repository round-trip per level; cascade deletes docs; `save` does not
+  clobber; cap at and past the limit; export writes all three descriptions;
+  flat export raises the note; import reads all three back; export → import →
+  export is unchanged (the existing `export_then_import_then_export_changes_nothing`
+  test extended rather than duplicated).
+- TypeScript: `renderMarkdown` renders each construct the spec names, and
+  strips `<script>`, an `onerror` attribute, a `javascript:` href and a remote
+  image; `applyFormat` wraps, unwraps and handles an empty selection; the
+  store focuses an existing Docs tab rather than opening a second one, and
+  marks dirty and clean correctly.
+- Component: right-click → Docs opens a tab titled `Docs: <name>`; typing
+  `# Overview` and switching to Preview shows an `h1` — the spec's two
+  scenarios, as written.
+
+### Out of scope
+
+Docs on **examples** (the tree has them, the spec does not ask for them),
+image paste or attachment, docs search across a collection, and any export
+format other than OpenAPI.
+
+### Open question
+
+**Where an external link in the preview goes.** Intercepting the click is not
+optional, but opening the URL in the user's real browser needs a way to ask
+the OS, and this app has no opener today — `tauri-plugin-opener` or the `open`
+crate would be a new dependency, which is a decision for Zoran and not one to
+take quietly. Until it is settled the preview renders links as styled,
+non-navigating text with a copy-link affordance, which is safe and complete on
+its own.
+
+---
+
+### Phase 12 shipped — 2026-09-21
+
+Everything in the plan above is implemented and green in the cloud
+(`cargo fmt --check`, `clippy --all-targets -D warnings`, 410 + 14 + 59 Rust
+tests, `tsc --noEmit`, eslint, 295 vitest — up from 228). Still to run on
+Windows: `verify.bat`, then `release.bat`.
+
+**Two corrections to the plan, found by reading the code while implementing:**
+
+1. **"Flat export has nowhere to put folder docs" was wrong.** Grouping is an
+   *import* option; the exporter always emits one tag per folder, so folder
+   documentation always has a home and the `ExportNote` the plan proposed
+   cannot fire. It was not written.
+2. **The plan missed the preview's stylesheet.** `renderMarkdown` returns an
+   HTML string, and Tailwind's preflight strips headings, list markers and
+   table borders back to plain text — so the preview would have rendered as
+   undifferentiated prose. Styles live in `src/index.css` under
+   `@layer components`, written out rather than pulling in
+   `@tailwindcss/typography`: that plugin is a whole prose design system where
+   two dozen declarations were needed, and it would have been a third
+   dependency for the feature. Every colour is a theme token.
+
+**Two bugs the tests caught, worth recording because both were silent:**
+
+- `applyFormat`'s unwrap computed the wrong end offset, and its toggle
+  mistook `**bold**` for italic and stripped one asterisk from each end.
+  Both now have the longer-run guard and a test.
+- `openDocs` fetching while the user typed: the guard was "is it loaded",
+  which the keystroke did not change, so the arriving text overwrote the
+  draft. The rule is now that an unloaded tab is read-only — the editor
+  enforces it and the store enforces it again — so the stored text wins and
+  nothing is lost, because there was nowhere to type. Without this, a
+  keystroke landing first would have left a one-character draft that autosave
+  then wrote over documentation the user had never seen.
+
+**What is in the tree**
+
+Backend: migration `0009_item_docs.sql`; `persistence/repositories/docs.rs`
+(the two statements, with `DocsTable` as the closed enum that keeps the table
+name out of reach of any caller); `docs`/`set_docs` on the three existing
+repository traits; `domain/services/docs.rs` with `MAX_DOCS_BYTES` at 256 KB;
+`commands/docs.rs`; `Operation.description` added to the OpenAPI document;
+docs mapped into `info`, tags and operations on export and read back on
+import.
+
+Frontend: `lib/markdown.ts` (the one sanitising chokepoint),
+`lib/markdown-format.ts`, `lib/docs-title.ts`, `services/docs.ts`,
+`types/docs.ts`, `features/docs/` (editor, toolbar, preview), `DocsTab` in the
+tabs store with debounced autosave, a Docs entry in three context menus, and
+Ctrl/Cmd+Shift+D.
+
+**The open question is still open.** An external link in the preview renders
+as styled, non-navigating text and copies its URL on click. Opening it in the
+user's real browser still needs an opener dependency, which is Zoran's call.
+
+**New dependencies:** `marked` and `dompurify`, both zero-dependency. A
+`pnpm install` is needed before the first build on a machine that has not run
+one since — `verify.bat` does it first, so running that covers it.
+
+---
+
+**Verified on Windows 2026-09-21.** `verify.bat` green end to end: 411 + 14 +
+59 Rust tests (the 411th is the Windows-only webview test), 295 vitest,
+`clippy --all-targets -D warnings` and `cargo fmt --check` both clean, and the
+production `vite build` succeeds.
+
+**Lockfile churn, caused by this phase and worth knowing about.** The two new
+packages were added with `pnpm add` in the cloud container, which runs
+**pnpm 10.28.0**, while this machine runs **12.3.4**. The two resolve a
+lockfile differently, so committing the cloud's `pnpm-lock.yaml` moved two
+unrelated devDependencies *backwards* within their caret ranges —
+`autoprefixer` 10.6.1 to 10.6.0 and `prettier` 3.9.8 to 3.9.6. Both are
+dev-only and neither changes a byte of the shipped binary, but it is an
+unintended diff.
+
+The fix is one command on this machine, which re-resolves them under pnpm 12:
+
+```
+pnpm up autoprefixer prettier
+```
+
+**The lesson for later phases: add dependencies on the machine whose pnpm
+owns the lockfile.** A cloud `pnpm add` is fine for checking that something
+builds, but the lockfile it writes should not be the one that ships while the
+two pnpm majors disagree.
+
+**`release.bat` green the same day.** Both bundles built, and the
+static-link check reports **29 imported DLLs — unchanged from before this
+phase**. That is the number worth recording: `marked` and `dompurify` are pure
+JavaScript bundled into the frontend, so neither reaches the linker, and the
+single-binary guarantee (CLAUDE.md section 11 rule 2) is untouched by Phase 12.
+
+**Bundle cost of the renderer choice**, now that it is measurable rather than
+estimated: the main chunk went 298.80 kB to 388.32 kB raw, 88.91 kB to
+117.89 kB gzipped — about **29 kB gzipped** for `marked` plus `dompurify`.
+The stylesheet went 23.05 kB to 25.68 kB for the preview's rules. For
+comparison, the Monaco chunk this app already ships is 861 kB gzipped.
+
+---
+
+## The installer art still said "Responder" — fixed 2026-09-21
+
+The NSIS header and sidebar bitmaps were regenerated for the rename. What
+came out of that showed the rename had left a second, quieter problem behind.
+
+**The bitmaps were stale, and the script was not.** `tools/build-installer-art.py`
+was updated on 2026-09-18 to say `ResponderHTTP`; the `.bmp` files it writes
+were last generated on 2026-09-14 and never rebuilt, so every installer built
+since the rename has carried the old wordmark. Generated files that are also
+committed need the generator *run*, not merely edited — the edit is invisible
+until someone does.
+
+**Regenerating it revealed the real bug: `fit_text` only ever fitted height.**
+
+```python
+def fit_text(text, font_path, target_px):
+    """Largest size whose cap height fits target_px."""
+```
+
+At 150 px wide, "ResponderHTTP" set to the same cap height as "Responder" is
+about fifteen pixels too long, and the header's lockup is right-aligned — so
+the overflow pushed the badge clean off the left edge of the canvas. The first
+regenerated header had the new name and no icon. The sidebar, centred, did not
+clip but sat within three pixels of each edge.
+
+`fit_text` now takes an optional `max_width` and honours both dimensions,
+which is what a wordmark in a fixed-size bitmap has always needed. The header
+gives the text exactly the room left after its margins, the badge and the gap,
+and clamps the badge's position so it cannot leave the canvas whatever the
+name. The sidebar reserves a 14 px margin either side.
+
+**And the name now lives in one place.** `NAME = "ResponderHTTP"` at the top,
+where it was previously spelled out at each of the four sites that draw it —
+which is precisely why the rename could half-apply.
+
+Measured, before and after:
+
+| | before | after |
+|---|---|---|
+| Sidebar wordmark | 91 px wide, margins 37 / 36 | 134 px wide, margins 15 / 15 |
+| Header leftmost badge pixel | x = 23 | x = 10 (0 would mean clipped) |
+
+Both files are still `BM 24-bit BI_RGB` at exactly 150×57 and 164×314, the
+same byte count as the ones they replace — NSIS is particular about that and
+the format did not change.
+
+Only the three bitmaps that carry text were regenerated. `installer.ico`,
+`uninstaller.ico` and the six `tray-*.png` files are the badge alone, with no
+wordmark in them, so they had nothing stale to fix and rerunning the whole
+script would have churned eight binary files for nothing.
+
+**Verified inside the built installer, not just on disk.** A green
+`release.bat` proves only that `makensis` ran — it would have succeeded with
+the stale bitmaps too. So the setup.exe was opened as an archive
+(`7z x ResponderHTTP_1.0.0_x64-setup.exe '$PLUGINSDIR/*.bmp'`, which reads
+NSIS) and the two bitmaps it carries were compared against the two in the
+repository:
+
+```
+fdf8b2874e3ec82affa752b6589e8357  $PLUGINSDIR/modern-wizard.bmp   <- sidebar.bmp
+0d419c66f274b35837b65c0dae01ce3d  $PLUGINSDIR/modern-header.bmp   <- header.bmp
+```
+
+Both match byte for byte. (The archive listing shows the header as 31 454
+bytes, which is its *compressed* size; extracted it is the expected 25 818.)
+Worth remembering as the way to check any installer asset without installing
+anything.
+
+---
+
 ## Open decisions to confirm before the relevant phase starts
 
 - ~~Phase 5: variable resolution order if more than one tier (environment vs. global) is wanted.~~ Settled 2026-09-14: environments only, no global tier.

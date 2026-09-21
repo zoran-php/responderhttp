@@ -1,10 +1,9 @@
 // http_client/src/features/request-builder/TabBar.tsx
 //
-// Postman-style row of open tabs above the builder. Presentational:
 // App.tsx owns the confirm-before-closing-a-dirty-tab prompt, since that
 // needs the shared ConfirmDialog and knows what "dirty" means for a tab.
 import type { ReactNode } from "react";
-import { Layers, MessageSquare, Plus, X } from "lucide-react";
+import { FileText, Layers, MessageSquare, Plus, X } from "lucide-react";
 
 import { methodTextColor } from "@/lib/http-method-colors";
 import type { HttpMethod } from "@/types/http";
@@ -12,12 +11,20 @@ import type { HttpMethod } from "@/types/http";
 /**
  * Mirrors the tab union in the store. An environment tab has no method and
  * cannot be dirty — it saves explicitly — so those fields are absent rather
- * than optional.
+ * than optional. A docs tab autosaves, so its dot is lit only between a
+ * keystroke and the write landing, or when a write has failed.
  */
 export type TabBarTab =
   | { kind: "request"; id: string; label: string; method: HttpMethod; isDirty: boolean }
   | { kind: "environment"; id: string; label: string }
-  | { kind: "example"; id: string; label: string };
+  | { kind: "example"; id: string; label: string }
+  | { kind: "docs"; id: string; label: string; isDirty: boolean };
+
+/** Only two of the four kinds can be unsaved, so this asks rather than
+ * assuming the field is there. */
+function isDirty(tab: TabBarTab): boolean {
+  return "isDirty" in tab && tab.isDirty;
+}
 
 interface TabBarProps {
   tabs: TabBarTab[];
@@ -73,22 +80,28 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, trailing }
                 onClick={() => onSelect(tab.id)}
                 type="button"
               >
+                {/* Hoisted out of the per-kind branch below: two kinds of
+                    tab can be unsaved now, and the dot means the same thing
+                    on both. */}
+                {isDirty(tab) && (
+                  <span
+                    aria-hidden
+                    className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-current align-middle"
+                  />
+                )}
                 {tab.kind === "request" ? (
-                  <>
-                    {tab.isDirty && (
-                      <span
-                        aria-hidden
-                        className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-current align-middle"
-                      />
-                    )}
-                    <span
-                      className={`mr-1.5 shrink-0 font-mono text-xs font-semibold ${methodTextColor(tab.method)}`}
-                    >
-                      {tab.method}
-                    </span>
-                  </>
+                  <span
+                    className={`mr-1.5 shrink-0 font-mono text-xs font-semibold ${methodTextColor(tab.method)}`}
+                  >
+                    {tab.method}
+                  </span>
                 ) : tab.kind === "environment" ? (
                   <Layers aria-hidden className="mr-1.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                ) : tab.kind === "docs" ? (
+                  <FileText
+                    aria-hidden
+                    className="mr-1.5 h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                  />
                 ) : (
                   <MessageSquare
                     aria-hidden

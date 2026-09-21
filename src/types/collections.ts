@@ -29,8 +29,7 @@ export interface SavedRequest {
 }
 
 /**
- * A saved response kept under the request that produced it — Postman calls
- * these examples. Mirrors ExampleDto.
+ * A saved response kept under the request that produced it. Mirrors ExampleDto.
  *
  * `request` is the request **as sent**: already resolved, unlike SavedRequest
  * and HistoryEntry, which keep their {{placeholders}} so they can be re-run

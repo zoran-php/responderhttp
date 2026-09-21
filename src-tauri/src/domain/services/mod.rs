@@ -1,6 +1,7 @@
 // http_client/src-tauri/src/domain/services/mod.rs
 pub mod collections;
 pub mod cookies;
+pub mod docs;
 pub mod downloads;
 pub mod environments;
 pub mod history;

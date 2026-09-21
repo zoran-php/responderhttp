@@ -8,7 +8,7 @@ use crate::domain::error::AppError;
 
 /// Numbered, append-only. `PRAGMA user_version` records how many have run,
 /// so adding a migration means appending to this list and nothing else.
-const MIGRATIONS: [&str; 8] = [
+const MIGRATIONS: [&str; 9] = [
     include_str!("migrations/0001_initial.sql"),
     include_str!("migrations/0002_request_auth.sql"),
     include_str!("migrations/0003_environments.sql"),
@@ -17,6 +17,7 @@ const MIGRATIONS: [&str; 8] = [
     include_str!("migrations/0006_examples.sql"),
     include_str!("migrations/0007_secrets.sql"),
     include_str!("migrations/0008_app_settings.sql"),
+    include_str!("migrations/0009_item_docs.sql"),
 ];
 
 /// Shared handle to the SQLite file. rusqlite's Connection is not Sync, so a
@@ -122,6 +123,28 @@ mod tests {
         assert!(tables.contains(&"collections".to_string()));
         assert!(tables.contains(&"folders".to_string()));
         assert!(tables.contains(&"requests".to_string()));
+    }
+
+    /// Phase 12 added the column by ALTER TABLE on three shipped tables. A
+    /// migration that ran on one of them and not the others would leave the
+    /// docs repository reading a column that is not there, so all three are
+    /// asserted rather than one standing in for the rest.
+    #[test]
+    fn every_documentable_item_has_a_docs_column() {
+        let database = Database::open_in_memory().expect("should open");
+        let guard = database.lock();
+
+        for table in ["collections", "folders", "requests"] {
+            let count: i64 = guard
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info(?1) WHERE name = 'docs_md'",
+                    [table],
+                    |row| row.get(0),
+                )
+                .expect("should read the table's columns");
+
+            assert_eq!(count, 1, "{table} should have a docs_md column");
+        }
     }
 
     #[test]

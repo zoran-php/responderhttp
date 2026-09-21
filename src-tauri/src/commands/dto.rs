@@ -16,6 +16,7 @@ use crate::domain::models::{
 };
 use crate::domain::secrets::SecretState;
 use crate::domain::services::collections::CollectionContents;
+use crate::domain::services::docs::DocsTarget;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -813,4 +814,27 @@ pub struct DownloadResultDto {
 pub struct OpenApiExportResultDto {
     pub saved_to: Option<String>,
     pub notes: Vec<String>,
+}
+
+/// Which item a Docs tab is for (PLAN.md Phase 12).
+///
+/// A tagged enum rather than a bare string, so an unknown kind is a
+/// deserialisation failure at the boundary rather than a not-found several
+/// layers in. serde's lowercase rename matches what TypeScript writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DocsTargetKind {
+    Collection,
+    Folder,
+    Request,
+}
+
+impl From<DocsTargetKind> for DocsTarget {
+    fn from(kind: DocsTargetKind) -> Self {
+        match kind {
+            DocsTargetKind::Collection => Self::Collection,
+            DocsTargetKind::Folder => Self::Folder,
+            DocsTargetKind::Request => Self::Request,
+        }
+    }
 }

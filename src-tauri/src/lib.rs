@@ -20,6 +20,7 @@ use crate::desktop::{toast, tray, webview, window};
 use crate::domain::ports::{CookieRepository, HttpClient};
 use crate::domain::services::collections::Collections;
 use crate::domain::services::cookies::Cookies;
+use crate::domain::services::docs::Docs;
 use crate::domain::services::downloads::Downloads;
 use crate::domain::services::environments::Environments;
 use crate::domain::services::history::History;
@@ -61,6 +62,7 @@ pub struct AppState {
     pub history: History,
     pub downloads: Downloads,
     pub openapi: OpenApiExport,
+    pub docs: Docs,
     /// Read by the window close handler (desktop/window.rs), not by a
     /// command: nothing in the frontend needs it.
     pub tray_notice: TrayNotice,
@@ -249,6 +251,14 @@ pub fn run() -> Result<(), StartupError> {
                     )),
                     Arc::new(SqliteExampleRepository::new(database.clone())),
                 ),
+                docs: Docs::new(
+                    Arc::new(SqliteCollectionRepository::new(database.clone())),
+                    Arc::new(SqliteFolderRepository::new(database.clone())),
+                    Arc::new(SqliteSavedRequestRepository::new(
+                        database.clone(),
+                        cipher.clone(),
+                    )),
+                ),
                 tray_notice: TrayNotice::new(Arc::new(SqliteAppSettingsRepository::new(
                     database.clone(),
                 ))),
@@ -300,7 +310,9 @@ pub fn run() -> Result<(), StartupError> {
             commands::openapi_import::pick_openapi_import,
             commands::openapi_import::preview_openapi_import,
             commands::openapi_import::import_openapi,
-            commands::openapi_import::discard_openapi_import
+            commands::openapi_import::discard_openapi_import,
+            commands::docs::item_docs,
+            commands::docs::set_item_docs
         ])
         .run(tauri::generate_context!())?;
 

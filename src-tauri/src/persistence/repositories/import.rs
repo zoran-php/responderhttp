@@ -6,6 +6,8 @@
 // saved one. If anything fails, nothing is kept.
 use std::sync::Arc;
 
+use rusqlite::Connection;
+
 use crate::domain::error::AppError;
 use crate::domain::ids::new_id;
 use crate::domain::import_plan::{ImportPlan, ImportedIds};
@@ -14,6 +16,7 @@ use crate::domain::ports::{ImportRepository, SecretCipher};
 use crate::domain::secrets::SecretState;
 use crate::persistence::database::{to_storage_error, Database};
 use crate::persistence::repositories::collections::insert_collection;
+use crate::persistence::repositories::docs::{write_docs, DocsTable};
 use crate::persistence::repositories::environments::{
     insert_environment, insert_variables, prepare_variables,
 };
@@ -81,8 +84,19 @@ impl ImportRepository for SqliteImportRepository {
         let transaction = guard.transaction().map_err(to_storage_error)?;
 
         insert_collection(&transaction, &collection, &now)?;
-        for folder in &folders {
+        // Written after the insert rather than as part of it: the two insert
+        // helpers are shared with the create paths, which have no
+        // documentation to write, and widening them would mean every caller
+        // passing an empty string (PLAN.md Phase 12).
+        write_docs_if_any(
+            &transaction,
+            DocsTable::Collections,
+            &collection.id,
+            &plan.collection_docs,
+        )?;
+        for (folder, planned) in folders.iter().zip(&plan.folders) {
             insert_folder(&transaction, folder, &now)?;
+            write_docs_if_any(&transaction, DocsTable::Folders, &folder.id, &planned.docs)?;
         }
         for planned in &plan.requests {
             let folder_id = match planned.folder {
@@ -100,6 +114,7 @@ impl ImportRepository for SqliteImportRepository {
                 secret_state: SecretState::Ok,
             };
             upsert_request(&transaction, &saved, self.cipher.as_ref(), &now)?;
+            write_docs_if_any(&transaction, DocsTable::Requests, &saved.id, &planned.docs)?;
             for example in &planned.examples {
                 let new_example = NewExample {
                     request_id: saved.id.clone(),
@@ -123,4 +138,21 @@ impl ImportRepository for SqliteImportRepository {
             environment_id: environment.map(|(environment, _)| environment.id),
         })
     }
+}
+
+/// Writes documentation only when there is some.
+///
+/// The column already defaults to empty, so an UPDATE for every undocumented
+/// item would be a statement per row to write what is already there — and an
+/// import is the one path that creates hundreds of rows at once.
+fn write_docs_if_any(
+    connection: &Connection,
+    table: DocsTable,
+    id: &str,
+    docs: &str,
+) -> Result<(), AppError> {
+    if docs.is_empty() {
+        return Ok(());
+    }
+    write_docs(connection, table, id, docs)
 }

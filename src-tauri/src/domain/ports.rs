@@ -33,6 +33,11 @@ pub trait CollectionRepository: Send + Sync {
     fn rename(&self, id: &str, name: &str) -> Result<(), AppError>;
     /// Cascades to the collection's folders and requests.
     fn delete(&self, id: &str) -> Result<(), AppError>;
+    /// This item's Markdown documentation, empty when it has none
+    /// (PLAN.md Phase 12).
+    fn docs(&self, id: &str) -> Result<String, AppError>;
+    /// Replaces this item's Markdown documentation.
+    fn set_docs(&self, id: &str, markdown: &str) -> Result<(), AppError>;
 }
 
 pub trait FolderRepository: Send + Sync {
@@ -45,6 +50,11 @@ pub trait FolderRepository: Send + Sync {
     ) -> Result<Folder, AppError>;
     fn rename(&self, id: &str, name: &str) -> Result<(), AppError>;
     fn delete(&self, id: &str) -> Result<(), AppError>;
+    /// This item's Markdown documentation, empty when it has none
+    /// (PLAN.md Phase 12).
+    fn docs(&self, id: &str) -> Result<String, AppError>;
+    /// Replaces this item's Markdown documentation.
+    fn set_docs(&self, id: &str, markdown: &str) -> Result<(), AppError>;
 }
 
 pub trait CookieRepository: Send + Sync {
@@ -86,6 +96,11 @@ pub trait SavedRequestRepository: Send + Sync {
     /// `folder_id` of None moves the request to the collection root.
     fn move_to(&self, id: &str, folder_id: Option<&str>) -> Result<(), AppError>;
     fn delete(&self, id: &str) -> Result<(), AppError>;
+    /// This item's Markdown documentation, empty when it has none
+    /// (PLAN.md Phase 12).
+    fn docs(&self, id: &str) -> Result<String, AppError>;
+    /// Replaces this item's Markdown documentation.
+    fn set_docs(&self, id: &str, markdown: &str) -> Result<(), AppError>;
 }
 
 /// Sent-request history. The repository owns trimming so the table stays

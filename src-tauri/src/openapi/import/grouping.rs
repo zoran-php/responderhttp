@@ -54,6 +54,9 @@ pub struct Placement<'a> {
 pub struct DeclaredTag<'a> {
     pub name: &'a str,
     pub parent: Option<&'a str>,
+    /// The tag's own prose, which becomes the folder's documentation
+    /// (PLAN.md Phase 12).
+    pub description: Option<&'a str>,
 }
 
 /// The folders to create and, per operation, the folder it goes into.
@@ -114,6 +117,7 @@ pub fn declared_tags(document: &Value) -> Vec<DeclaredTag<'_>> {
                     Some(DeclaredTag {
                         name: tag.get("name")?.as_str()?,
                         parent: tag.get("parent").and_then(Value::as_str),
+                        description: tag.get("description").and_then(Value::as_str),
                     })
                 })
                 .collect()
@@ -125,10 +129,16 @@ fn by_tags(placements: &[Placement<'_>], declared: &[DeclaredTag<'_>]) -> Arrang
     // Declared order first, then the order undeclared tags first appear in.
     let mut order: Vec<&str> = Vec::new();
     let mut parents: BTreeMap<&str, Option<&str>> = BTreeMap::new();
+    // Only declared tags have a description to carry. A tag used on an
+    // operation but never declared has a name and nothing else.
+    let mut descriptions: BTreeMap<&str, &str> = BTreeMap::new();
     for tag in declared {
         if !parents.contains_key(tag.name) {
             order.push(tag.name);
             parents.insert(tag.name, tag.parent);
+            if let Some(description) = tag.description {
+                descriptions.insert(tag.name, description);
+            }
         }
     }
     for placement in placements {
@@ -143,7 +153,13 @@ fn by_tags(placements: &[Placement<'_>], declared: &[DeclaredTag<'_>]) -> Arrang
     let mut arrangement = Arrangement::default();
     let mut index_of: BTreeMap<&str, usize> = BTreeMap::new();
     for name in &order {
-        ensure_tag_folder(name, &parents, &mut index_of, &mut arrangement);
+        ensure_tag_folder(
+            name,
+            &parents,
+            &descriptions,
+            &mut index_of,
+            &mut arrangement,
+        );
     }
     arrangement.assignment = placements
         .iter()
@@ -162,6 +178,7 @@ fn by_tags(placements: &[Placement<'_>], declared: &[DeclaredTag<'_>]) -> Arrang
 fn ensure_tag_folder<'a>(
     name: &'a str,
     parents: &BTreeMap<&'a str, Option<&'a str>>,
+    descriptions: &BTreeMap<&'a str, &'a str>,
     index_of: &mut BTreeMap<&'a str, usize>,
     arrangement: &mut Arrangement,
 ) -> usize {
@@ -169,9 +186,8 @@ fn ensure_tag_folder<'a>(
         return *index;
     }
     let parent = match nestable_parent(name, parents) {
-        Ok(parent) => {
-            parent.map(|parent| ensure_tag_folder(parent, parents, index_of, arrangement))
-        }
+        Ok(parent) => parent
+            .map(|parent| ensure_tag_folder(parent, parents, descriptions, index_of, arrangement)),
         Err(()) => {
             arrangement.unnested_tags.push(name.to_string());
             None
@@ -181,6 +197,11 @@ fn ensure_tag_folder<'a>(
     arrangement.folders.push(PlannedFolder {
         name: name.to_string(),
         parent,
+        docs: descriptions
+            .get(name)
+            .copied()
+            .unwrap_or_default()
+            .to_string(),
     });
     index_of.insert(name, index);
     index
@@ -262,7 +283,13 @@ fn emit(nodes: &[Node], start: usize, parent: Option<usize>, arrangement: &mut A
     }
 
     let index = arrangement.folders.len();
-    arrangement.folders.push(PlannedFolder { name, parent });
+    // A folder invented from a path segment documents nothing: the segment
+    // is a routing detail, not prose anyone wrote.
+    arrangement.folders.push(PlannedFolder {
+        name,
+        parent,
+        docs: String::new(),
+    });
     for &operation in &nodes[current].operations {
         arrangement.assignment[operation] = Some(index);
     }
@@ -296,6 +323,7 @@ mod tests {
         PlannedFolder {
             name: name.into(),
             parent,
+            docs: String::new(),
         }
     }
 
@@ -311,14 +339,17 @@ mod tests {
             DeclaredTag {
                 name: "alpha",
                 parent: None,
+                description: None,
             },
             DeclaredTag {
                 name: "beta",
                 parent: None,
+                description: None,
             },
             DeclaredTag {
                 name: "unused",
                 parent: None,
+                description: None,
             },
         ];
 
@@ -346,14 +377,17 @@ mod tests {
             DeclaredTag {
                 name: "child",
                 parent: Some("middle"),
+                description: None,
             },
             DeclaredTag {
                 name: "middle",
                 parent: Some("top"),
+                description: None,
             },
             DeclaredTag {
                 name: "top",
                 parent: None,
+                description: None,
             },
         ];
 
@@ -377,18 +411,22 @@ mod tests {
             DeclaredTag {
                 name: "a",
                 parent: Some("b"),
+                description: None,
             },
             DeclaredTag {
                 name: "b",
                 parent: Some("a"),
+                description: None,
             },
             DeclaredTag {
                 name: "c",
                 parent: Some("missing"),
+                description: None,
             },
             DeclaredTag {
                 name: "d",
                 parent: Some("d"),
+                description: None,
             },
         ];
 

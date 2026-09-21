@@ -8,6 +8,7 @@ import { CollectionsSidebar } from "@/features/collections/CollectionsSidebar";
 import { EnvironmentsPanel } from "@/features/environments/EnvironmentsPanel";
 import { HistoryPanel } from "@/features/history/HistoryPanel";
 import type { SavedRequest } from "@/types/collections";
+import type { DocsTarget } from "@/types/docs";
 import type { SendRequestInput } from "@/types/http";
 
 const PANELS = ["Collections", "Environments", "History"] as const;
@@ -22,6 +23,7 @@ interface SidebarProps {
   onOpenEnvironment: (environmentId: string) => void;
   onOpenExample: (exampleId: string) => void;
   onOpenHistoryEntry: (request: SendRequestInput) => void;
+  onOpenDocs: (target: DocsTarget) => void;
 }
 
 export function Sidebar({
@@ -31,6 +33,7 @@ export function Sidebar({
   onOpenEnvironment,
   onOpenExample,
   onOpenHistoryEntry,
+  onOpenDocs,
 }: SidebarProps) {
   const [panel, setPanel] = useState<Panel>("Collections");
 
@@ -57,6 +60,7 @@ export function Sidebar({
       {panel === "Collections" && (
         <CollectionsSidebar
           loadedRequestId={loadedRequestId}
+          onOpenDocs={onOpenDocs}
           onOpenExample={onOpenExample}
           onOpenRequest={onOpenRequest}
         />

@@ -188,6 +188,11 @@ pub struct Operation {
     pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
+    /// The request's own documentation (PLAN.md Phase 12). `summary` keeps
+    /// carrying the request's name; this is the prose under it, and the spec
+    /// says it may be Markdown, which is exactly what we store.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_id: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]

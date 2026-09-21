@@ -1,7 +1,7 @@
 // http_client/src/lib/shortcuts.test.ts
 import { describe, expect, it } from "vitest";
 
-import { matchesSaveShortcut, type ShortcutEvent } from "@/lib/shortcuts";
+import { matchesDocsShortcut, matchesSaveShortcut, type ShortcutEvent } from "@/lib/shortcuts";
 
 function press(overrides: Partial<ShortcutEvent>): ShortcutEvent {
   return {
@@ -48,5 +48,42 @@ describe("matchesSaveShortcut", () => {
 
   it("ignores the modifier on another key", () => {
     expect(matchesSaveShortcut(press({ ctrlKey: true, key: "a" }))).toBe(false);
+  });
+});
+
+describe("matchesDocsShortcut", () => {
+  const docs = {
+    key: "d",
+    ctrlKey: true,
+    metaKey: false,
+    altKey: false,
+    shiftKey: true,
+    repeat: false,
+  };
+
+  it("matches Ctrl+Shift+D and Cmd+Shift+D", () => {
+    expect(matchesDocsShortcut(docs)).toBe(true);
+    expect(matchesDocsShortcut({ ...docs, ctrlKey: false, metaKey: true })).toBe(true);
+  });
+
+  /** Ctrl+D is the browser's bookmark chord; this must not answer to it. */
+  it("requires shift rather than tolerating it", () => {
+    expect(matchesDocsShortcut({ ...docs, shiftKey: false })).toBe(false);
+  });
+
+  it("refuses alt, both modifiers at once, and neither", () => {
+    expect(matchesDocsShortcut({ ...docs, altKey: true })).toBe(false);
+    expect(matchesDocsShortcut({ ...docs, metaKey: true })).toBe(false);
+    expect(matchesDocsShortcut({ ...docs, ctrlKey: false })).toBe(false);
+  });
+
+  it("ignores a held key and another letter", () => {
+    expect(matchesDocsShortcut({ ...docs, repeat: true })).toBe(false);
+    expect(matchesDocsShortcut({ ...docs, key: "s" })).toBe(false);
+  });
+
+  /** CapsLock reports an uppercase key. */
+  it("matches whatever the case", () => {
+    expect(matchesDocsShortcut({ ...docs, key: "D" })).toBe(true);
   });
 });

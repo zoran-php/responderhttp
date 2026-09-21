@@ -5,7 +5,7 @@
 // here as local state; persistence goes through store/collections-store.ts,
 // the only thing that calls services/collections.ts for this feature.
 import { useEffect, useState, type MouseEvent } from "react";
-import { ChevronDown, ChevronRight, FileInput, FolderPlus, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, FileInput, FileText, FolderPlus, Plus } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CollectionTreeNode } from "@/features/collections/CollectionTreeNode";
@@ -24,12 +24,14 @@ import { buildFolderTree } from "@/lib/collection-tree";
 import { useCollectionsStore } from "@/store/collections-store";
 import { useEnvironmentsStore } from "@/store/environments-store";
 import type { SavedRequest } from "@/types/collections";
+import type { DocsTarget } from "@/types/docs";
 import type { OpenApiImportResult } from "@/types/openapi-import";
 
 interface CollectionsSidebarProps {
   loadedRequestId: string | null;
   onOpenRequest: (request: SavedRequest) => void;
   onOpenExample: (exampleId: string) => void;
+  onOpenDocs: (target: DocsTarget) => void;
 }
 
 interface MenuState {
@@ -71,6 +73,7 @@ export function CollectionsSidebar({
   loadedRequestId,
   onOpenRequest,
   onOpenExample,
+  onOpenDocs,
 }: CollectionsSidebarProps) {
   const store = useCollectionsStore();
   // Selected separately from `store` above: useCollectionsStore() with no
@@ -118,7 +121,12 @@ export function CollectionsSidebar({
     }
   }
 
-  async function handleCommitRename(kind: TreeKind, id: string, name: string, collectionId: string) {
+  async function handleCommitRename(
+    kind: TreeKind,
+    id: string,
+    name: string,
+    collectionId: string,
+  ) {
     setRenaming(null);
     if (kind === "collection") {
       await store.renameCollection(id, name);
@@ -206,15 +214,24 @@ export function CollectionsSidebar({
         },
         { label: "Rename", onSelect: () => setRenaming({ kind: "collection", id: target.id }) },
         {
+          label: "Docs",
+          icon: FileText,
+          onSelect: () => onOpenDocs({ kind: "collection", id: target.id }),
+        },
+        {
           label: "Export as OpenAPI",
-          onSelect: () =>
-            setExportTarget({ collectionId: target.id, collectionName: target.name }),
+          onSelect: () => setExportTarget({ collectionId: target.id, collectionName: target.name }),
         },
         {
           label: "Delete",
           destructive: true,
           onSelect: () =>
-            setDeleteTarget({ kind: "collection", id: target.id, collectionId: target.id, name: target.name }),
+            setDeleteTarget({
+              kind: "collection",
+              id: target.id,
+              collectionId: target.id,
+              name: target.name,
+            }),
         },
       ];
     }
@@ -237,6 +254,11 @@ export function CollectionsSidebar({
           },
         },
         { label: "Rename", onSelect: () => setRenaming({ kind: "folder", id: target.id }) },
+        {
+          label: "Docs",
+          icon: FileText,
+          onSelect: () => onOpenDocs({ kind: "folder", id: target.id }),
+        },
         {
           label: "Delete",
           destructive: true,
@@ -269,6 +291,11 @@ export function CollectionsSidebar({
     return [
       { label: "Rename", onSelect: () => setRenaming({ kind: "request", id: target.id }) },
       {
+        label: "Docs",
+        icon: FileText,
+        onSelect: () => onOpenDocs({ kind: "request", id: target.id }),
+      },
+      {
         label: "Duplicate",
         onSelect: () => void handleDuplicateRequest(target.id, target.collectionId, target.name),
       },
@@ -296,7 +323,10 @@ export function CollectionsSidebar({
     ];
   }
 
-  function buildCtx(collectionId: string, examplesByRequestId: TreeContext["examplesByRequestId"]): TreeContext {
+  function buildCtx(
+    collectionId: string,
+    examplesByRequestId: TreeContext["examplesByRequestId"],
+  ): TreeContext {
     return {
       expandedFolderIds: store.expandedFolderIds,
       onToggleFolder: store.toggleFolder,
@@ -391,7 +421,9 @@ export function CollectionsSidebar({
                 }}
               >
                 <button
-                  aria-label={isExpanded ? `Collapse ${collection.name}` : `Expand ${collection.name}`}
+                  aria-label={
+                    isExpanded ? `Collapse ${collection.name}` : `Expand ${collection.name}`
+                  }
                   className="shrink-0 text-muted-foreground"
                   onClick={() => store.toggleCollection(collection.id)}
                   type="button"
@@ -446,7 +478,12 @@ export function CollectionsSidebar({
       </div>
 
       {menu && (
-        <ContextMenu items={menuItems(menu.target)} onClose={() => setMenu(null)} x={menu.x} y={menu.y} />
+        <ContextMenu
+          items={menuItems(menu.target)}
+          onClose={() => setMenu(null)}
+          x={menu.x}
+          y={menu.y}
+        />
       )}
 
       {deleteTarget && (

@@ -23,6 +23,11 @@ from PIL import Image, ImageDraw, ImageFont
 # lookalike that drifts the moment either one is retouched.
 SRC = "src-tauri/icons/icon.png"
 OUT = "src-tauri/icons"
+
+# The wordmark, in one place. It used to be spelled out at each of the four
+# sites that draw it, which is why the 2026-09-18 rename left the shipped
+# bitmaps reading "Responder" while the script said otherwise.
+NAME = "ResponderHTTP"
 POPPINS_BOLD = "/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf"
 POPPINS_MED = "/usr/share/fonts/truetype/google-fonts/Poppins-Medium.ttf"
 
@@ -112,13 +117,22 @@ def _unused_write_ico(path, muted=False):
     return path
 
 
-def fit_text(text, font_path, target_px):
-    """Largest size whose cap height fits target_px."""
+def fit_text(text, font_path, target_px, max_width=None):
+    """Largest size whose cap height fits target_px and whose drawn width fits
+    max_width, when one is given.
+
+    Height alone was the only constraint until the app was renamed: at 150 px
+    wide, "ResponderHTTP" set to the same cap height as "Responder" pushed the
+    badge clean off the left edge of the header. A wordmark has two
+    dimensions, and a bitmap of a fixed size has to honour both.
+    """
     size = target_px
     while size > 4:
         f = ImageFont.truetype(font_path, size)
         box = f.getbbox(text)
-        if (box[3] - box[1]) <= target_px:
+        fits_height = (box[3] - box[1]) <= target_px
+        fits_width = max_width is None or (box[2] - box[0]) <= max_width
+        if fits_height and fits_width:
             return f
         size -= 1
     return ImageFont.truetype(font_path, 6)
@@ -131,14 +145,19 @@ def header(path, muted=False, with_wordmark=True):
     im = Image.new("RGB", (W * SS, H * SS), (255, 255, 255))
     b = badge(40 * SS, glyph_colour=UNINSTALL_GLYPH if muted else FROST,
               bg=((88, 94, 108), (58, 63, 74)) if muted else (BG_TOP, BG_BOTTOM))
-    right = W * SS - 9 * SS
+    margin, gap = 9 * SS, 8 * SS
+    right = W * SS - margin
     if with_wordmark:
-        font = fit_text("ResponderHTTP", POPPINS_BOLD, 13 * SS)
-        tw = font.getbbox("ResponderHTTP")[2] - font.getbbox("ResponderHTTP")[0]
-        bx = right - tw - 8 * SS - b.width
+        # The lockup is right-aligned, so the text is given exactly the room
+        # left over after the margins, the badge and the gap — and no more.
+        font = fit_text(NAME, POPPINS_BOLD, 13 * SS,
+                        max_width=right - margin - b.width - gap)
+        box = font.getbbox(NAME)
+        tw = box[2] - box[0]
+        bx = max(margin, right - tw - gap - b.width)
         im.paste(b, (bx, (H * SS - b.height) // 2), b)
         d = ImageDraw.Draw(im)
-        d.text((bx + b.width + 8 * SS, H * SS // 2), "ResponderHTTP",
+        d.text((bx + b.width + gap, H * SS // 2), NAME,
                font=font, fill=MUTED if muted else INK, anchor="lm")
     else:
         im.paste(b, (right - b.width, (H * SS - b.height) // 2), b)
@@ -152,8 +171,10 @@ def sidebar(path):
     b = badge(72 * SS)
     im.paste(b, ((W * SS - b.width) // 2, 74 * SS), b)
     d = ImageDraw.Draw(im)
-    font = fit_text("ResponderHTTP", POPPINS_BOLD, 17 * SS)
-    d.text((W * SS // 2, 172 * SS), "ResponderHTTP", font=font, fill=(236, 239, 244), anchor="mt")
+    # Centred, so it needs a margin on both sides rather than just room to
+    # exist: without one the longer name sat within three pixels of each edge.
+    font = fit_text(NAME, POPPINS_BOLD, 17 * SS, max_width=(W - 28) * SS)
+    d.text((W * SS // 2, 172 * SS), NAME, font=font, fill=(236, 239, 244), anchor="mt")
     d.line([(W * SS // 2 - 22 * SS, 200 * SS), (W * SS // 2 + 22 * SS, 200 * SS)],
            fill=FROST, width=max(1, SS))
     small = fit_text("API client", POPPINS_MED, 9 * SS)

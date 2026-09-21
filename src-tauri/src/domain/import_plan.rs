@@ -9,6 +9,9 @@ use crate::domain::models::{EnvironmentVariable, HttpRequest, KeyValue};
 #[derive(Debug, Clone)]
 pub struct ImportPlan {
     pub collection_name: String,
+    /// The document's `info.description`, kept as the collection's
+    /// documentation (PLAN.md Phase 12). Empty when the document had none.
+    pub collection_docs: String,
     /// Parents always come before their children, so the folders can be
     /// written in order.
     pub folders: Vec<PlannedFolder>,
@@ -21,11 +24,19 @@ pub struct PlannedFolder {
     pub name: String,
     /// Index into `ImportPlan::folders`, always lower than this folder's own.
     pub parent: Option<usize>,
+    /// The tag's `description`, when this folder came from a declared tag.
+    /// Folders invented from paths have none, because a path has nothing to
+    /// say about itself.
+    pub docs: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct PlannedRequest {
     pub name: String,
+    /// The operation's `description`. Until Phase 12 this was read and
+    /// discarded; it is the documentation every imported specification was
+    /// throwing away.
+    pub docs: String,
     /// Index into `ImportPlan::folders`; None is the collection root.
     pub folder: Option<usize>,
     pub request: HttpRequest,

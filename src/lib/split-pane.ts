@@ -40,6 +40,16 @@ export const MIN_SIDEBAR_WIDTH = 256;
  */
 export const MIN_BUILDER_WIDTH = 640;
 
+/** Half a typical window: the documentation split opens even. */
+export const DEFAULT_DOCS_EDITOR_WIDTH = 520;
+
+/**
+ * Narrower than this and Markdown stops being editable — a fenced block or a
+ * table wraps at every second word. The same floor serves the preview, which
+ * has the same problem for the same reason.
+ */
+export const MIN_DOCS_PANE_WIDTH = 280;
+
 export interface PaneBounds {
   /**
    * Distance from the start of the pane being sized to the end of the area the

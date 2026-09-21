@@ -11,7 +11,11 @@
 // which is what every editor with a split view does.
 import { create } from "zustand";
 
-import { DEFAULT_BUILDER_PANEL_HEIGHT, DEFAULT_SIDEBAR_WIDTH } from "@/lib/split-pane";
+import {
+  DEFAULT_BUILDER_PANEL_HEIGHT,
+  DEFAULT_DOCS_EDITOR_WIDTH,
+  DEFAULT_SIDEBAR_WIDTH,
+} from "@/lib/split-pane";
 
 interface LayoutState {
   /** Height in pixels of the Params/Auth/Headers/Body/Settings panel. */
@@ -20,11 +24,16 @@ interface LayoutState {
   sidebarWidth: number;
   sidebarCollapsed: boolean;
   responseCollapsed: boolean;
+  /** Width in pixels of the editor half of a Docs tab's split view. Global
+   * like the others: dragging it on one Docs tab moves it on all of them. */
+  docsEditorWidth: number;
 
   setBuilderPanelHeight: (height: number) => void;
   resetBuilderPanelHeight: () => void;
   setSidebarWidth: (width: number) => void;
   resetSidebarWidth: () => void;
+  setDocsEditorWidth: (width: number) => void;
+  resetDocsEditorWidth: () => void;
   toggleSidebar: () => void;
   toggleResponse: () => void;
 }
@@ -34,11 +43,14 @@ export const useLayoutStore = create<LayoutState>((set) => ({
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   sidebarCollapsed: false,
   responseCollapsed: false,
+  docsEditorWidth: DEFAULT_DOCS_EDITOR_WIDTH,
 
   setBuilderPanelHeight: (builderPanelHeight) => set({ builderPanelHeight }),
   resetBuilderPanelHeight: () => set({ builderPanelHeight: DEFAULT_BUILDER_PANEL_HEIGHT }),
   setSidebarWidth: (sidebarWidth) => set({ sidebarWidth }),
   resetSidebarWidth: () => set({ sidebarWidth: DEFAULT_SIDEBAR_WIDTH }),
+  setDocsEditorWidth: (docsEditorWidth) => set({ docsEditorWidth }),
+  resetDocsEditorWidth: () => set({ docsEditorWidth: DEFAULT_DOCS_EDITOR_WIDTH }),
 
   // Collapsing keeps the dragged width rather than resetting it, so restoring
   // puts the pane back where the user left it — the whole point of a collapse

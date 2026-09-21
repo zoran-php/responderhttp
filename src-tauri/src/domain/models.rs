@@ -168,7 +168,7 @@ pub enum HttpVersionPreference {
 }
 
 /// Lowest TLS version to accept. rustls supports 1.2 and 1.3 and nothing
-/// older, so unlike Postman's "protocols disabled during handshake" there is
+/// older, so there is
 /// no TLS 1.0 or 1.1 here to switch off — the floor is already 1.2.
 /// `Auto` leaves libcurl's own default alone rather than asserting one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -424,7 +424,7 @@ pub struct NewHistoryEntry {
     pub request: HttpRequest,
 }
 
-/// A named response saved under a request — Postman calls these examples.
+/// A named response saved under a request.
 /// It carries the request snapshot that produced it, so several examples
 /// under one request (a success, a 404, a validation error) each say which
 /// inputs got there.

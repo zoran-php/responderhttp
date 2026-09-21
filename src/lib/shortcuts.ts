@@ -38,3 +38,22 @@ export function matchesSaveShortcut(event: ShortcutEvent): boolean {
   // Lowercased because CapsLock reports "S".
   return event.key.toLowerCase() === "s";
 }
+
+/**
+ * Ctrl+Shift+D on Windows and Linux, Cmd+Shift+D on macOS: open the selected
+ * item's documentation (PLAN.md Phase 12).
+ *
+ * Shift is required rather than tolerated, for the same reason
+ * `matchesSaveShortcut` refuses it: Ctrl+D is the browser's bookmark chord
+ * and a plain Ctrl+D reaching this would be a shortcut firing when nobody
+ * asked it to.
+ */
+export function matchesDocsShortcut(event: ShortcutEvent): boolean {
+  if (event.repeat || event.altKey || !event.shiftKey) {
+    return false;
+  }
+  if (event.ctrlKey === event.metaKey) {
+    return false;
+  }
+  return event.key.toLowerCase() === "d";
+}

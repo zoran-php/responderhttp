@@ -9,6 +9,7 @@ use crate::domain::models::{HttpMethod, HttpRequest, SavedRequest};
 use crate::domain::ports::{SavedRequestRepository, SecretCipher};
 use crate::persistence::database::{to_storage_error, Database};
 use crate::persistence::repositories::collections::missing_if_zero;
+use crate::persistence::repositories::docs::{read_docs, write_docs, DocsTable};
 use crate::persistence::repositories::json::{self, SecretRead, SecretWrite};
 
 /// The table name as it appears in a sealed secret's scope.
@@ -106,6 +107,16 @@ impl SavedRequestRepository for SqliteSavedRequestRepository {
             .execute("DELETE FROM requests WHERE id = ?1", params![id])
             .map_err(to_storage_error)?;
         missing_if_zero(changed, id, "request")
+    }
+
+    fn docs(&self, id: &str) -> Result<String, AppError> {
+        let guard = self.database.lock();
+        read_docs(&guard, DocsTable::Requests, id)
+    }
+
+    fn set_docs(&self, id: &str, markdown: &str) -> Result<(), AppError> {
+        let guard = self.database.lock();
+        write_docs(&guard, DocsTable::Requests, id, markdown)
     }
 }
 

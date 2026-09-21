@@ -211,6 +211,12 @@ mod tests {
         fn delete(&self, _id: &str) -> Result<(), AppError> {
             Ok(())
         }
+        fn docs(&self, _id: &str) -> Result<String, AppError> {
+            Ok(String::new())
+        }
+        fn set_docs(&self, _id: &str, _markdown: &str) -> Result<(), AppError> {
+            Ok(())
+        }
     }
 
     #[derive(Default)]
@@ -237,6 +243,12 @@ mod tests {
             Ok(())
         }
         fn delete(&self, _id: &str) -> Result<(), AppError> {
+            Ok(())
+        }
+        fn docs(&self, _id: &str) -> Result<String, AppError> {
+            Ok(String::new())
+        }
+        fn set_docs(&self, _id: &str, _markdown: &str) -> Result<(), AppError> {
             Ok(())
         }
     }
@@ -267,6 +279,12 @@ mod tests {
             Ok(())
         }
         fn delete(&self, _id: &str) -> Result<(), AppError> {
+            Ok(())
+        }
+        fn docs(&self, _id: &str) -> Result<String, AppError> {
+            Ok(String::new())
+        }
+        fn set_docs(&self, _id: &str, _markdown: &str) -> Result<(), AppError> {
             Ok(())
         }
     }

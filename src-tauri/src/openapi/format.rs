@@ -301,6 +301,7 @@ mod tests {
                 get: Some(Operation {
                     tags: TRAPS.iter().map(|trap| (*trap).to_string()).collect(),
                     summary: Some("yes".into()),
+                    description: None,
                     operation_id: Some("007".into()),
                     parameters,
                     request_body: Some(RequestBody {

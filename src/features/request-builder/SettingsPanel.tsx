@@ -3,7 +3,7 @@ import { ShieldAlert } from "lucide-react";
 
 import type { HttpVersionPreference, RequestSettings, TlsMinimum } from "@/types/http";
 
-/** Labelled for what this app actually does, not for what Postman calls it:
+/** Labelled for what this app actually does:
  * libcurl exposes no general "strict parser", and rustls has no TLS below
  * 1.2 to disable. Copying the other product's wording would promise more
  * than the transport can deliver. */

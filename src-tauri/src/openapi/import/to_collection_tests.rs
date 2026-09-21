@@ -848,3 +848,126 @@ fn templating_and_encoding_helpers() {
     assert_eq!(value_text(&json!({"a": 1})), "{\"a\":1}");
     assert_eq!(value_text(&json!(null)), "");
 }
+
+// --- Item documentation (PLAN.md Phase 12) ---------------------------------
+
+#[test]
+fn an_operations_description_becomes_the_requests_documentation() {
+    let document = doc(json!({
+        "/pets": {
+            "get": {
+                "summary": "List pets",
+                "description": "Returns every pet.\n\nPaginated with `?page`.",
+                "responses": {"200": {"description": "ok"}}
+            }
+        }
+    }));
+
+    let mapped = map(&document);
+
+    assert_eq!(
+        only_request(&mapped).docs,
+        "Returns every pet.\n\nPaginated with `?page`."
+    );
+    // The summary still names the request; the description is what sits under it.
+    assert_eq!(only_request(&mapped).name, "List pets");
+}
+
+#[test]
+fn an_operation_without_a_description_imports_undocumented() {
+    let document = doc(json!({
+        "/pets": {"get": {"summary": "List pets", "responses": {"200": {"description": "ok"}}}}
+    }));
+
+    assert_eq!(only_request(&map(&document)).docs, "");
+}
+
+#[test]
+fn a_documents_description_becomes_the_collections_documentation() {
+    let mut document = doc(json!({
+        "/pets": {"get": {"responses": {"200": {"description": "ok"}}}}
+    }));
+    document["info"]["description"] = json!("# Pets API\n\nEverything about pets.");
+
+    assert_eq!(
+        map(&document).plan.collection_docs,
+        "# Pets API\n\nEverything about pets."
+    );
+}
+
+/// Exporting an undocumented collection writes a provenance sentence into
+/// `info.description`. Importing that back must not leave it sitting in the
+/// user's documentation as though they had written it.
+#[test]
+fn this_apps_own_provenance_sentence_is_not_imported_as_documentation() {
+    let mut document = doc(json!({
+        "/pets": {"get": {"responses": {"200": {"description": "ok"}}}}
+    }));
+    document["info"]["description"] = json!(
+        crate::openapi::from_collection::generated_description("Pets")
+    );
+
+    assert_eq!(map(&document).plan.collection_docs, "");
+}
+
+#[test]
+fn a_declared_tags_description_becomes_its_folders_documentation() {
+    let mut document = doc(json!({
+        "/pets": {
+            "get": {"tags": ["pets"], "responses": {"200": {"description": "ok"}}}
+        }
+    }));
+    document["tags"] = json!([{"name": "pets", "description": "Everything pet-shaped."}]);
+
+    let mapped = map(&document);
+
+    assert_eq!(mapped.plan.folders.len(), 1);
+    assert_eq!(mapped.plan.folders[0].docs, "Everything pet-shaped.");
+}
+
+/// A tag used on an operation but never declared has a name and nothing else,
+/// and a folder invented from a path segment has less than that.
+#[test]
+fn a_folder_with_nothing_to_describe_it_imports_undocumented() {
+    let undeclared = doc(json!({
+        "/pets": {"get": {"tags": ["pets"], "responses": {"200": {"description": "ok"}}}}
+    }));
+    let by_path = doc(json!({
+        "/pets": {"get": {"responses": {"200": {"description": "ok"}}}}
+    }));
+
+    let tagged = map(&undeclared);
+    assert_eq!(tagged.plan.folders[0].docs, "");
+
+    let paths = to_plan(
+        &by_path,
+        &ImportOptions {
+            grouping: Grouping::Paths,
+            ..options()
+        },
+    );
+    assert!(paths
+        .plan
+        .folders
+        .iter()
+        .all(|folder| folder.docs.is_empty()));
+}
+
+/// Markdown is whitespace sensitive, and the spec says a description may be
+/// Markdown. Trimming it on the way in would edit what the author wrote.
+#[test]
+fn an_imported_description_keeps_its_whitespace() {
+    let document = doc(json!({
+        "/pets": {
+            "get": {
+                "description": "    indented code\n\nand a break  \n",
+                "responses": {"200": {"description": "ok"}}
+            }
+        }
+    }));
+
+    assert_eq!(
+        only_request(&map(&document)).docs,
+        "    indented code\n\nand a break  \n"
+    );
+}

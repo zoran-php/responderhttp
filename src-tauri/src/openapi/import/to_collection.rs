@@ -25,6 +25,7 @@ use crate::domain::models::{
     RequestBody, RequestSettings,
 };
 use crate::domain::secrets::is_credential_param_name;
+use crate::openapi::from_collection::is_generated_description;
 use crate::openapi::import::grouping::{self, Arrangement, Grouping, Placement};
 use crate::openapi::import::refs::Refs;
 use crate::openapi::import::sample::{declared_value, sample};
@@ -286,6 +287,7 @@ pub fn to_plan(document: &Value, options: &ImportOptions) -> Mapped {
             name: collection_name.clone(),
             variables: environment.variables,
         }),
+        collection_docs: collection_docs(document),
         collection_name,
         folders: arrangement.folders,
         requests,
@@ -294,6 +296,23 @@ pub fn to_plan(document: &Value, options: &ImportOptions) -> Mapped {
         plan,
         notes: notes.finish(),
     }
+}
+
+/// The document's own prose, kept as the collection's documentation
+/// (PLAN.md Phase 12).
+///
+/// One description is dropped on the way in: the sentence this app writes
+/// into `info.description` when a collection has no documentation of its own.
+/// Keeping it would mean that exporting an undocumented collection and
+/// importing it back left "Exported from the ResponderHTTP collection …"
+/// sitting in the user's documentation as though they had written it.
+fn collection_docs(document: &Value) -> String {
+    document
+        .pointer("/info/description")
+        .and_then(Value::as_str)
+        .filter(|description| !is_generated_description(description))
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn title(document: &Value) -> String {
@@ -731,6 +750,15 @@ struct Parameter<'a> {
 impl<'a> RequestContext<'a, '_> {
     fn request(&mut self, operation: &OperationRef<'a>, folder: Option<usize>) -> PlannedRequest {
         let name = request_name(operation);
+        // Read and kept, rather than read and dropped: before Phase 12 this
+        // field was discarded on every import, which threw away the
+        // documentation in every specification anyone has ever imported.
+        let docs = operation
+            .operation
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
 
         let (prefix, own_server) = match self.own_server(operation) {
             Some(url) => (url, true),
@@ -818,6 +846,7 @@ impl<'a> RequestContext<'a, '_> {
         };
         PlannedRequest {
             name,
+            docs,
             folder,
             request,
             examples,

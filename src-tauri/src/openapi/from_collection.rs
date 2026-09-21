@@ -54,6 +54,60 @@ pub enum ExportNote {
     ExampleBodyDecoded,
 }
 
+/// Every item's Markdown documentation, keyed by id (PLAN.md Phase 12).
+///
+/// Passed alongside the items rather than carried on `Collection`, `Folder`
+/// and `SavedRequest` themselves. Documentation is an attribute of the item,
+/// not part of it: putting it on the models would mean every save carried it,
+/// and a save that carries documentation is a save that can wipe it.
+#[derive(Debug, Default)]
+pub struct ExportDocs {
+    pub collection: String,
+    pub folders: BTreeMap<String, String>,
+    pub requests: BTreeMap<String, String>,
+}
+
+impl ExportDocs {
+    fn folder(&self, id: &str) -> Option<String> {
+        self.folders.get(id).and_then(|docs| written(docs))
+    }
+
+    fn request(&self, id: &str) -> Option<String> {
+        self.requests.get(id).and_then(|docs| written(docs))
+    }
+}
+
+/// What `info.description` says when the collection has no documentation of
+/// its own.
+///
+/// Public, and paired with `is_generated_description`, because the import
+/// side has to be able to recognise it: without that, exporting an
+/// undocumented collection and importing it back would leave this sentence
+/// sitting in the user's collection documentation as though they had written
+/// it.
+pub fn generated_description(collection_name: &str) -> String {
+    format!("Exported from the ResponderHTTP collection \"{collection_name}\".")
+}
+
+/// Whether a description is one this app generated rather than one a person
+/// wrote. Matched on the stem rather than the whole sentence, so a collection
+/// renamed between the export and the import is still recognised.
+pub fn is_generated_description(description: &str) -> bool {
+    description
+        .trim()
+        .starts_with("Exported from the ResponderHTTP collection ")
+}
+
+/// Documentation, if there is any, **exactly as the user wrote it**.
+///
+/// Deliberately not `non_empty`, which trims. Markdown is whitespace
+/// sensitive — four leading spaces are a code block, two trailing ones are a
+/// line break — so the test for "is there anything here" must not double as
+/// an edit of what is there.
+fn written(docs: &str) -> Option<String> {
+    (!docs.trim().is_empty()).then(|| docs.to_string())
+}
+
 pub struct ExportInput<'a> {
     pub collection: &'a Collection,
     pub folders: &'a [Folder],
@@ -61,6 +115,7 @@ pub struct ExportInput<'a> {
     /// Full saved responses per request id. Empty unless the user opted in —
     /// response bodies can carry tokens, so inclusion is a deliberate act.
     pub examples: &'a BTreeMap<String, Vec<SavedExample>>,
+    pub docs: &'a ExportDocs,
 }
 
 pub fn to_document(input: ExportInput<'_>, version: OpenApiVersion) -> (Document, Vec<ExportNote>) {
@@ -202,6 +257,7 @@ pub fn to_document(input: ExportInput<'_>, version: OpenApiVersion) -> (Document
                 .map(|name| vec![(*name).to_string()])
                 .unwrap_or_default(),
             summary: non_empty(&saved.name),
+            description: input.docs.request(&saved.id),
             operation_id: Some(unique_operation_id(&saved.name, &mut used_operation_ids)),
             parameters: parameters.into_vec(),
             request_body: request_body_for(&saved.request.body, version),
@@ -227,7 +283,7 @@ pub fn to_document(input: ExportInput<'_>, version: OpenApiVersion) -> (Document
         .iter()
         .map(|folder| Tag {
             name: folder.name.clone(),
-            description: None,
+            description: input.docs.folder(&folder.id),
         })
         .collect();
 
@@ -246,10 +302,12 @@ pub fn to_document(input: ExportInput<'_>, version: OpenApiVersion) -> (Document
             // thing, so this is a starting point for the user to edit.
             version: "1.0.0".into(),
             summary: None,
-            description: Some(format!(
-                "Exported from the ResponderHTTP collection \"{}\".",
-                input.collection.name
-            )),
+            // The collection's own documentation when it has any. The
+            // generated provenance line is a placeholder for an empty
+            // description, not something to prepend to real prose the user
+            // wrote — an export is a document someone else will read.
+            description: written(&input.docs.collection)
+                .or_else(|| Some(generated_description(&input.collection.name))),
         },
         servers: servers.into_values().collect(),
         paths,
@@ -662,6 +720,15 @@ mod tests {
         }
     }
 
+    fn folder(id: &str, name: &str) -> Folder {
+        Folder {
+            id: id.into(),
+            collection_id: "col_1".into(),
+            parent_folder_id: None,
+            name: name.into(),
+        }
+    }
+
     fn export(requests: &[SavedRequest], folders: &[Folder]) -> (Document, Vec<ExportNote>) {
         export_as(requests, folders, &BTreeMap::new(), OpenApiVersion::V3_2)
     }
@@ -672,6 +739,16 @@ mod tests {
         examples: &BTreeMap<String, Vec<SavedExample>>,
         version: OpenApiVersion,
     ) -> (Document, Vec<ExportNote>) {
+        export_documented(requests, folders, examples, version, &ExportDocs::default())
+    }
+
+    fn export_documented(
+        requests: &[SavedRequest],
+        folders: &[Folder],
+        examples: &BTreeMap<String, Vec<SavedExample>>,
+        version: OpenApiVersion,
+        docs: &ExportDocs,
+    ) -> (Document, Vec<ExportNote>) {
         let col = collection();
         to_document(
             ExportInput {
@@ -679,6 +756,7 @@ mod tests {
                 folders,
                 requests,
                 examples,
+                docs,
             },
             version,
         )
@@ -1410,5 +1488,166 @@ mod tests {
             notes.as_slice(),
             [ExportNote::UnmappableUrl { .. }]
         ));
+    }
+    // --- Item documentation (PLAN.md Phase 12) ---------------------------
+
+    #[test]
+    fn a_collections_documentation_becomes_the_documents_description() {
+        let docs = ExportDocs {
+            collection: "# Billing API\n\nEverything about invoices.".into(),
+            ..ExportDocs::default()
+        };
+
+        let (doc, _) = export_documented(
+            &[request(
+                "List users",
+                HttpMethod::Get,
+                "https://api.example.com/users",
+            )],
+            &[],
+            &BTreeMap::new(),
+            OpenApiVersion::V3_2,
+            &docs,
+        );
+
+        assert_eq!(
+            doc.info.description.as_deref(),
+            Some("# Billing API\n\nEverything about invoices.")
+        );
+    }
+
+    /// The generated provenance line is a placeholder for an empty
+    /// description, not a preamble to glue onto prose the user wrote.
+    #[test]
+    fn an_undocumented_collection_keeps_the_generated_description() {
+        let (doc, _) = export(
+            &[request(
+                "List users",
+                HttpMethod::Get,
+                "https://api.example.com/users",
+            )],
+            &[],
+        );
+
+        assert!(doc
+            .info
+            .description
+            .as_deref()
+            .expect("a description")
+            .contains("Exported from the ResponderHTTP collection"));
+    }
+
+    #[test]
+    fn a_folders_documentation_becomes_its_tags_description() {
+        let folder = folder("fld_1", "Users");
+        let mut saved = request(
+            "List users",
+            HttpMethod::Get,
+            "https://api.example.com/users",
+        );
+        saved.folder_id = Some("fld_1".into());
+        let docs = ExportDocs {
+            folders: BTreeMap::from([(
+                "fld_1".to_string(),
+                "User management endpoints.".to_string(),
+            )]),
+            ..ExportDocs::default()
+        };
+
+        let (doc, _) = export_documented(
+            &[saved],
+            &[folder],
+            &BTreeMap::new(),
+            OpenApiVersion::V3_2,
+            &docs,
+        );
+
+        assert_eq!(doc.tags.len(), 1);
+        assert_eq!(
+            doc.tags[0].description.as_deref(),
+            Some("User management endpoints.")
+        );
+    }
+
+    #[test]
+    fn a_requests_documentation_becomes_its_operations_description() {
+        let saved = request(
+            "List users",
+            HttpMethod::Get,
+            "https://api.example.com/users",
+        );
+        let docs = ExportDocs {
+            requests: BTreeMap::from([(
+                saved.id.clone(),
+                "Returns 409 on a duplicate.".to_string(),
+            )]),
+            ..ExportDocs::default()
+        };
+
+        let (doc, _) =
+            export_documented(&[saved], &[], &BTreeMap::new(), OpenApiVersion::V3_2, &docs);
+
+        let operation = doc.paths["/users"].get.as_ref().expect("a GET");
+        assert_eq!(
+            operation.description.as_deref(),
+            Some("Returns 409 on a duplicate.")
+        );
+        // The name still travels as the summary; documentation is the prose
+        // under it, not a replacement for it.
+        assert_eq!(operation.summary.as_deref(), Some("List users"));
+    }
+
+    /// An empty column is the common case — most items are never documented
+    /// — and it must not write `description: ""` into every operation.
+    #[test]
+    fn an_undocumented_item_writes_no_description_at_all() {
+        let saved = request(
+            "List users",
+            HttpMethod::Get,
+            "https://api.example.com/users",
+        );
+        let docs = ExportDocs {
+            requests: BTreeMap::from([(saved.id.clone(), "   \n  ".to_string())]),
+            ..ExportDocs::default()
+        };
+
+        let (doc, _) =
+            export_documented(&[saved], &[], &BTreeMap::new(), OpenApiVersion::V3_2, &docs);
+
+        assert!(doc.paths["/users"]
+            .get
+            .as_ref()
+            .expect("a GET")
+            .description
+            .is_none());
+    }
+
+    /// Markdown is whitespace sensitive: four leading spaces are a code
+    /// block. The emptiness test must not double as an edit.
+    #[test]
+    fn documentation_is_exported_exactly_as_written() {
+        let saved = request(
+            "List users",
+            HttpMethod::Get,
+            "https://api.example.com/users",
+        );
+        let text = "    indented code\n\nand a break  \n";
+        let docs = ExportDocs {
+            requests: BTreeMap::from([(saved.id.clone(), text.to_string())]),
+            ..ExportDocs::default()
+        };
+
+        let (doc, _) =
+            export_documented(&[saved], &[], &BTreeMap::new(), OpenApiVersion::V3_2, &docs);
+
+        assert_eq!(
+            doc.paths["/users"]
+                .get
+                .as_ref()
+                .expect("a GET")
+                .description
+                .as_deref(),
+            Some(text)
+        );
     }
 }

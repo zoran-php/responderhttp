@@ -1399,6 +1399,7 @@ fn importer(repos: &Repos) -> SqliteImportRepository {
 fn planned_request(name: &str, folder: Option<usize>, auth: Auth) -> PlannedRequest {
     PlannedRequest {
         name: name.into(),
+        docs: String::new(),
         folder,
         request: HttpRequest {
             method: HttpMethod::Get,
@@ -1440,14 +1441,17 @@ fn an_import_plan_is_written_with_nesting_examples_and_environment() {
     });
     let plan = ImportPlan {
         collection_name: "Pet Store".into(),
+        collection_docs: String::new(),
         folders: vec![
             PlannedFolder {
                 name: "store".into(),
                 parent: None,
+                docs: String::new(),
             },
             PlannedFolder {
                 name: "pets".into(),
                 parent: Some(0),
+                docs: String::new(),
             },
         ],
         requests: vec![listed, planned_request("Health", None, Auth::None)],
@@ -1528,9 +1532,11 @@ fn a_failure_part_way_through_leaves_nothing_behind() {
     let locked = repos_on(database.clone(), without_key("locked".into()).0);
     let plan = ImportPlan {
         collection_name: "Half".into(),
+        collection_docs: String::new(),
         folders: vec![PlannedFolder {
             name: "f".into(),
             parent: None,
+            docs: String::new(),
         }],
         requests: vec![
             planned_request("First", Some(0), Auth::None),
@@ -1564,9 +1570,11 @@ fn a_plan_with_a_child_before_its_parent_is_refused_before_writing() {
     let repos = repos();
     let plan = ImportPlan {
         collection_name: "Bad".into(),
+        collection_docs: String::new(),
         folders: vec![PlannedFolder {
             name: "orphan".into(),
             parent: Some(3),
+            docs: String::new(),
         }],
         requests: Vec::new(),
         environment: None,
@@ -1581,6 +1589,13 @@ fn a_plan_with_a_child_before_its_parent_is_refused_before_writing() {
 
 /// A collection that survives export → import → export unchanged in every
 /// version and syntax: everything in it is something OpenAPI can carry.
+/// Markdown at each level, with the whitespace and punctuation that a
+/// careless mapping would eat: a fenced block, a hard line break, a quote.
+const COLLECTION_DOCS: &str = "# Round Trip\n\nThe whole API, \"quoted\".";
+const FOLDER_DOCS: &str = "User management.\n\n- create\n- update";
+const REQUEST_DOCS: &str =
+    "Updates a user.\n\n```json\n{\"name\": \"x\"}\n```\n\nReturns 409 on a duplicate.";
+
 fn round_trip_collection(repos: &Repos) -> String {
     let collection = repos.collections.create("Round Trip").expect("create");
     let folder = repos
@@ -1601,6 +1616,7 @@ fn round_trip_collection(repos: &Repos) -> String {
         },
         settings: RequestSettings::default(),
     };
+    let folder_id = folder.id.clone();
     let saved = SavedRequest {
         id: "req_update".into(),
         collection_id: collection.id.clone(),
@@ -1610,6 +1626,22 @@ fn round_trip_collection(repos: &Repos) -> String {
         secret_state: SecretState::Ok,
     };
     repos.requests.save(&saved).expect("save");
+    // Documented at all three levels, so the round-trip below covers the
+    // Phase 12 mapping as well — collection docs to info.description, folder
+    // docs to the tag, request docs to the operation — rather than a second
+    // near-identical round-trip test existing alongside this one.
+    repos
+        .collections
+        .set_docs(&collection.id, COLLECTION_DOCS)
+        .expect("collection docs");
+    repos
+        .folders
+        .set_docs(&folder_id, FOLDER_DOCS)
+        .expect("folder docs");
+    repos
+        .requests
+        .set_docs(&saved.id, REQUEST_DOCS)
+        .expect("request docs");
     repos
         .examples
         .create(&NewExample {
@@ -1834,5 +1866,261 @@ fn the_tray_notice_stops_after_it_is_dismissed() {
             .expect("read"),
         Some("true".to_string()),
         "the flag should survive in the table, not just in memory"
+    );
+}
+
+// --- Item documentation (PLAN.md Phase 12) ---------------------------------
+
+#[test]
+fn documentation_round_trips_for_each_kind_of_item() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    let folder = repos
+        .folders
+        .create(&collection.id, None, "Users")
+        .expect("should create");
+    let saved = SavedRequest {
+        id: "req_1".into(),
+        collection_id: collection.id.clone(),
+        folder_id: Some(folder.id.clone()),
+        name: "Create user".into(),
+        request: rich_request(),
+        secret_state: SecretState::Ok,
+    };
+    repos.requests.save(&saved).expect("should save");
+
+    repos
+        .collections
+        .set_docs(&collection.id, "# Overview\n\nThe whole API.")
+        .expect("should write collection docs");
+    repos
+        .folders
+        .set_docs(&folder.id, "User management endpoints.")
+        .expect("should write folder docs");
+    repos
+        .requests
+        .set_docs("req_1", "Returns 409 when the email is taken.")
+        .expect("should write request docs");
+
+    assert_eq!(
+        repos.collections.docs(&collection.id).expect("should read"),
+        "# Overview\n\nThe whole API."
+    );
+    assert_eq!(
+        repos.folders.docs(&folder.id).expect("should read"),
+        "User management endpoints."
+    );
+    assert_eq!(
+        repos.requests.docs("req_1").expect("should read"),
+        "Returns 409 when the email is taken."
+    );
+}
+
+/// The column is NOT NULL DEFAULT '', so an item that has never been
+/// documented reads as empty rather than failing or returning a null.
+#[test]
+fn an_item_that_was_never_documented_reads_as_empty() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+
+    assert_eq!(
+        repos.collections.docs(&collection.id).expect("should read"),
+        ""
+    );
+}
+
+/// Writing or reading an id that is not there is a not-found, not a silent
+/// no-op — the same contract as every other update in this layer.
+#[test]
+fn documentation_for_an_unknown_id_is_not_found() {
+    let repos = repos();
+
+    assert!(matches!(
+        repos.collections.docs("col_nope"),
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        repos.folders.set_docs("fld_nope", "text"),
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        repos.requests.docs("req_nope"),
+        Err(AppError::NotFound(_))
+    ));
+}
+
+/// Docs live on the item's own row, so the cascade that removes the item has
+/// to take them with it. A polymorphic docs table was rejected for exactly
+/// this reason (PLAN.md Phase 12) — this test is what proves the column got
+/// the behaviour the table could not.
+#[test]
+fn deleting_a_collection_takes_its_documentation_with_it() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    let folder = repos
+        .folders
+        .create(&collection.id, None, "Users")
+        .expect("should create");
+    repos
+        .folders
+        .set_docs(&folder.id, "Folder documentation.")
+        .expect("should write");
+
+    repos
+        .collections
+        .delete(&collection.id)
+        .expect("should delete");
+
+    assert!(matches!(
+        repos.folders.docs(&folder.id),
+        Err(AppError::NotFound(_))
+    ));
+}
+
+/// **Regression test.** The requests upsert names its DO UPDATE SET columns
+/// one by one and does not mention docs_md, so pressing Save in the request
+/// builder leaves documentation alone. That is true by accident of how the
+/// statement happens to be written, which is exactly the kind of thing a
+/// later edit breaks without noticing.
+#[test]
+fn saving_a_request_does_not_wipe_its_documentation() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    let mut saved = SavedRequest {
+        id: "req_1".into(),
+        collection_id: collection.id.clone(),
+        folder_id: None,
+        name: "Create user".into(),
+        request: rich_request(),
+        secret_state: SecretState::Ok,
+    };
+    repos.requests.save(&saved).expect("should save");
+    repos
+        .requests
+        .set_docs("req_1", "Documentation that must survive a re-save.")
+        .expect("should write docs");
+
+    saved.name = "Renamed in the builder".into();
+    repos.requests.save(&saved).expect("should re-save");
+
+    assert_eq!(
+        repos.requests.docs("req_1").expect("should read"),
+        "Documentation that must survive a re-save."
+    );
+}
+
+/// The spec's third acceptance scenario, end to end: document a collection,
+/// export it, import it back, and read the documentation off the new items.
+///
+/// Distinct from `export_then_import_then_export_changes_nothing`, which
+/// compares two documents. This one goes back to storage and asks the
+/// repositories, which is what the user actually does when they reopen the
+/// collection.
+#[test]
+fn documentation_survives_an_export_and_a_re_import() {
+    let repos = repos();
+    let original_id = round_trip_collection(&repos);
+    let exported = export_service(&repos)
+        .export(
+            &original_id,
+            OpenApiVersion::V3_1,
+            ExportFormat::Yaml,
+            false,
+        )
+        .expect("export");
+
+    let (detected, _) = check(exported.text.as_bytes())
+        .expect("schemas load")
+        .unwrap_or_else(|refusal| panic!("export refused: {refusal:?}"));
+    let mapped = to_plan(
+        &detected.document,
+        &ImportOptions {
+            grouping: Grouping::Tags,
+            include_examples: false,
+            create_environment: false,
+        },
+    );
+    let ids = importer(&repos).import(&mapped.plan).expect("import");
+
+    assert_eq!(
+        repos.collections.docs(&ids.collection_id).expect("read"),
+        COLLECTION_DOCS
+    );
+
+    let folders = repos
+        .folders
+        .list_by_collection(&ids.collection_id)
+        .expect("folders");
+    assert_eq!(folders.len(), 1);
+    assert_eq!(
+        repos.folders.docs(&folders[0].id).expect("read"),
+        FOLDER_DOCS
+    );
+
+    // The fixture has two requests and documents one of them, so this also
+    // shows the documentation landing on the right row rather than on
+    // whichever was written first.
+    let requests = repos
+        .requests
+        .list_by_collection(&ids.collection_id)
+        .expect("requests");
+    let documented = requests
+        .iter()
+        .find(|request| request.name == "Update user")
+        .expect("the documented request");
+    let undocumented = requests
+        .iter()
+        .find(|request| request.name == "Health")
+        .expect("the undocumented request");
+
+    assert_eq!(
+        repos.requests.docs(&documented.id).expect("read"),
+        REQUEST_DOCS
+    );
+    assert_eq!(repos.requests.docs(&undocumented.id).expect("read"), "");
+}
+
+/// An undocumented collection must not come back from a round trip carrying
+/// the provenance sentence the exporter writes into `info.description`.
+#[test]
+fn a_round_trip_does_not_invent_documentation_for_an_undocumented_collection() {
+    let repos = repos();
+    let collection = repos.collections.create("Plain").expect("create");
+    repos
+        .requests
+        .save(&SavedRequest {
+            id: "req_1".into(),
+            collection_id: collection.id.clone(),
+            folder_id: None,
+            name: "List".into(),
+            request: rich_request(),
+            secret_state: SecretState::Ok,
+        })
+        .expect("save");
+
+    let exported = export_service(&repos)
+        .export(
+            &collection.id,
+            OpenApiVersion::V3_1,
+            ExportFormat::Json,
+            false,
+        )
+        .expect("export");
+    let (detected, _) = check(exported.text.as_bytes())
+        .expect("schemas load")
+        .unwrap_or_else(|refusal| panic!("export refused: {refusal:?}"));
+    let mapped = to_plan(
+        &detected.document,
+        &ImportOptions {
+            grouping: Grouping::Tags,
+            include_examples: false,
+            create_environment: false,
+        },
+    );
+    let ids = importer(&repos).import(&mapped.plan).expect("import");
+
+    assert_eq!(
+        repos.collections.docs(&ids.collection_id).expect("read"),
+        ""
     );
 }

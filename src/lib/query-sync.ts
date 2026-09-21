@@ -1,6 +1,6 @@
 // http_client/src/lib/query-sync.ts
 //
-// The Params tab as a view of the URL, the way Postman does it (decided
+// The Params tab as a view of the URL (decided
 // 2026-09-17). The URL is the one source of truth: typing in the URL bar
 // rewrites the table, and editing the table rewrites the URL's query string.
 // Nothing else is stored — a request's `queryParams` is always empty once it

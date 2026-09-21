@@ -6,13 +6,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ResizeHandle } from "@/components/ResizeHandle";
 import { buildCurlCommand } from "@/lib/curl-string-builder";
+import { docsTabLabel, docsTargetName } from "@/lib/docs-title";
 import { requestPathSegments } from "@/lib/request-path";
-import { matchesSaveShortcut } from "@/lib/shortcuts";
+import { matchesDocsShortcut, matchesSaveShortcut } from "@/lib/shortcuts";
 import { clampPaneSize, MIN_BUILDER_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/split-pane";
 import { updateMultipartRow, withTrailingBlankPart } from "@/lib/multipart-rows";
 import { chooseFile } from "@/services/files";
 import { substituteRequestInput } from "@/lib/variables";
 import { SaveRequestDialog } from "@/features/collections/SaveRequestDialog";
+import { DocsEditor } from "@/features/docs/DocsEditor";
 import { ExampleViewer } from "@/features/examples/ExampleViewer";
 import { SaveExampleDialog } from "@/features/examples/SaveExampleDialog";
 import { EnvironmentEditor } from "@/features/environments/EnvironmentEditor";
@@ -149,6 +151,32 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [canSaveWithShortcut]);
 
+  // Ctrl/Cmd+Shift+D opens the documentation for whatever the builder has
+  // loaded. "Selected item" means the request in front of the user: the
+  // sidebar's own selection is a hover-and-click affair that does not
+  // survive a click elsewhere, so binding to it would make the shortcut
+  // depend on something invisible.
+  const docsTargetForShortcut =
+    activeTab.kind === "request" ? (activeTab.loadedRequest?.id ?? null) : null;
+  const openDocs = tabsStore.openDocs;
+  useEffect(() => {
+    if (docsTargetForShortcut === null) {
+      return;
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (!matchesDocsShortcut(event) || docsTargetForShortcut === null) {
+        return;
+      }
+      if (document.querySelector("[data-modal]") !== null) {
+        return;
+      }
+      event.preventDefault();
+      openDocs({ kind: "request", id: docsTargetForShortcut });
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [docsTargetForShortcut, openDocs]);
+
   async function handleSaveClick() {
     const active = tabsStore.activeRequestTab();
     if (active === null) {
@@ -220,7 +248,11 @@ export default function App() {
   }
 
   function handleCloseTab(id: string) {
-    if (tabsStore.isDirty(id)) {
+    const tab = tabsStore.tabs.find((candidate) => candidate.id === id);
+    // A Docs tab autosaves, and closeTab flushes whatever is still pending,
+    // so there is nothing to lose and nothing to ask about. Only a request
+    // tab, which saves explicitly, reaches the prompt.
+    if (tab?.kind !== "docs" && tabsStore.isDirty(id)) {
       setClosingTabId(id);
       return;
     }
@@ -246,6 +278,14 @@ export default function App() {
           "Environment",
       };
     }
+    if (tab.kind === "docs") {
+      return {
+        kind: "docs",
+        id: tab.id,
+        label: docsTabLabel(docsTargetName(tab.target, collections, contentsById)),
+        isDirty: tabsStore.isDirty(tab.id),
+      };
+    }
     // "Example" until the body arrives; the store caches it after the first
     // open, so this only shows for a moment.
     return { kind: "example", id: tab.id, label: examplesById[tab.exampleId]?.name ?? "Example" };
@@ -261,6 +301,7 @@ export default function App() {
       {!sidebarCollapsed && (
         <Sidebar
           loadedRequestId={requestTab?.loadedRequest?.id ?? null}
+          onOpenDocs={(target) => tabsStore.openDocs(target)}
           onOpenEnvironment={(environmentId) => tabsStore.openEnvironment(environmentId)}
           onOpenExample={(exampleId) => tabsStore.openExample(exampleId)}
           onOpenHistoryEntry={(request) => tabsStore.openHistoryEntry(request)}
@@ -296,6 +337,8 @@ export default function App() {
           <EnvironmentEditor environmentId={activeTab.environmentId} />
         ) : activeTab.kind === "example" ? (
           <ExampleViewer exampleId={activeTab.exampleId} />
+        ) : activeTab.kind === "docs" ? (
+          <DocsEditor tab={activeTab} />
         ) : (
           <>
             <RequestBuilder

@@ -54,7 +54,7 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // One color per HTTP method, Postman-style — consumed via
+        // One color per HTTP method, consumed via
         // lib/http-method-colors.ts rather than referenced by name in
         // components, so the method → color mapping has one home.
         method: {

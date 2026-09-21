@@ -63,9 +63,8 @@ export const AUTH_NONE: Auth = { kind: "none" };
 export type HttpVersionPreference = "auto" | "http11" | "http2";
 
 /**
- * Mirrors TlsMinimum. rustls supports 1.2 and 1.3 and nothing older, so —
- * unlike Postman's "protocols disabled during handshake" — there is no TLS
- * 1.0 or 1.1 here to switch off.
+ * Mirrors TlsMinimum. rustls supports 1.2 and 1.3 and nothing older,
+ * so there is no TLS 1.0 or 1.1 here to switch off.
  */
 export type TlsMinimum = "auto" | "tls12" | "tls13";
 
@@ -118,9 +117,7 @@ export interface SendRequestInput {
   settings: RequestSettings;
 }
 
-export type ResponseBody =
-  | { kind: "text"; text: string }
-  | { kind: "binary"; byteLength: number };
+export type ResponseBody = { kind: "text"; text: string } | { kind: "binary"; byteLength: number };
 
 export interface Timing {
   dnsMs: number;

@@ -15,13 +15,15 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::domain::error::AppError;
-use crate::domain::models::Example;
+use crate::domain::models::{Example, Folder, SavedRequest};
 use crate::domain::ports::{
     CollectionRepository, ExampleRepository, FolderRepository, SavedRequestRepository,
 };
 use crate::openapi::document::OpenApiVersion;
 use crate::openapi::format::{render, ExportFormat};
-use crate::openapi::from_collection::{document_file_name, to_document, ExportInput, ExportNote};
+use crate::openapi::from_collection::{
+    document_file_name, to_document, ExportDocs, ExportInput, ExportNote,
+};
 
 /// The document, ready to write, plus everything the mapping could not say.
 pub struct ExportedDocument {
@@ -81,12 +83,15 @@ impl OpenApiExport {
             BTreeMap::new()
         };
 
+        let docs = self.load_docs(&collection.id, &folders, &requests)?;
+
         let (document, notes) = to_document(
             ExportInput {
                 collection: &collection,
                 folders: &folders,
                 requests: &requests,
                 examples: &examples,
+                docs: &docs,
             },
             version,
         );
@@ -96,6 +101,36 @@ impl OpenApiExport {
             text: render(&document, format)?,
             notes,
         })
+    }
+
+    /// One read per item (PLAN.md Phase 12).
+    ///
+    /// The same shape as `load_examples` below, and for the same reason: an
+    /// export is one collection, triggered by a person, and these are
+    /// microsecond reads against a local file. A bulk
+    /// `docs_by_collection` would be two more methods on two more traits to
+    /// save a millisecond nobody can perceive — YAGNI (CLAUDE.md section 7).
+    /// If a collection ever grows large enough for it to matter, that method
+    /// is a small addition, not a redesign.
+    fn load_docs(
+        &self,
+        collection_id: &str,
+        folders: &[Folder],
+        requests: &[SavedRequest],
+    ) -> Result<ExportDocs, AppError> {
+        let mut docs = ExportDocs {
+            collection: self.collections.docs(collection_id)?,
+            ..ExportDocs::default()
+        };
+        for folder in folders {
+            docs.folders
+                .insert(folder.id.clone(), self.folders.docs(&folder.id)?);
+        }
+        for request in requests {
+            docs.requests
+                .insert(request.id.clone(), self.requests.docs(&request.id)?);
+        }
+        Ok(docs)
     }
 
     /// One `get` per example, because the summary a collection listing returns

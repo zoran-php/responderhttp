@@ -21,81 +21,76 @@
   :root {
     --background: 221.7 16.3% 27.6%; /* bg-main #3b4252 */
     --foreground: 217.5 26.7% 94.1%; /* text-main #eceff4 */
-    --card: 220.0 16.4% 21.6%; /* bg-sidebar #2e3440 */
+    --card: 220 16.4% 21.6%; /* bg-sidebar #2e3440 */
     --card-foreground: 217.5 26.7% 94.1%; /* text-main */
-    --popover: 220.0 17.2% 17.1%; /* bg-topbar #242933 */
+    --popover: 220 17.2% 17.1%; /* bg-topbar #242933 */
     --popover-foreground: 217.5 26.7% 94.1%; /* text-main */
     --primary: 193.3 43.4% 67.5%; /* accent-blue #88c0d0 */
-    --primary-foreground: 220.0 17.2% 17.1%; /* bg-topbar, for contrast on the light accent */
-    --secondary: 220.0 16.5% 35.7%; /* bg-active #4c566a */
+    --primary-foreground: 220 17.2% 17.1%; /* bg-topbar, for contrast on the light accent */
+    --secondary: 220 16.5% 35.7%; /* bg-active #4c566a */
     --secondary-foreground: 217.5 26.7% 94.1%; /* text-main */
-    --muted: 220.0 16.8% 31.6%; /* bg-hover #434c5e */
+    --muted: 220 16.8% 31.6%; /* bg-hover #434c5e */
     --muted-foreground: 218.7 18.1% 66.5%; /* text-muted #9aa5b9 */
-    --accent: 220.0 16.8% 31.6%; /* bg-hover #434c5e */
+    --accent: 220 16.8% 31.6%; /* bg-hover #434c5e */
     --accent-foreground: 217.5 26.7% 94.1%; /* text-main */
     --destructive: 354.3 42.3% 56.5%; /* nord11 red #bf616a */
     --destructive-foreground: 0 0% 100%; /* text-light */
     --warning: 14.4 50.5% 62.7%; /* accent-orange #d08770 — defined, not yet used anywhere */
-    --warning-foreground: 220.0 17.2% 17.1%; /* bg-topbar */
-    --border: 220.0 16.5% 35.7%; /* border-color #4c566a */
+    --warning-foreground: 220 17.2% 17.1%; /* bg-topbar */
+    --border: 220 16.5% 35.7%; /* border-color #4c566a */
     --input: 221.5 16.5% 15.5%; /* bg-input #21252e */
     --ring: 193.3 43.4% 67.5%; /* accent-blue #88c0d0 */
     --radius: 0.5rem;
 
-    /* HTTP method colors (added 2026-09-13), matching Postman's convention
-       of color-coding methods in the collections tree and the method
-       select. get/post/put/delete are sampled from a Postman screenshot the
-       user provided; patch/head/options aren't visible in Postman's own UI
-       in dark mode by default, so those three are picked to fit the same
-       pastel-on-dark family rather than copied from anywhere. */
+    /* HTTP method colors (added 2026-09-13) */
     --method-get: 145.3 47.1% 73.3%; /* #9bdbb6 */
     --method-post: 44.8 95.3% 74.9%; /* #fcdd82 */
-    --method-put: 218.0 62.1% 74.1%; /* #94b2e6 */
-    --method-patch: 175.0 50.0% 67.0%; /* #81d5ce */
+    --method-put: 218 62.1% 74.1%; /* #94b2e6 */
+    --method-patch: 175 50% 67%; /* #81d5ce */
     --method-delete: 9.2 61.2% 72.7%; /* #e49c8f */
-    --method-head: 268.0 45.0% 76.0%; /* #c0a6dd */
-    --method-options: 220.0 14.0% 70.0%; /* #a8afbd */
+    --method-head: 268 45% 76%; /* #c0a6dd */
+    --method-options: 220 14% 70%; /* #a8afbd */
 
     /* Nord "frost" family members not already covered by an existing token
        (primary is nord8 #88c0d0). Added for the in-flight request spinner
        (2026-09-13); free to reuse anywhere else a frost accent is needed. */
     --frost-teal: 178.7 25.1% 64.9%; /* nord7 #8fbcbb */
-    --frost-deep: 213.1 32.0% 52.2%; /* nord10 #5e81ac */
+    --frost-deep: 213.1 32% 52.2%; /* nord10 #5e81ac */
   }
 
   .dark {
     --background: 221.7 16.3% 27.6%;
     --foreground: 217.5 26.7% 94.1%;
-    --card: 220.0 16.4% 21.6%;
+    --card: 220 16.4% 21.6%;
     --card-foreground: 217.5 26.7% 94.1%;
-    --popover: 220.0 17.2% 17.1%;
+    --popover: 220 17.2% 17.1%;
     --popover-foreground: 217.5 26.7% 94.1%;
     --primary: 193.3 43.4% 67.5%;
-    --primary-foreground: 220.0 17.2% 17.1%;
-    --secondary: 220.0 16.5% 35.7%;
+    --primary-foreground: 220 17.2% 17.1%;
+    --secondary: 220 16.5% 35.7%;
     --secondary-foreground: 217.5 26.7% 94.1%;
-    --muted: 220.0 16.8% 31.6%;
+    --muted: 220 16.8% 31.6%;
     --muted-foreground: 218.7 18.1% 66.5%;
-    --accent: 220.0 16.8% 31.6%;
+    --accent: 220 16.8% 31.6%;
     --accent-foreground: 217.5 26.7% 94.1%;
     --destructive: 354.3 42.3% 56.5%;
     --destructive-foreground: 0 0% 100%;
     --warning: 14.4 50.5% 62.7%;
-    --warning-foreground: 220.0 17.2% 17.1%;
-    --border: 220.0 16.5% 35.7%;
+    --warning-foreground: 220 17.2% 17.1%;
+    --border: 220 16.5% 35.7%;
     --input: 221.5 16.5% 15.5%;
     --ring: 193.3 43.4% 67.5%;
 
     --method-get: 145.3 47.1% 73.3%;
     --method-post: 44.8 95.3% 74.9%;
-    --method-put: 218.0 62.1% 74.1%;
-    --method-patch: 175.0 50.0% 67.0%;
+    --method-put: 218 62.1% 74.1%;
+    --method-patch: 175 50% 67%;
     --method-delete: 9.2 61.2% 72.7%;
-    --method-head: 268.0 45.0% 76.0%;
-    --method-options: 220.0 14.0% 70.0%;
+    --method-head: 268 45% 76%;
+    --method-options: 220 14% 70%;
 
     --frost-teal: 178.7 25.1% 64.9%;
-    --frost-deep: 213.1 32.0% 52.2%;
+    --frost-deep: 213.1 32% 52.2%;
   }
 }
 
@@ -178,5 +173,161 @@
     button:not(:disabled):active {
       transform: none;
     }
+  }
+}
+
+/* The rendered half of a Docs tab (PLAN.md Phase 12).
+ *
+ * Written out rather than pulled in from @tailwindcss/typography: the plugin
+ * is a whole prose design system where what is needed here is two dozen
+ * declarations, and it would be a third dependency for the feature.
+ *
+ * Plain CSS rather than utilities because the elements come from
+ * lib/markdown.ts as an HTML string — there is no JSX to hang a className on.
+ * Every colour is a theme token, so this stays in step with the rest of the
+ * app (CLAUDE.md section 6). */
+@layer components {
+  .markdown-preview {
+    line-height: 1.65;
+    overflow-wrap: break-word;
+  }
+
+  .markdown-preview > *:first-child {
+    margin-top: 0;
+  }
+
+  .markdown-preview h1,
+  .markdown-preview h2,
+  .markdown-preview h3,
+  .markdown-preview h4,
+  .markdown-preview h5,
+  .markdown-preview h6 {
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 1.5em 0 0.5em;
+  }
+
+  .markdown-preview h1 {
+    font-size: 1.5rem;
+    /* A rule under the top-level heading, the way a document's title is set
+       off from its body. */
+    border-bottom: 1px solid hsl(var(--border));
+    padding-bottom: 0.3em;
+  }
+  .markdown-preview h2 {
+    font-size: 1.25rem;
+  }
+  .markdown-preview h3 {
+    font-size: 1.1rem;
+  }
+  .markdown-preview h4,
+  .markdown-preview h5,
+  .markdown-preview h6 {
+    font-size: 1rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .markdown-preview p,
+  .markdown-preview blockquote,
+  .markdown-preview pre,
+  .markdown-preview table {
+    margin: 0.75em 0;
+  }
+
+  .markdown-preview ul,
+  .markdown-preview ol {
+    margin: 0.75em 0;
+    padding-left: 1.5em;
+  }
+  .markdown-preview ul {
+    list-style: disc;
+  }
+  .markdown-preview ol {
+    list-style: decimal;
+  }
+  .markdown-preview li {
+    margin: 0.25em 0;
+  }
+  /* A nested list is part of its parent item, not a new block. */
+  .markdown-preview li > ul,
+  .markdown-preview li > ol {
+    margin: 0.25em 0;
+  }
+
+  .markdown-preview blockquote {
+    border-left: 3px solid hsl(var(--border));
+    padding-left: 0.9em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .markdown-preview code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.875em;
+    background: hsl(var(--input));
+    border-radius: calc(var(--radius) - 0.25rem);
+    padding: 0.15em 0.35em;
+  }
+
+  .markdown-preview pre {
+    background: hsl(var(--input));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    padding: 0.75em 0.9em;
+    overflow-x: auto;
+  }
+  /* Inside a block the padding and background belong to the <pre>; doubling
+     them on the <code> draws a box inside a box. */
+  .markdown-preview pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.85em;
+  }
+
+  .markdown-preview table {
+    border-collapse: collapse;
+    display: block;
+    overflow-x: auto;
+  }
+  .markdown-preview th,
+  .markdown-preview td {
+    border: 1px solid hsl(var(--border));
+    padding: 0.4em 0.7em;
+    text-align: left;
+  }
+  .markdown-preview th {
+    background: hsl(var(--card));
+    font-weight: 600;
+  }
+
+  .markdown-preview hr {
+    border: 0;
+    border-top: 1px solid hsl(var(--border));
+    margin: 1.5em 0;
+  }
+
+  /* Links are spans, not anchors: lib/markdown.ts strips the href so a click
+     cannot navigate the app away. They still have to look clickable, because
+     clicking one copies the URL. */
+  .markdown-preview .md-link {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  .markdown-preview .md-link:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  /* An image whose remote source was stripped. Shown as its alt text in a
+     dashed frame, so the reader can see something was meant to be there
+     rather than wondering why the page looks wrong. */
+  .markdown-preview .md-blocked-image {
+    display: inline-block;
+    border: 1px dashed hsl(var(--border));
+    border-radius: calc(var(--radius) - 0.25rem);
+    padding: 0.3em 0.6em;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.875em;
+    font-style: italic;
   }
 }

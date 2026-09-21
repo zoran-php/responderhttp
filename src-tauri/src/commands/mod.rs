@@ -5,6 +5,7 @@
 // calls, no SQL. See CLAUDE.md section 2 and section 11 rule 3.
 pub mod collections;
 pub mod cookies;
+pub mod docs;
 pub mod dto;
 pub mod environments;
 pub mod error;

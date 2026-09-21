@@ -30,21 +30,27 @@ interface ResizeHandleProps {
    * started, so the handle needs to know where that was. */
   size: number;
   label: string;
-  collapsed: boolean;
-  collapseLabel: string;
   onSizeChange: (size: number) => void;
   onReset: () => void;
-  onToggleCollapse: () => void;
+  /**
+   * Collapsing is optional. The documentation split has its own Edit /
+   * Preview / Split switcher, which already does what a chevron here would,
+   * and two ways to hide the same pane is one too many. Leave these out and
+   * the strip is a plain divider.
+   */
+  collapsed?: boolean;
+  collapseLabel?: string;
+  onToggleCollapse?: () => void;
 }
 
 export function ResizeHandle({
   axis,
   size,
   label,
-  collapsed,
-  collapseLabel,
   onSizeChange,
   onReset,
+  collapsed = false,
+  collapseLabel,
   onToggleCollapse,
 }: ResizeHandleProps) {
   const drag = useRef<{ pointer: number; size: number } | null>(null);
@@ -149,19 +155,21 @@ export function ResizeHandle({
           response's at the very bottom — where that overhang is clipped and
           the only control that brings the pane back is half invisible. So it
           overlaps inward instead, into the pane that is always there. */}
-      <button
-        aria-label={collapseLabel}
-        className={`absolute z-10 flex items-center justify-center rounded border border-border bg-card text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 ${
-          horizontal ? "left-0 top-8 h-8 w-3" : "bottom-0 left-8 h-3 w-8"
-        } ${collapsed ? "opacity-100" : ""}`}
-        onClick={onToggleCollapse}
-        onDoubleClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => event.stopPropagation()}
-        title={collapseLabel}
-        type="button"
-      >
-        <Chevron aria-hidden className="h-3 w-3" />
-      </button>
+      {onToggleCollapse !== undefined && collapseLabel !== undefined && (
+        <button
+          aria-label={collapseLabel}
+          className={`absolute z-10 flex items-center justify-center rounded border border-border bg-card text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 ${
+            horizontal ? "left-0 top-8 h-8 w-3" : "bottom-0 left-8 h-3 w-8"
+          } ${collapsed ? "opacity-100" : ""}`}
+          onClick={onToggleCollapse}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+          title={collapseLabel}
+          type="button"
+        >
+          <Chevron aria-hidden className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }

@@ -3,11 +3,15 @@
 // One right-click menu shape for collections, folders and requests — the row
 // that opened it decides which actions are offered (CollectionsSidebar).
 import { useEffect, useRef } from "react";
+import type { LucideIcon } from "lucide-react";
 
 export interface ContextMenuItem {
   label: string;
   onSelect: () => void;
   destructive?: boolean;
+  /** Optional, because most entries here have never needed one. Where it is
+   * set, the label is indented to match so the column stays straight. */
+  icon?: LucideIcon;
 }
 
 interface ContextMenuProps {
@@ -45,21 +49,31 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
       ref={ref}
       style={{ left: x, top: y }}
     >
-      {items.map((item) => (
-        <button
-          className={`block w-full px-3 py-1.5 text-left hover:bg-accent ${
-            item.destructive ? "text-destructive" : ""
-          }`}
-          key={item.label}
-          onClick={() => {
-            item.onSelect();
-            onClose();
-          }}
-          type="button"
-        >
-          {item.label}
-        </button>
-      ))}
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent ${
+              item.destructive ? "text-destructive" : ""
+            }`}
+            key={item.label}
+            onClick={() => {
+              item.onSelect();
+              onClose();
+            }}
+            type="button"
+          >
+            {Icon === undefined ? (
+              // A spacer, so an entry without an icon lines up with one that
+              // has it rather than sitting four pixels to the left.
+              <span aria-hidden className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <Icon aria-hidden className="h-3.5 w-3.5 shrink-0" />
+            )}
+            {item.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
