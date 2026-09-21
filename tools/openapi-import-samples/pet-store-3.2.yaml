@@ -1,0 +1,176 @@
+# Manual-test sample for the OpenAPI import (PLAN.md Phase 8d). Valid 3.2.
+# Exercises: nested tags (3.2 `parent`), a templated server, bearer and
+# API-key auth, an unsupported oauth2 scheme, path/query/header/cookie
+# parameters, JSON / form / multipart bodies, response examples, a 2XX range,
+# a QUERY operation (not importable) and a webhook (ignored).
+openapi: 3.2.0
+info:
+  title: Pet Store (import sample)
+  version: 1.0.0
+servers:
+  - url: https://{region}.petstore.example.com/v1
+    variables:
+      region:
+        default: eu
+        enum: [eu, us]
+  - url: https://staging.petstore.example.com/v1
+tags:
+  - name: store
+    summary: Store
+    kind: nav
+  - name: pets
+    parent: store
+  - name: orders
+    parent: store
+  - name: users
+security:
+  - bearerAuth: []
+paths:
+  /pets:
+    get:
+      tags: [pets]
+      summary: List pets
+      parameters:
+        - name: limit
+          in: query
+          schema: {type: integer, default: 20}
+        - name: status
+          in: query
+          required: true
+          schema: {type: string, enum: [available, sold]}
+        - name: verbose
+          in: query
+          schema: {type: boolean}
+        - name: X-Request-Id
+          in: header
+          required: true
+          schema: {type: string}
+        - name: session
+          in: cookie
+          schema: {type: string}
+      responses:
+        '200':
+          description: Pets
+          content:
+            application/json:
+              examples:
+                two:
+                  summary: Two pets
+                  value: [{id: 1, name: Rex}, {id: 2, name: Tom}]
+                none:
+                  summary: No pets
+                  value: []
+        4XX:
+          description: Client error
+          content:
+            application/problem+json:
+              example: {title: Bad request}
+    post:
+      tags: [pets]
+      summary: Add a pet
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NewPet'}
+      responses:
+        '201': {description: Created}
+    query:
+      tags: [pets]
+      summary: Search pets with a body
+      responses:
+        '200': {description: ok}
+  /pets/{petId}:
+    parameters:
+      - name: petId
+        in: path
+        required: true
+        schema: {type: integer}
+        example: 42
+    get:
+      tags: [pets]
+      summary: Get a pet
+      security:
+        - apiKey: []
+      responses:
+        '200':
+          description: The pet
+          content:
+            application/json:
+              example: {id: 42, name: Rex}
+    delete:
+      tags: [pets]
+      summary: Delete a pet
+      deprecated: true
+      security:
+        - petstoreOauth: [write]
+      responses:
+        '204': {description: Deleted}
+  /pets/{petId}/photo:
+    post:
+      tags: [pets]
+      summary: Upload a photo
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                caption: {type: string, example: At the beach}
+                file: {type: string, format: binary}
+      responses:
+        '200': {description: ok}
+  /store/orders:
+    post:
+      tags: [orders]
+      summary: Place an order
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            example: {petId: 42, quantity: 1}
+      responses:
+        '200': {description: ok}
+  /login:
+    post:
+      tags: [users]
+      summary: Log in
+      security: []
+      requestBody:
+        content:
+          application/json:
+            example: {username: ann, password: example-only}
+      responses:
+        '200': {description: ok}
+  /health:
+    get:
+      summary: Health check
+      security: [{}]
+      responses:
+        '200':
+          description: Healthy
+          content:
+            text/plain:
+              example: OK
+webhooks:
+  petAdopted:
+    post:
+      responses:
+        '200': {description: ok}
+components:
+  schemas:
+    NewPet:
+      type: object
+      required: [name]
+      properties:
+        id: {type: integer, readOnly: true}
+        name: {type: string}
+        tag: {type: string}
+        birthday: {type: string, format: date}
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer}
+    apiKey: {type: apiKey, in: header, name: X-API-Key}
+    petstoreOauth:
+      type: oauth2
+      flows:
+        implicit:
+          authorizationUrl: https://petstore.example.com/oauth
+          scopes: {write: modify pets}

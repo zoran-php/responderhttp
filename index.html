@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ResponderHTTP</title>
+    <!--
+      Inlined, not in src/index.css: this has to paint before React (and the
+      Tailwind bundle it pulls in) has loaded at all, so it can't depend on
+      either. Colors are hand-copied from the Nord Ice tokens in
+      src/index.css rather than ad-hoc — keep the two in sync if the palette
+      changes. Removed by main.tsx once App has mounted.
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #3b4252; /* --background */
+      }
+
+      #preloader {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #3b4252; /* --background */
+        transition: opacity 150ms ease-out;
+      }
+
+      #preloader.preloader-hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .nord-loader {
+        position: relative;
+        width: 160px;
+        height: 160px;
+      }
+
+      .nord-loader-ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 1px solid rgba(236, 239, 244, 0.12); /* text-main, low alpha */
+      }
+
+      .nord-loader-ring--inner {
+        inset: 30px;
+        border-color: rgba(236, 239, 244, 0.18);
+      }
+
+      /* The traveling glow: a conic gradient masked down to a thin ring the
+         same size as the outer border, then spun. The mask is what turns a
+         solid gradient disc into a ring-shaped trace. */
+      .nord-loader-trace {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: conic-gradient(
+          from 0deg,
+          transparent 0deg,
+          transparent 265deg,
+          #8fbcbb 300deg,
+          /* Nord7 teal */ #88c0d0 330deg,
+          /* accent-blue */ transparent 360deg
+        );
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+        mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+        animation: nord-orbit-spin 1.6s linear infinite;
+      }
+
+      .nord-loader-core {
+        position: absolute;
+        inset: 55px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #88c0d0, #5e81ac 75%); /* accent-blue -> Nord10 */
+        box-shadow: 0 0 24px 2px rgba(136, 192, 208, 0.35);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #eceff4; /* text-main */
+        font: 600 13px/1 system-ui, sans-serif;
+        letter-spacing: 0.06em;
+      }
+
+      @keyframes nord-orbit-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="preloader">
+      <div class="nord-loader">
+        <div class="nord-loader-ring"></div>
+        <div class="nord-loader-trace"></div>
+        <div class="nord-loader-ring nord-loader-ring--inner"></div>
+        <div class="nord-loader-core">API</div>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

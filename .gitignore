@@ -1,0 +1,73 @@
+# dependencies
+node_modules
+
+# pnpm is the package manager for this repo (CLAUDE.md section 9), and the
+# decision only holds if the npm lockfile cannot come back: two lockfiles drift
+# and whoever installs next gets a different tree.
+package-lock.json
+yarn.lock
+
+# build output
+dist
+dist-ssr
+src-tauri/target
+spikes/*/target
+/Claude outputs/
+*log.txt*
+
+# env
+.env
+.env.local
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.mypy_cache
+
+# os
+.DS_Store
+Thumbs.db
+
+# tauri generated — regenerated on every build, platform-specific
+# (NOT src-tauri/schemas/, which is vendored OpenAPI source the build reads)
+src-tauri/gen/schemas/
+
+# signing material — winapp cert generate writes devcert.pfx here
+*.pfx
+*.p12
+*.snk
+
+# packaged output
+msix-stage/
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+*.msi
+*.exe
+
+# env
+.env.*
+!.env.example
+
+# scratch that must never be committed
+_to_delete/
+
+# test / build leftovers
+coverage/
+*.tsbuildinfo
+*.sqlite3
+*.orig
+*.rej
+
+# os
+desktop.ini
+
+# Development certificate
+devcert.pfx

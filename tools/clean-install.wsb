@@ -1,0 +1,57 @@
+<!--
+  tools/clean-install.wsb
+
+  Phase 7's Done-when, as a double-click: a machine with no Rust, no Node, no
+  curl and no OpenSSL, installing the real bundle.
+
+  Run release.bat first. <HostFolder> must already exist or the sandbox
+  refuses to start, and the path below only exists after a bundle.
+
+  The host folder is mapped READ-ONLY on purpose. Microsoft's own warning:
+  "Changes made during a Sandbox session to a mapped folder with
+  write-permissions will persist after a Sandbox is disposed." A clean-install
+  test has no business writing to the tree it is testing.
+
+  Networking is on because it has to be: tauri.conf.json uses
+  webviewInstallMode "downloadBootstrapper", so the installer fetches the
+  WebView2 runtime. That is the documented cost of a small installer, and this
+  is where it gets tested rather than assumed.
+
+  What to check once inside (2026-09-15):
+
+    1. The NSIS installer's own graphics — header, sidebar, icons. Never seen.
+    2. That it installs and the app launches at all.
+    3. That a real HTTPS request succeeds. This is the actual Done-when:
+       libcurl, rustls and SQLite are inside the exe, and nothing here has
+       ever proved that at runtime on a machine that lacks them.
+    4. The allowlist gap in spikes/static-link-proof/check-windows.ps1 —
+       four DLLs were added to it without being confirmed present. In a
+       sandbox cmd window:
+
+         dir C:\Windows\System32\comctl32.dll C:\Windows\System32\dwmapi.dll
+         dir C:\Windows\System32\gdi32.dll C:\Windows\System32\shlwapi.dll
+
+       All four present closes it; delete the "NOT yet eyeballed" comment in
+       that script.
+    5. Re-run the installer over itself to see the downgrade block behave.
+
+  Requires Windows Pro/Enterprise/Education with the "Windows Sandbox"
+  optional feature enabled, on Windows 10 build 18342 or later.
+-->
+<Configuration>
+  <MappedFolders>
+    <MappedFolder>
+      <!-- Relative to this file. If the sandbox will not start, some builds
+           want it absolute: C:\...\src-tauri\target\release\bundle\nsis -->
+      <HostFolder>..\src-tauri\target\release\bundle\nsis</HostFolder>
+      <SandboxFolder>C:\install</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+
+  <Networking>Enable</Networking>
+
+  <LogonCommand>
+    <Command>explorer.exe C:\install</Command>
+  </LogonCommand>
+</Configuration>

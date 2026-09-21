@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ResponderHTTP — MSIX package manifest for the Microsoft Store.
+
+  The three identity values below are not ours to choose: they are copied
+  verbatim from Partner Center (Product management > View app identity
+  details) for the reserved name "ResponderHTTP", Store ID 9NV8JJQKDBRK.
+  If any one of them differs by a character the Store rejects the upload.
+
+    Package/Identity/Name                  ZoranDavidovi.ResponderHTTP
+    Package/Identity/Publisher             CN=921A9FC1-…
+    Package/Properties/PublisherDisplayName  Zoran Davidović
+
+  The Publisher is not a certificate we own — the Store re-signs the package
+  with its own certificate at submission, which is why this route needs no
+  bought certificate (PLAN.md Phase 10). `winapp cert generate` reads the
+  Publisher from here, via its manifest option, to make a *development*
+  certificate — that one is only for installing the package locally before
+  submitting.
+
+  Version is four parts. The Store requires the last part to be 0 and the
+  first part to be non-zero, so it is 1.0.0.0 and it must stay in step with
+  `version` in tauri.conf.json, Cargo.toml and package.json — pack-store.bat
+  fails the build if the two drift apart.
+
+  Executable is the name the staged file gets, not the Cargo output name:
+  pack-store.bat copies target\release\responderhttp.exe into the staging
+  folder as ResponderHTTP.exe so the running process matches the product.
+
+  EntryPoint Windows.FullTrustApplication plus the runFullTrust capability is
+  what makes this a packaged Win32 app rather than a UWP one. runFullTrust is
+  a restricted capability; it is the expected declaration for a desktop app
+  and is granted for Store submissions of this kind.
+
+  Only the two mandatory logos and the Store logo are referenced. Wide tiles,
+  a splash screen and the large square tile are optional and are left out
+  until the first package is known to build — a manifest that names an asset
+  the generator did not produce fails at pack time.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="ZoranDavidovi.ResponderHTTP"
+    Publisher="CN=921A9FC1-B849-48FC-BD33-F30886A7A063"
+    Version="1.0.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>ResponderHTTP</DisplayName>
+    <PublisherDisplayName>Zoran Davidović</PublisherDisplayName>
+    <Description>A desktop API client with libcurl built in. Send HTTP requests, organise them into collections, and keep everything on your own machine.</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!--
+      17763 (Windows 10 1809) is the usual floor for MSIX desktop packages and
+      is comfortably below anything this app needs: WebView2 and Credential
+      Manager both predate it. MaxVersionTested is a released Windows 11 build;
+      it does not restrict installation, it records what was tested.
+    -->
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.17763.0"
+      MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application
+      Id="App"
+      Executable="ResponderHTTP.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="ResponderHTTP"
+        Description="A desktop API client with libcurl built in."
+        BackgroundColor="#3B4252"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

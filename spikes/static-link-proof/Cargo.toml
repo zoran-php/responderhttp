@@ -1,0 +1,25 @@
+[package]
+name = "static-link-proof"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Standalone on purpose, not part of src-tauri: Tauri and WebView2 imports
+# would crowd the import table and blur what libcurl itself pulls in.
+
+[dependencies]
+# Must stay byte-for-byte identical to the curl line in src-tauri/Cargo.toml.
+# That line is what this crate proves.
+curl = { version = "0.4", default-features = false, features = [
+  "static-curl",
+  "rustls",
+  "http2",
+] }
+
+# Same as src-tauri's release profile, so the proof links the way the app will.
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

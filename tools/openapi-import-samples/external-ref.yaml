@@ -1,0 +1,11 @@
+openapi: 3.1.0
+info: {title: Split spec, version: '1'}
+paths:
+  /pets:
+    get:
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: './common.yaml#/components/schemas/Pet'}

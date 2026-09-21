@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Baseline permissions for the main window. This app's own #[tauri::command]s are allowed by default and need no entry here — the file exists because plugin commands called from the frontend do, and a missing grant fails silently at runtime rather than at cargo check. log:default is what lets services/logger.ts reach tauri-plugin-log; tauri-plugin-dialog is driven from Rust only, so it needs nothing.",
+  "windows": ["main"],
+  "permissions": ["core:default", "log:default"]
+}

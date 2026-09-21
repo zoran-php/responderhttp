@@ -1,0 +1,24 @@
+<!--
+  spikes/static-link-proof/proof.wsb
+
+  Windows Sandbox config for the clean-machine run. Double-click to start a
+  throwaway Windows with no dev tools or VC++ runtime; it runs the proof on
+  logon and writes the output to target\release\sandbox-result.txt on the
+  host. Build first with check-windows.ps1 so the exe exists.
+
+  .wsb files don't support relative paths, so HostFolder is this machine's
+  absolute path. Update it if the repo moves.
+-->
+<Configuration>
+  <vGPU>Disable</vGPU>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\Users\Zoran\Documents\http_client\spikes\static-link-proof\target\release</HostFolder>
+      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\proof</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>cmd.exe /v:on /c "cd /d C:\Users\WDAGUtilityAccount\Desktop\proof &amp; static-link-proof.exe &gt; sandbox-result.txt 2&gt;&amp;1 &amp; echo exit=!errorlevel! &gt;&gt; sandbox-result.txt"</Command>
+  </LogonCommand>
+</Configuration>
