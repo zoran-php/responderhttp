@@ -9,7 +9,7 @@ curl is not a dependency. libcurl is compiled into the binary, so there is no
 curl to install, no runtime to add, and no system SSL library to keep patched.
 
 - **No accounts, no telemetry, no analytics, no crash reporting.** The app has
-  no server to talk to. See [`store/privacy-policy.md`](store/privacy-policy.md).
+  no server to talk to. See [`docs/privacy-policy.md`](docs/privacy-policy.md).
 - **One file.** A release build imports only Windows system DLLs — that is
   checked on every release.
 - **Your data stays put.** A single SQLite database in your user profile.
@@ -18,26 +18,29 @@ curl to install, no runtime to add, and no system SSL library to keep patched.
 
 ## Contents
 
-- [Install](#install)
-- [Your first request](#your-first-request)
-- [The window](#the-window)
-- [Building a request](#building-a-request)
-- [Sending](#sending)
-- [Reading the response](#reading-the-response)
-- [Server-sent events](#server-sent-events)
-- [WebSocket](#websocket)
-- [Collections and folders](#collections-and-folders)
-- [Environments and variables](#environments-and-variables)
-- [History](#history)
-- [Documentation](#documentation)
-- [Cookies](#cookies)
-- [OpenAPI](#openapi)
-- [Per-request settings](#per-request-settings)
-- [Keyboard shortcuts](#keyboard-shortcuts)
-- [The tray](#the-tray)
-- [Where your data lives](#where-your-data-lives)
-- [Troubleshooting](#troubleshooting)
-- [Building from source](#building-from-source)
+- [ResponderHTTP](#responderhttp)
+  - [Contents](#contents)
+  - [Install](#install)
+  - [Your first request](#your-first-request)
+  - [The window](#the-window)
+  - [Building a request](#building-a-request)
+  - [Sending](#sending)
+  - [Reading the response](#reading-the-response)
+  - [Server-sent events](#server-sent-events)
+  - [WebSocket](#websocket)
+  - [Collections and folders](#collections-and-folders)
+  - [Environments and variables](#environments-and-variables)
+  - [History](#history)
+  - [Documentation](#documentation)
+  - [Cookies](#cookies)
+  - [OpenAPI](#openapi)
+  - [Per-request settings](#per-request-settings)
+  - [Keyboard shortcuts](#keyboard-shortcuts)
+  - [The tray](#the-tray)
+  - [Where your data lives](#where-your-data-lives)
+  - [Troubleshooting](#troubleshooting)
+  - [Building from source](#building-from-source)
+  - [Privacy and contact](#privacy-and-contact)
 
 ---
 
@@ -422,7 +425,7 @@ Architecture, conventions and the rules the code is held to are in
 
 ## Privacy and contact
 
-The full policy is [`store/privacy-policy.md`](store/privacy-policy.md). The
+The full policy is [`docs/privacy-policy.md`](docs/privacy-policy.md). The
 short version: nothing is collected, nothing is sent anywhere except the
 addresses you type, and everything the app keeps stays on your computer.
 
