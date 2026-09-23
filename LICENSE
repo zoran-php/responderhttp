@@ -1,0 +1,68 @@
+ResponderHTTP License
+Copyright (c) 2026 Zoran Davidović. All rights reserved.
+
+This is not an open-source licence. The source code is published so that it can
+be read and verified, and the application is free for anyone to use, but the
+right to distribute modified versions is reserved.
+
+1. PERMISSION TO USE
+
+   Permission is granted, free of charge, to any person or organisation
+   obtaining a copy of this software (the "Software") to:
+
+   a. use the Software for any purpose, including commercial purposes and use
+      within a business, on any number of computers;
+   b. redistribute the Software, unmodified and in its entirety, provided this
+      licence and all copyright and authorship notices are included and no fee
+      is charged for it;
+   c. read, compile and modify the source code for the licensee's own use.
+
+   No fee, registration or account is required.
+
+2. NO DISTRIBUTION OF MODIFIED VERSIONS
+
+   No person or organisation may distribute, publish, sublicense, sell or
+   otherwise make available to any third party:
+
+   a. a modified copy of the Software, in source or binary form;
+   b. a work derived from the Software, including a fork, a port, a
+      repackaging or a rebranding of it;
+   c. the Software, modified or not, presented as that person's own work or
+      under another name.
+
+   Modifying a copy for the licensee's own use is permitted by section 1(c);
+   passing that modified copy to anyone else is not.
+
+3. NOTICES
+
+   The name of the Software and of its author may not be removed from, or
+   altered in, any copy that is passed on, and may not be used to endorse or
+   promote another product without written permission.
+
+4. THIRD-PARTY COMPONENTS
+
+   The Software incorporates third-party components, including but not limited
+   to libcurl, SQLite, Tauri, Rust crates, React and the Monaco editor. Each of
+   those remains subject to its own licence, which this licence neither
+   replaces nor restricts.
+
+5. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+6. LIMITATION OF LIABILITY
+
+   IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+
+7. TERMINATION
+
+   Any distribution in breach of section 2 terminates the permission granted by
+   section 1 for the party in breach. Copies held by others are unaffected.
+
+For any use these terms do not allow, including a redistribution arrangement,
+write to zorandavidovic@outlook.com.

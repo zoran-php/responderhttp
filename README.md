@@ -9,7 +9,8 @@ curl is not a dependency. libcurl is compiled into the binary, so there is no
 curl to install, no runtime to add, and no system SSL library to keep patched.
 
 - **No accounts, no telemetry, no analytics, no crash reporting.** The app has
-  no server to talk to. See [`store/privacy-policy.md`](store/privacy-policy.md).
+  no server to talk to. See the
+  [privacy policy](https://zoran-php.github.io/responderhttp/privacy-policy.html).
 - **One file.** A release build imports only Windows system DLLs — that is
   checked on every release.
 - **Your data stays put.** A single SQLite database in your user profile.
@@ -40,6 +41,7 @@ curl to install, no runtime to add, and no system SSL library to keep patched.
   - [Where your data lives](#where-your-data-lives)
   - [Troubleshooting](#troubleshooting)
   - [Building from source](#building-from-source)
+- [Licence](#licence)
   - [Privacy and contact](#privacy-and-contact)
 
 ---
@@ -423,9 +425,23 @@ Architecture, conventions and the rules the code is held to are in
 
 ---
 
+## Licence
+
+ResponderHTTP is **free to use** — any person, any organisation, commercial work
+included, on as many machines as you like — and the installer may be passed on
+unchanged. What is reserved is **distributing a modified version**: no forks, no
+rebuilt or rebranded copies. Changing your own copy for your own use is fine;
+handing that copy to someone else is not.
+
+The source is published so the claims above can be checked, not as an
+open-source grant. Full text: [`LICENSE`](LICENSE); the plain-language version
+is at [Terms and Conditions](https://zoran-php.github.io/responderhttp/terms.html).
+
 ## Privacy and contact
 
-The full policy is [`store/privacy-policy.md`](store/privacy-policy.md). The
+The full policy is at
+[zoran-php.github.io/responderhttp/privacy-policy](https://zoran-php.github.io/responderhttp/privacy-policy.html).
+The
 short version: nothing is collected, nothing is sent anywhere except the
 addresses you type, and everything the app keeps stays on your computer.
 

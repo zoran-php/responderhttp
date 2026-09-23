@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResponderHTTP — Terms and Conditions</title>
+    <meta name="description" content="Terms and conditions for ResponderHTTP, a desktop API client by Zoran Davidović: free to use, no modified redistribution.">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        themeBg: '#181D24',
+                        themeBgAlt: '#1F252E',
+                        themeCard: '#262E37',
+                        themeCardHover: '#2D3742',
+                        themeBorder: '#353F4B',
+                        themeBorderLight: '#435060',
+                        brandAccent: '#73B0C2',
+                        brandAccentHover: '#86C1D3',
+                        brandAccentMuted: 'rgba(115, 176, 194, 0.12)',
+                        brandAccentBorder: 'rgba(115, 176, 194, 0.25)',
+                        textPrimary: '#F1F5F9',
+                        textSecondary: '#94A3B8',
+                        textMuted: '#64748B'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #181D24;
+            color: #F1F5F9;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-image: radial-gradient(circle at 50% 0%, #222B36 0%, #181D24 70%);
+            background-attachment: fixed;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #181D24;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #353F4B;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #73B0C2;
+        }
+
+        .active-toc-item {
+            color: #73B0C2 !important;
+            border-left-color: #73B0C2 !important;
+            background-color: rgba(115, 176, 194, 0.08);
+            font-weight: 600;
+        }
+
+        /* Print styling rules */
+        @media print {
+            .no-print { display: none !important; }
+            body { 
+                background: #ffffff !important; 
+                color: #0f172a !important; 
+                background-image: none !important;
+            }
+            .print-card { 
+                background: #ffffff !important; 
+                border: 1px solid #cbd5e1 !important; 
+                color: #0f172a !important;
+                box-shadow: none !important;
+            }
+            .print-text-dark { color: #0f172a !important; }
+            .print-text-muted { color: #475569 !important; }
+            .print-accent { color: #0891b2 !important; }
+            a { text-decoration: underline !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-brandAccent selection:text-themeBg">
+
+    <!-- Navigation Bar -->
+    <header class="sticky top-0 z-50 bg-themeBg/90 backdrop-blur-md border-b border-themeBorder/80 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            
+            <!-- Brand & App Logo -->
+            <a href="index.html" class="flex items-center space-x-3.5 group transition-transform duration-200 hover:scale-[1.01]">
+                <div class="relative w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-black/40 border border-themeBorderLight shrink-0 flex items-center justify-center">
+                    <!-- SVG Logo matching StoreLogo image -->
+                    <svg class="w-full h-full" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="logoBg" x1="0" y1="0" x2="0" y2="128" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#3A4452"/>
+                                <stop offset="100%" stop-color="#1E242D"/>
+                            </linearGradient>
+                            <linearGradient id="rGrad" x1="0" y1="0" x2="0" y2="128" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#80BDCF"/>
+                                <stop offset="100%" stop-color="#67A3B5"/>
+                            </linearGradient>
+                        </defs>
+                        <rect width="128" height="128" rx="28" fill="url(#logoBg)"/>
+                        <rect x="1" y="1" width="126" height="126" rx="27" stroke="#4A5667" stroke-width="2" stroke-opacity="0.6"/>
+                        <path d="M36 28h32c13.2 0 22 7.8 22 19.5C90 59 81.5 66.5 68 66.5 L88 100 H69.5 L53 70 H53 V100 H36 V28 Z M53 42 v16 h14 c4.5 0 8-3 8-8 s-3.5-8-8-8 H53 Z" fill="url(#rGrad)"/>
+                    </svg>
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-extrabold text-textPrimary tracking-tight text-lg group-hover:text-brandAccent transition-colors">
+                        ResponderHTTP
+                    </span>
+                    <span class="text-[10px] font-mono tracking-widest text-textMuted uppercase -mt-0.5">Desktop API Client</span>
+                </div>
+            </a>
+
+            <!-- Page links -->
+            <nav class="flex items-center space-x-1 sm:space-x-2">
+                    <a href="index.html" class="px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Overview</a>
+                    <a href="privacy-policy.html" class="px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Privacy</a>
+                    <a href="terms.html" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">Terms</a>
+                    <button onclick="window.print()" class="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary bg-themeCard hover:bg-themeCardHover border border-themeBorder transition-all duration-150">
+                        <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        <span>Print</span>
+                    </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <div class="border-b border-themeBorder/60 bg-themeBgAlt/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+            <div class="max-w-3xl">
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-themeCard border border-themeBorder text-xs text-textMuted font-mono mb-4">
+                    <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span>Effective Date: 23 September 2026</span>
+                </div>
+                <h1 class="text-3xl sm:text-5xl font-extrabold text-textPrimary tracking-tight print-text-dark">
+                    Terms and Conditions
+                </h1>
+                <p class="mt-4 text-base sm:text-lg text-textSecondary leading-relaxed print-text-muted">
+                    ResponderHTTP is a desktop API client published by <strong class="text-textPrimary font-semibold print-text-dark">Zoran Davidović</strong>. These terms say what you may do with it. The short version: use it freely, for anything, at no cost — but do not hand out a modified copy.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-grow w-full">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 no-print">
+            <div class="p-4 rounded-xl bg-themeCard border border-themeBorder flex items-start space-x-3.5 hover:border-themeBorderLight transition-all">
+                <div class="p-2.5 rounded-lg bg-brandAccentMuted border border-brandAccentBorder text-brandAccent shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                </div>
+                <div>
+                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">Free to use</h2>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">Any person, any organisation, commercial work included.</p>
+                </div>
+            </div>
+            <div class="p-4 rounded-xl bg-themeCard border border-themeBorder flex items-start space-x-3.5 hover:border-themeBorderLight transition-all">
+                <div class="p-2.5 rounded-lg bg-brandAccentMuted border border-brandAccentBorder text-brandAccent shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </div>
+                <div>
+                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">Share it unchanged</h2>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">Pass the installer on as it came.</p>
+                </div>
+            </div>
+            <div class="p-4 rounded-xl bg-themeCard border border-themeBorder flex items-start space-x-3.5 hover:border-themeBorderLight transition-all">
+                <div class="p-2.5 rounded-lg bg-brandAccentMuted border border-brandAccentBorder text-brandAccent shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                </div>
+                <div>
+                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">No modified copies</h2>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">Forks and rebuilt builds may not be distributed.</p>
+                </div>
+            </div>
+            <div class="p-4 rounded-xl bg-themeCard border border-themeBorder flex items-start space-x-3.5 hover:border-themeBorderLight transition-all">
+                <div class="p-2.5 rounded-lg bg-brandAccentMuted border border-brandAccentBorder text-brandAccent shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+                </div>
+                <div>
+                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">Provided as is</h2>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">No warranty; you own the requests you send.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+            <aside class="hidden lg:block lg:col-span-4 sticky top-24 no-print">
+                <div class="bg-themeCard/80 border border-themeBorder rounded-2xl p-5 backdrop-blur-sm">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-textMuted mb-3 px-2 flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+                        <span>Contents</span>
+                    </h2>
+                    <nav class="space-y-1 text-sm font-medium">
+                        <a href="#permission" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">01</span> What you may do
+                        </a>
+                        <a href="#restrictions" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">02</span> What you may not do
+                        </a>
+                        <a href="#source" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">03</span> The source code
+                        </a>
+                        <a href="#warranty" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">04</span> No warranty
+                        </a>
+                        <a href="#liability" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">05</span> Limitation of liability
+                        </a>
+                        <a href="#third-party" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">06</span> Third-party components
+                        </a>
+                        <a href="#changes" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">07</span> Changes to these terms
+                        </a>
+                        <a href="#contact" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">08</span> Contact
+                        </a>
+                    </nav>
+                </div>
+            </aside>
+
+            <div class="lg:col-span-8 space-y-6 sm:space-y-8">
+
+                <section id="permission" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            01
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            What you may do
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">ResponderHTTP is <strong class="text-brandAccent font-medium print-text-dark">free of charge</strong>. Permission is granted to any person or organisation to use it, and that permission is deliberately broad:</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Use it for anything, including commercial work, inside a company, or on client projects</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Install it on as many computers as you like</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Pass the installer on to someone else <strong class="text-textPrimary font-semibold print-text-dark">unchanged</strong></span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Read the source code, and build it yourself to check that it does what this site says it does</span>
+                        </li>
+                    </ul>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mt-4">There is no licence fee, no registration, no account and no seat count to track.</p>
+                </section>
+
+                <section id="restrictions" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            02
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            What you may not do
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">One thing is reserved: <strong class="text-brandAccent font-medium print-text-dark">nobody may distribute a modified version of this application.</strong></p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Do not publish, share, sell or otherwise distribute a changed build, a fork, a repackaging or a rebranded copy</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Do not present the app, or anything derived from it, as your own work</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Do not remove or alter the name, the authorship or these notices in a copy you pass on</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Do not sell the app, or charge for access to it, whether changed or not</span>
+                        </li>
+                    </ul>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mt-4">Changing your own copy, on your own machine, for your own use is not what this restricts — what it restricts is handing that changed copy to anyone else. If you want a change in the app, the issue tracker is the right place to ask, and a change worth making helps everyone rather than one fork.</p>
+                </section>
+
+                <section id="source" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            03
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            The source code
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">The source is public so that the claims on this site can be checked: that nothing is collected, that secrets are encrypted, that requests go only where you send them. Being readable is not the same as being open source — the repository carries no open-source licence, and the restriction above applies to the code as much as to the built application.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark ">The full licence text is in the <a href="https://github.com/zoran-php/responderhttp/blob/master/LICENSE" class="text-brandAccent hover:text-brandAccentHover underline decoration-brandAccent/40 underline-offset-4">LICENSE file</a> in the repository. Where the licence and this page differ, the licence governs.</p>
+                </section>
+
+                <section id="warranty" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            04
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            No warranty
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">The application is provided <strong class="text-textPrimary font-semibold print-text-dark">as is</strong>, without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose and non-infringement.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark ">It is a tool that sends whatever you tell it to send, to whatever address you type. You are responsible for the requests you make, for having permission to make them, and for the data you put in them.</p>
+                </section>
+
+                <section id="liability" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            05
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Limitation of liability
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">To the fullest extent permitted by law, the author is not liable for any claim, damages or other liability — whether in contract, tort or otherwise — arising from the application or its use, including any loss of data, loss of profit, or consequences of a request the application sent.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark ">Some jurisdictions do not allow certain exclusions, in which case those exclusions apply only as far as the law allows and nothing here removes a right you have that cannot be waived.</p>
+                </section>
+
+                <section id="third-party" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            06
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Third-party components
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark ">The application is built on open-source components — among them libcurl, SQLite, Tauri, Rust crates, React and the Monaco editor. Each remains under its own licence, and those licences continue to apply to those components rather than being replaced by these terms. It also relies on the Microsoft Edge WebView2 Runtime, which is Microsoft’s and is covered by Microsoft’s own terms.</p>
+                </section>
+
+                <section id="changes" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            07
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Changes to these terms
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark ">If these terms change, the updated version will be published at this address and the date above will change. A change does not reach back: a copy you already have stays under the terms it was given to you under.</p>
+                </section>
+
+                <section id="contact" class="scroll-mt-24 print-card bg-gradient-to-br from-themeCard to-themeBgAlt border border-brandAccentBorder rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+                    <div class="absolute -right-10 -bottom-10 w-40 h-40 rounded-full bg-brandAccent/5 blur-2xl pointer-events-none"></div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">08</span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">Contact</h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed mb-6 print-text-dark">
+                        Questions about these terms, or a use that does not fit them — a redistribution arrangement, for
+                        instance — can be raised directly:
+                    </p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <a href="mailto:zorandavidovic@outlook.com" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-themeBg border border-themeBorder hover:border-brandAccent text-textPrimary transition-all duration-150 group">
+                            <svg class="w-4 h-4 text-brandAccent group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            <span class="font-mono text-xs sm:text-sm font-medium">zorandavidovic@outlook.com</span>
+                        </a>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Page Footer -->
+    <footer class="border-t border-themeBorder/80 bg-themeBg/95 text-xs text-textMuted py-8 mt-12 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-6 h-6 rounded-md bg-themeCard border border-themeBorder flex items-center justify-center font-mono text-[10px] text-brandAccent font-bold">
+                    R
+                </div>
+                <span>&copy; 2026 Zoran Davidović. All rights reserved.</span>
+            </div>
+            <div class="flex items-center space-x-4 font-mono text-[11px]">
+                <a href="index.html" class="hover:text-brandAccent transition-colors">Overview</a>
+                <span>&bull;</span>
+                <a href="privacy-policy.html" class="hover:text-brandAccent transition-colors">Privacy</a>
+                <span>&bull;</span>
+                <a href="terms.html" class="hover:text-brandAccent transition-colors">Terms</a>
+                <span>&bull;</span>
+                <a href="https://github.com/zoran-php/responderhttp" class="hover:text-brandAccent transition-colors">GitHub</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Highlights the section the reader is in, as on the other pages.
+        document.addEventListener('DOMContentLoaded', () => {
+            const sections = document.querySelectorAll('section[id]');
+            const navLinks = document.querySelectorAll('.toc-item');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.getAttribute('id');
+                        navLinks.forEach(link => {
+                            if (link.getAttribute('href') === `#${id}`) {
+                                link.classList.add('active-toc-item');
+                            } else {
+                                link.classList.remove('active-toc-item');
+                            }
+                        });
+                    }
+                });
+            }, { rootMargin: '-10% 0px -70% 0px' });
+            sections.forEach(section => observer.observe(section));
+        });
+    </script>
+</body>
+</html>

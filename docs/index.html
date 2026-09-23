@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ResponderHTTP — Privacy Policy</title>
-    <meta name="description" content="Official Privacy Policy for ResponderHTTP desktop API client by Zoran Davidović.">
+    <title>ResponderHTTP — Desktop API Client for Windows</title>
+    <meta name="description" content="ResponderHTTP is a desktop API client for Windows: HTTP, WebSocket and server-sent events in one executable, with libcurl built in and everything stored locally.">
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -101,7 +101,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             
             <!-- Brand & App Logo -->
-            <a href="#" class="flex items-center space-x-3.5 group transition-transform duration-200 hover:scale-[1.01]">
+            <a href="index.html" class="flex items-center space-x-3.5 group transition-transform duration-200 hover:scale-[1.01]">
                 <div class="relative w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-black/40 border border-themeBorderLight shrink-0 flex items-center justify-center">
                     <!-- SVG Logo matching StoreLogo image -->
                     <svg class="w-full h-full" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -128,328 +128,656 @@
                 </div>
             </a>
 
-            <!-- Header Badges and Actions -->
-            <div class="flex items-center space-x-3">
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                    Privacy Policy
-                </span>
-                <button onclick="window.print()" class="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary bg-themeCard hover:bg-themeCardHover border border-themeBorder transition-all duration-150">
-                    <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                    <span>Print Document</span>
-                </button>
-            </div>
+            <!-- Page links -->
+            <nav class="flex items-center space-x-1 sm:space-x-2">
+                    <a href="index.html" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">Overview</a>
+                    <a href="privacy-policy.html" class="px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Privacy</a>
+                    <a href="terms.html" class="px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Terms</a>
+            </nav>
         </div>
     </header>
 
-    <!-- Hero Banner Header -->
+    <!-- Hero -->
     <div class="border-b border-themeBorder/60 bg-themeBgAlt/50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
             <div class="max-w-3xl">
                 <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-themeCard border border-themeBorder text-xs text-textMuted font-mono mb-4">
-                    <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    <span>Effective Date: 23 September 2026</span>
+                    <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <span>Version 1.0.0 &bull; Windows 10 &amp; 11, 64-bit</span>
                 </div>
                 <h1 class="text-3xl sm:text-5xl font-extrabold text-textPrimary tracking-tight print-text-dark">
-                    Privacy Policy
+                    A desktop API client that ships as one file
                 </h1>
                 <p class="mt-4 text-base sm:text-lg text-textSecondary leading-relaxed print-text-muted">
-                    ResponderHTTP is a desktop API client published by <strong class="text-textPrimary font-semibold print-text-dark">Zoran Davidović</strong>. This page describes what the app does with your data. It is short because the app does very little with it.
+                    Send HTTP requests, open WebSocket connections, watch a server-sent event stream arrive live — and keep every collection, environment and cookie on your own machine. curl is not a dependency: libcurl is compiled into the binary.
                 </p>
             </div>
         </div>
     </div>
 
-    <!-- Main Content Grid with Side TOC -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-grow w-full">
-        
-        <!-- Pillar Cards Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 no-print">
-            
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 no-print">
+            <div class="p-4 rounded-xl bg-themeCard border border-themeBorder flex items-start space-x-3.5 hover:border-themeBorderLight transition-all">
+                <div class="p-2.5 rounded-lg bg-brandAccentMuted border border-brandAccentBorder text-brandAccent shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                </div>
+                <div>
+                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">One executable</h2>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">No curl, no runtime, no system SSL library to keep patched.</p>
+                </div>
+            </div>
             <div class="p-4 rounded-xl bg-themeCard border border-themeBorder flex items-start space-x-3.5 hover:border-themeBorderLight transition-all">
                 <div class="p-2.5 rounded-lg bg-brandAccentMuted border border-brandAccentBorder text-brandAccent shrink-0">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
                 </div>
                 <div>
                     <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">0 Analytics / Telemetry</h2>
-                    <p class="text-xs text-textSecondary mt-1 leading-snug">No user tracking, error reporting, or accounts.</p>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">No accounts, no tracking, no crash reporting, no server.</p>
                 </div>
             </div>
-
             <div class="p-4 rounded-xl bg-themeCard border border-themeBorder flex items-start space-x-3.5 hover:border-themeBorderLight transition-all">
                 <div class="p-2.5 rounded-lg bg-brandAccentMuted border border-brandAccentBorder text-brandAccent shrink-0">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>
                 </div>
                 <div>
                     <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">100% Local Storage</h2>
-                    <p class="text-xs text-textSecondary mt-1 leading-snug">Data stays inside your local Windows profile SQLite database.</p>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">Collections, history and cookies in one local SQLite database.</p>
                 </div>
             </div>
-
-            <div class="p-4 rounded-xl bg-themeCard border border-themeBorder flex items-start space-x-3.5 hover:border-themeBorderLight transition-all">
-                <div class="p-2.5 rounded-lg bg-brandAccentMuted border border-brandAccentBorder text-brandAccent shrink-0">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                </div>
-                <div>
-                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">Hardware Encrypted</h2>
-                    <p class="text-xs text-textSecondary mt-1 leading-snug">Secrets protected via Windows Credential Manager keys.</p>
-                </div>
-            </div>
-
             <div class="p-4 rounded-xl bg-themeCard border border-themeBorder flex items-start space-x-3.5 hover:border-themeBorderLight transition-all">
                 <div class="p-2.5 rounded-lg bg-brandAccentMuted border border-brandAccentBorder text-brandAccent shrink-0">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                 </div>
                 <div>
-                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">Direct Traffic Only</h2>
-                    <p class="text-xs text-textSecondary mt-1 leading-snug">Requests connect directly to your specified hosts.</p>
+                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">HTTP, WS and SSE</h2>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">Requests, live WebSocket sessions and streamed events in one place.</p>
                 </div>
             </div>
-
         </div>
 
-        <!-- Two-Column Container -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            
-            <!-- Desktop Sticky Table of Contents -->
+
             <aside class="hidden lg:block lg:col-span-4 sticky top-24 no-print">
                 <div class="bg-themeCard/80 border border-themeBorder rounded-2xl p-5 backdrop-blur-sm">
                     <h2 class="text-xs font-bold uppercase tracking-wider text-textMuted mb-3 px-2 flex items-center space-x-2">
                         <svg class="w-4 h-4 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
-                        <span>Table of Contents</span>
+                        <span>Contents</span>
                     </h2>
                     <nav class="space-y-1 text-sm font-medium">
-                        <a href="#collects-nothing" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">01</span> The developer collects nothing
+                        <a href="#what-it-is" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">01</span> What it is
                         </a>
-                        <a href="#stores-locally" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">02</span> Everything stays on your computer
+                        <a href="#install" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">02</span> Install
                         </a>
-                        <a href="#credentials" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">03</span> Credentials
+                        <a href="#first-request" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">03</span> Your first request
                         </a>
-                        <a href="#network-requests" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">04</span> Network requests
+                        <a href="#requests" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">04</span> Building a request
                         </a>
-                        <a href="#logs" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">05</span> Logs
+                        <a href="#responses" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">05</span> Reading the response
                         </a>
-                        <a href="#files-open-save" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">06</span> Files you open or save
+                        <a href="#sse" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">06</span> Server-sent events
                         </a>
-                        <a href="#children" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">07</span> Children
+                        <a href="#websocket" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">07</span> WebSocket
                         </a>
-                        <a href="#policy-changes" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">08</span> Changes to this policy
+                        <a href="#organising" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">08</span> Collections and environments
                         </a>
-                        <a href="#contact" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">09</span> Contact
+                        <a href="#openapi" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">09</span> OpenAPI
+                        </a>
+                        <a href="#settings" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">10</span> Per-request settings
+                        </a>
+                        <a href="#shortcuts" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">11</span> Shortcuts and the tray
+                        </a>
+                        <a href="#data" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">12</span> Where your data lives
+                        </a>
+                        <a href="#troubleshooting" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">13</span> Troubleshooting
+                        </a>
+                        <a href="#links" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">14</span> Links and contact
                         </a>
                     </nav>
                 </div>
             </aside>
 
-            <!-- Main Content Sections Column -->
             <div class="lg:col-span-8 space-y-6 sm:space-y-8">
 
-                <!-- Section 01 -->
-                <section id="collects-nothing" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                <section id="what-it-is" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
                             01
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
-                            The developer collects nothing
+                            What it is
                         </h2>
                     </div>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        ResponderHTTP has no analytics, no telemetry, no crash reporting and no accounts. It does not phone home, and it contains no update checker. Nothing about you or your use of the app is sent to the developer, and there is no server to send it to.
-                    </p>
-                </section>
-
-                <!-- Section 02 -->
-                <section id="stores-locally" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
-                    <div class="flex items-center space-x-3 mb-4">
-                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                            02
-                        </span>
-                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
-                            Everything the app stores stays on your computer
-                        </h2>
-                    </div>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed mb-4 print-text-dark">
-                        The app keeps its data in a SQLite database in your Windows user profile, inside the app's own storage. That database holds:
-                    </p>
-                    
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">ResponderHTTP is an API client for Windows. Type a URL, choose a method, add headers, parameters, a body and authentication, and send. You get the status code, the response headers, the body with syntax highlighting, and a timing breakdown showing where the time actually went — DNS, connect, TLS, first byte, total.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">It ships as a <strong class="text-textPrimary font-semibold print-text-dark">single executable</strong>. The HTTP and WebSocket engine is libcurl, compiled into the app, so there is no curl to install, no runtime to add and no system SSL library to keep up to date.</p>
                     <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="print-text-dark">The HTTP and WebSocket requests and collections you save</span>
+                            <span class="print-text-dark">Requests — every common method, query parameters, headers, form and raw bodies, and per-request control over redirects, timeouts, TLS verification and proxies</span>
                         </li>
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="print-text-dark">The Markdown documentation you write for a collection, folder or request</span>
+                            <span class="print-text-dark">Authentication — Basic, Bearer, API key and custom schemes</span>
                         </li>
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="print-text-dark">Environments and their variables</span>
+                            <span class="print-text-dark">WebSocket — ws:// and wss:// requests saved alongside HTTP ones, with a composer and a searchable message log</span>
                         </li>
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="print-text-dark">Your request history</span>
+                            <span class="print-text-dark">Server-sent events — a <span class="font-mono text-xs">text/event-stream</span> response shown event by event as it arrives</span>
                         </li>
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="print-text-dark">Cookies received from servers you sent requests to</span>
+                            <span class="print-text-dark">Collections, environments, history and Markdown documentation</span>
                         </li>
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="print-text-dark">Application settings</span>
+                            <span class="print-text-dark">OpenAPI 3.0, 3.1 and 3.2 import and export, in JSON or YAML</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Copy as cURL — turn any request into a command you can paste elsewhere</span>
                         </li>
                     </ul>
-
-                    <div class="mt-6 pt-4 border-t border-themeBorder/80 flex items-center text-xs text-textMuted font-mono">
-                        <svg class="w-4 h-4 text-brandAccent mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        <span>Uninstalling the app removes this data.</span>
-                    </div>
                 </section>
 
-                <!-- Section 03 -->
-                <section id="credentials" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                <section id="install" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            02
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Install
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">Windows 10 or 11, 64-bit.</strong> A release build produces two installers — an NSIS setup program and an MSI for deployment tooling. Both install the same single executable. A Microsoft Store listing is prepared but not published yet.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">The app draws its interface with the Microsoft Edge WebView2 Runtime, which is part of Windows 11 and already present on most Windows 10 machines. If it is missing, Windows Update or Microsoft’s standalone installer adds it.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark ">macOS and Linux are not supported today. The engine is portable, but secret storage is written against Windows Credential Manager.</p>
+                </section>
+
+                <section id="first-request" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
                             03
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
-                            Credentials
+                            Your first request
                         </h2>
                     </div>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        Values the app treats as secrets — passwords, bearer tokens, API keys, and environment variables marked secret — are never written to the database in plain text. They are encrypted with a key held in <strong class="text-textPrimary font-semibold print-text-dark">Windows Credential Manager</strong>, which only your Windows account can read. The key never leaves your computer.
-                    </p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Open the app — a blank request tab is already waiting</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Type <span class="font-mono text-xs">https://httpbin.org/get</span> in the URL bar</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Press <strong class="text-textPrimary font-semibold print-text-dark">Send</strong></span>
+                        </li>
+                    </ul>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mt-4">The response pane fills in: a status pill, how long it took, the size, and the body with syntax highlighting. The timing line underneath breaks the total into DNS, connect, TLS and time-to-first-byte, which is usually enough to tell a slow server from a slow network. Press <span class="font-mono text-xs">Ctrl+S</span> to keep the request in a collection.</p>
                 </section>
 
-                <!-- Section 04 -->
-                <section id="network-requests" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                <section id="requests" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
                             04
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
-                            Network requests
+                            Building a request
                         </h2>
                     </div>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        ResponderHTTP sends HTTP requests, and opens WebSocket connections, <strong class="text-brandAccent font-medium underline decoration-brandAccent/40 underline-offset-4 print-text-dark">only to the addresses you enter</strong>. It is a tool for making those requests, so the destination, the headers and the body are entirely under your control. They go directly from your computer to the server you named; they do not pass through any service operated by the developer.
-                    </p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">Params</strong> are a table view of the URL’s query string, kept in step both ways: edit a row and the URL updates, edit the URL and the rows follow. <strong class="text-textPrimary font-semibold print-text-dark">Headers</strong> autocomplete the common names and their usual values.</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Raw</strong> — JSON, XML, HTML or plain text, with the content type you pick</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Form URL-encoded</strong> — a key-value table</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Multipart</strong> — text fields and file parts; a file part stores the path, and the file is read from disk as the request is sent, so a large upload never sits in memory</span>
+                        </li>
+                    </ul>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mt-4">Authentication is Basic, Bearer token, API key (in a header or the query string), or a custom header. Anything the app treats as a secret is encrypted before it is saved.</p>
                 </section>
 
-                <!-- Section 05 -->
-                <section id="logs" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                <section id="responses" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
                             05
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
-                            Logs
+                            Reading the response
                         </h2>
                     </div>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        The app writes a local log file to help diagnose problems. Request bodies, authentication headers, tokens and cookies are deliberately kept out of it, as are the WebSocket messages you send and receive and the events of a streamed response; a redaction step strips credentials that would otherwise ride along inside an error message. The log stays on your computer and is never uploaded.
-                    </p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">The bar across the top shows the status code, the total time, the size and the timing breakdown. Three views: <strong class="text-textPrimary font-semibold print-text-dark">Pretty</strong> for formatted JSON and XML, <strong class="text-textPrimary font-semibold print-text-dark">Raw</strong> for exactly what arrived, and <strong class="text-textPrimary font-semibold print-text-dark">Headers</strong>.</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Hover the size for a breakdown: response headers and body, request headers and body. A gzipped response counts decoded — the size of what you are looking at</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Save response</strong> keeps it next to the request that produced it, as an example</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Send and download</strong> — the chevron beside Send — writes the body straight to a file, so a multi-gigabyte download costs nothing in memory</span>
+                        </li>
+                    </ul>
                 </section>
 
-                <!-- Section 06 -->
-                <section id="files-open-save" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                <section id="sse" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
                             06
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
-                            Files you open or save
+                            Server-sent events
                         </h2>
                     </div>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        Importing an OpenAPI document, or saving a response to disk, reads and writes only the file you chose in the system dialog.
-                    </p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">A response that arrives as <span class="font-mono text-xs">Content-Type: text/event-stream</span> is shown <strong class="text-brandAccent font-medium print-text-dark">event by event while it is still arriving</strong>. There is nothing to switch on and Send stays one button — it is the response that differs, not the request.</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Events</strong> — one row per event, numbered, with its event name, id and a millisecond timestamp, newest first</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Raw</strong> — the stream exactly as it arrived, growing as it goes</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">A Streaming badge, a running event count and a byte total while the stream is open</span>
+                        </li>
+                    </ul>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mt-4">The request timeout stops applying once a response turns out to be a stream: a timeout is there to stop you waiting forever for a response, not to cut one off that is working. A request that never answers still times out. The viewer keeps the most recent 1 000 events, up to 32 MiB, and says how many earlier ones it dropped.</p>
                 </section>
 
-                <!-- Section 07 -->
-                <section id="children" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                <section id="websocket" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
                             07
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
-                            Children
+                            WebSocket
                         </h2>
                     </div>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        The app is a developer tool and is not directed at children.
-                    </p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">WebSocket requests live in the same collections as HTTP ones. Connect performs the handshake; the badge follows the connection state. Query parameters and handshake headers work as they do for HTTP, and the cookie jar is offered to the handshake unless you turn that off.</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">The composer sends Text, JSON, XML, HTML or Binary — binary typed as Base64 or hexadecimal, whichever you prefer</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Beautify for JSON, XML and HTML; text that does not parse is left exactly as you typed it, with the reason shown</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">A message log, newest first, with millisecond timestamps, expandable rows, a direction filter and a search box</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Per-request settings: handshake timeout, largest message to accept, and automatic reconnect for an unexpected drop</span>
+                        </li>
+                    </ul>
                 </section>
 
-                <!-- Section 08 -->
-                <section id="policy-changes" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                <section id="organising" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
                             08
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
-                            Changes to this policy
+                            Collections and environments
                         </h2>
                     </div>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        If this policy changes, the updated version will be published at this address and the date above will change.
-                    </p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Save a request with <span class="font-mono text-xs">Ctrl+S</span>. Collections hold folders, folders hold requests, and the tree is yours to arrange — rename, duplicate, move, delete, all from the right-click menu.</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Environments</strong> — write <span class="font-mono text-xs">{{base_url}}</span> anywhere in a request and the active environment’s value is substituted when you send. Requests are saved with the placeholders intact, so the same request works against staging and production</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Secret variables</strong> — encrypted with a key held in Windows Credential Manager, never in history, examples or the log</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">History</strong> — every request you sent, with its status and duration, ready to re-send</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Documentation</strong> — Markdown notes on any collection, folder or request, with Edit, Preview and Split views</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Cookies</strong> — a jar that follows RFC 6265, with a manager for inspecting and clearing it</span>
+                        </li>
+                    </ul>
                 </section>
 
-                <!-- Section 09: Contact Card -->
-                <section id="contact" class="scroll-mt-24 print-card bg-gradient-to-br from-themeCard to-themeBgAlt border border-brandAccentBorder rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-                    <div class="absolute -right-10 -bottom-10 w-40 h-40 rounded-full bg-brandAccent/5 blur-2xl pointer-events-none"></div>
-                    
+                <section id="openapi" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
                             09
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
-                            Contact
+                            OpenAPI
                         </h2>
                     </div>
-                    
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed mb-6 print-text-dark">
-                        Questions regarding this policy or ResponderHTTP privacy practices can be sent directly to:
-                    </p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Import a 3.0, 3.1 or 3.2 document, in JSON or YAML, as a new collection. Nothing is written until you confirm: the dialog shows how many requests and saved responses it found, lets you choose how they are grouped into folders, and offers to create an environment from the document’s servers. Descriptions come in as documentation.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark ">Export a collection back out, choosing the version and JSON or YAML; request and response shapes are inferred from the examples you saved. WebSocket requests cannot be exported — the OpenAPI specification has no way to describe them, and the dialog says how many it is leaving out.</p>
+                </section>
 
+                <section id="settings" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            10
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Per-request settings
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Every request carries its own settings, saved with it.</p>
+                    <div class="overflow-x-auto rounded-xl border border-themeBorder">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="bg-themeBgAlt/60 text-textMuted uppercase tracking-wider text-[11px]">
+                                <tr>
+                                    <th class="px-4 py-2.5 font-semibold">Setting</th>
+                                    <th class="px-4 py-2.5 font-semibold">Default</th>
+                                    <th class="px-4 py-2.5 font-semibold">What it does</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-themeBorder/70">
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Follow redirects</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">On</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Follow 3xx responses</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Max redirects</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">10</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">How many hops before giving up</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Timeout</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">30 000 ms</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Whole request; lifted once a response turns out to be an event stream</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Verify TLS</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">On</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Turning it off is a deliberate, visible, per-request choice</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Minimum TLS</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Auto</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Or pin 1.2 / 1.3</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">HTTP version</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Auto</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Auto tries HTTP/2 over TLS and falls back to 1.1; or force 1.1 or 2</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Proxy</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">None</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Per request, not a global setting</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Send cookies</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">On</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Use the jar for this request</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Keep method on redirect</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Off</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Browsers and curl turn POST into GET on 301/302/303; this keeps it</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Keep auth across hosts</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Off</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">On is how credentials leak somewhere unintended</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Encode URL</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">On</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Percent-encode the parameters the app appends; what you typed is passed through untouched either way</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Allow HTTP/0.9</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Off</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Accept a bodies-only response</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="shortcuts" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            11
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Shortcuts and the tray
+                        </h2>
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-themeBorder">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="bg-themeBgAlt/60 text-textMuted uppercase tracking-wider text-[11px]">
+                                <tr>
+                                    <th class="px-4 py-2.5 font-semibold">Keys</th>
+                                    <th class="px-4 py-2.5 font-semibold">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-themeBorder/70">
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Ctrl+S</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Save the current request</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Ctrl+Shift+D</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Open documentation for the request in the builder</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mt-4">Closing the window hides the app to the notification area rather than quitting it, so requests in flight and open WebSocket connections survive. The first few closes say so in a toast with a "Don’t show this again" button. The tray icon’s menu has Show and Quit.</p>
+                </section>
+
+                <section id="data" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            12
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Where your data lives
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-2">One SQLite database plus a log folder, under your user profile:</p>
+                    <pre class="mt-4 overflow-x-auto rounded-xl border border-themeBorder bg-themeBg/80 p-4 font-mono text-xs text-textSecondary leading-relaxed print-text-dark">%APPDATA%\io.github.zoran-php.responderhttp\
+    responderhttp.sqlite3      collections, environments, history, cookies, settings
+    logs\                      rotating log files</pre>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mt-4 mb-4">Installed from the Microsoft Store the same files live under <span class="font-mono text-xs">%LOCALAPPDATA%\Packages\&lt;package&gt;\LocalCache\</span>, which Windows removes when the app is uninstalled.</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Back up</strong> by copying the database while the app is closed — but note that secrets in it are encrypted with a key in your Windows Credential Manager, so the database alone will not carry them to another machine</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Start over</strong> by closing the app and deleting the database; it is recreated empty on the next start</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The log</strong> records what happened, never what was in it: bodies, auth headers, tokens, cookies, WebSocket messages and stream events are all kept out</span>
+                        </li>
+                    </ul>
+                </section>
+
+                <section id="troubleshooting" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            13
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Troubleshooting
+                        </h2>
+                    </div>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">"The database was created by a newer version."</strong> A dialog says so at startup and the app stops rather than touching the file. Install the newer version, or move the database aside to start fresh</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">A request fails with a TLS error.</strong> Check the clock, the certificate chain and any corporate proxy first. Turning off Verify TLS for that one request will tell you whether that is the cause — and it should go back on</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Everything times out behind a corporate network.</strong> Set the proxy in the request’s Settings tab</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">A stream stops after 30 seconds.</strong> It should not: the timeout is lifted once a response identifies itself as text/event-stream. If it is being cut off, the response is probably not sending that content type</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Secrets ask to be re-entered.</strong> The data key in Credential Manager could not be read — usually a different Windows account, or a restored profile. The stored values cannot be recovered</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The window does not appear.</strong> The app may be in the notification area — click its tray icon, or use Show from the icon’s menu</span>
+                        </li>
+                    </ul>
+                </section>
+
+                <section id="links" class="scroll-mt-24 print-card bg-gradient-to-br from-themeCard to-themeBgAlt border border-brandAccentBorder rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+                    <div class="absolute -right-10 -bottom-10 w-40 h-40 rounded-full bg-brandAccent/5 blur-2xl pointer-events-none"></div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">14</span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">Links and contact</h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed mb-6 print-text-dark">
+                        The source code, the full documentation and the issue tracker are on GitHub. Questions and bug
+                        reports are welcome by email.
+                    </p>
                     <div class="flex flex-wrap items-center gap-3">
-                        <a href="mailto:zorandavidovic@outlook.com" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-themeBg border border-themeBorder hover:border-brandAccent text-textPrimary transition-all duration-150 group">
-                            <svg class="w-4 h-4 text-brandAccent group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        <a href="https://github.com/zoran-php/responderhttp" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-themeBg border border-themeBorder hover:border-brandAccent text-textPrimary transition-all duration-150 group">
+                            <svg class="w-4 h-4 text-brandAccent group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .5C5.73.5.5 5.73.5 12a11.5 11.5 0 007.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.3-1.7-1.3-1.7-1.05-.72.08-.7.08-.7 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 015.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.2.67.8.56A11.5 11.5 0 0023.5 12C23.5 5.73 18.27.5 12 .5z"></path></svg>
+                            <span class="font-mono text-xs sm:text-sm font-medium">github.com/zoran-php/responderhttp</span>
+                        </a>
+                        <a href="privacy-policy.html" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-themeBg border border-themeBorder hover:border-brandAccent text-textPrimary transition-all duration-150">
+                            <svg class="w-4 h-4 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                            <span class="text-xs sm:text-sm font-medium">Privacy policy</span>
+                        </a>
+                        <a href="terms.html" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-themeBg border border-themeBorder hover:border-brandAccent text-textPrimary transition-all duration-150">
+                            <svg class="w-4 h-4 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
+                            <span class="text-xs sm:text-sm font-medium">Terms and conditions</span>
+                        </a>
+                        <a href="mailto:zorandavidovic@outlook.com" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-themeBg border border-themeBorder hover:border-brandAccent text-textPrimary transition-all duration-150">
+                            <svg class="w-4 h-4 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                             <span class="font-mono text-xs sm:text-sm font-medium">zorandavidovic@outlook.com</span>
                         </a>
-
-                        <!-- Interactive Copy Email Button -->
-                        <button id="copyBtn" onclick="copyEmail()" class="no-print inline-flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-brandAccentMuted text-brandAccent hover:bg-brandAccent/20 border border-brandAccentBorder text-xs font-medium transition-all">
-                            <svg id="copyIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                            <span id="copyText">Copy Email</span>
-                        </button>
-                    </div>
-
-                    <!-- Toast Notification -->
-                    <div id="toast" class="hidden mt-3 inline-flex items-center text-xs font-mono text-emerald-400 space-x-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                        <span>Copied to clipboard!</span>
                     </div>
                 </section>
 
@@ -467,50 +795,22 @@
                 <span>&copy; 2026 Zoran Davidović. All rights reserved.</span>
             </div>
             <div class="flex items-center space-x-4 font-mono text-[11px]">
-                <a href="#collects-nothing" class="hover:text-brandAccent transition-colors">Top</a>
+                <a href="index.html" class="hover:text-brandAccent transition-colors">Overview</a>
                 <span>&bull;</span>
-                <span>ResponderHTTP</span>
+                <a href="privacy-policy.html" class="hover:text-brandAccent transition-colors">Privacy</a>
                 <span>&bull;</span>
-                <button onclick="window.print()" class="hover:text-brandAccent transition-colors">Print PDF</button>
+                <a href="terms.html" class="hover:text-brandAccent transition-colors">Terms</a>
+                <span>&bull;</span>
+                <a href="https://github.com/zoran-php/responderhttp" class="hover:text-brandAccent transition-colors">GitHub</a>
             </div>
         </div>
     </footer>
 
-    <!-- Scroll Observer & Interactions -->
     <script>
-        // 1-Click Copy Email logic without alert()
-        function copyEmail() {
-            const email = 'zorandavidovic@outlook.com';
-            const tempInput = document.createElement('input');
-            tempInput.value = email;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            
-            try {
-                document.execCommand('copy');
-                const copyText = document.getElementById('copyText');
-                const toast = document.getElementById('toast');
-                
-                if (copyText) copyText.innerText = 'Copied!';
-                if (toast) {
-                    toast.classList.remove('hidden');
-                    setTimeout(() => {
-                        toast.classList.add('hidden');
-                        if (copyText) copyText.innerText = 'Copy Email';
-                    }, 2500);
-                }
-            } catch (err) {
-                console.error('Copy failed', err);
-            } finally {
-                document.body.removeChild(tempInput);
-            }
-        }
-
-        // Active Table of Contents highlighting
+        // Highlights the section the reader is in, as on the other pages.
         document.addEventListener('DOMContentLoaded', () => {
             const sections = document.querySelectorAll('section[id]');
             const navLinks = document.querySelectorAll('.toc-item');
-
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
@@ -524,10 +824,7 @@
                         });
                     }
                 });
-            }, {
-                rootMargin: '-10% 0px -70% 0px'
-            });
-
+            }, { rootMargin: '-10% 0px -70% 0px' });
             sections.forEach(section => observer.observe(section));
         });
     </script>

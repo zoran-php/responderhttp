@@ -91,6 +91,56 @@ websocket client
 Developer tools
 ```
 
+## Subcategory
+
+```
+Utilities
+```
+
+Not Networking: in a developer-tools listing that shelf is for traffic-level
+tooling — proxies, packet capture, protocol analysers — where Fiddler belongs
+because it sits in the middle of someone else's traffic. This app does not
+intercept anything; you write a request and it sends it. Changeable later
+through a new submission, unlike a Games category.
+
+## System requirements
+
+Partner Center's *System requirements* table, row by row. The section is
+optional and leaving it blank publishes no hardware requirements at all — which
+is nearly the right answer for a developer tool. The one thing to understand
+before ticking anything: a box under **Minimum hardware** makes the Store show
+a warning to customers whose device lacks that feature, and **those customers
+cannot rate or review the app**. It does not stop them installing it. So a tick
+there costs reviews and buys nothing for an app that only needs a PC.
+
+| Feature | Minimum | Recommended | Why |
+|---|---|---|---|
+| Touch screen | — | — | Works with touch, needs none |
+| Keyboard | — | ✓ | It is a text-entry tool; the on-screen keyboard still works, so this is a recommendation, not a requirement |
+| Mouse | — | ✓ | Right-click menus and draggable dividers want a pointer |
+| Camera | — | — | |
+| NFC HCE | — | — | |
+| NFC Proximity | — | — | |
+| Bluetooth LE | — | — | |
+| Telephony | — | — | |
+| Microphone | — | — | |
+| Xbox controller or gamepad | — | — | |
+| Windows Mixed Reality motion controllers | — | — | |
+| Windows Mixed Reality immersive headset | — | — | |
+| Memory | 4 GB | 8 GB | A judgement, not a measurement — see below |
+| DirectX | Not specified | Not specified | The interface is HTML in WebView2; there is no feature level to claim |
+| Video memory | Not specified | Not specified | |
+| Processor | *(blank)* | *(blank)* | Naming a threshold nobody has tested is worse than saying nothing |
+| Graphics | *(blank)* | *(blank)* | |
+
+**Memory, DirectX, Video memory, Processor and Graphics are never verified by
+the Store** — no warning is ever shown for them, on any device. They are display
+text on the listing and nothing more. The 4 GB / 8 GB figures have not been
+measured; they are what a WebView2 app of this size needs to be pleasant. Either
+measure them or leave Memory unspecified as well.
+
+Architecture is not in this table. x64-only comes from the package itself.
+
 ## Additional system requirements
 
 Partner Center's _System requirements_ section covers hardware only, so the
@@ -102,17 +152,60 @@ Requires the Microsoft Edge WebView2 Runtime, which is included in Windows 11
 and already installed on most Windows 10 PCs.
 ```
 
+## Restricted capabilities (Submission options page)
+
+Uploading the package raises: *"The following restricted capabilities require
+approval before you can use them in your app: runFullTrust."* That is a
+**warning, not a rejection**, and it is unavoidable — `runFullTrust` is what
+lets a packaged Win32 app install and run at all, and the manifest pairs it
+with `EntryPoint="Windows.FullTrustApplication"`. Removing it would break the
+package. It is the only restricted capability declared.
+
+Microsoft no longer takes these by support ticket: the details go on the
+**Submission options** page of the submission, and certification testers read
+them, which can add a little review time. Paste:
+
+```
+ResponderHTTP is a packaged Win32 desktop application rather than a UWP app:
+its executable is declared with EntryPoint="Windows.FullTrustApplication", and
+runFullTrust is the capability that allows such a package to be installed and
+launched. It is the only restricted capability this package declares.
+
+Full trust is what the app's ordinary work needs:
+
+- It sends HTTP requests and opens WebSocket connections using libcurl, which
+  is compiled into the executable — a native networking stack rather than the
+  WinRT HTTP APIs.
+- It keeps saved requests, collections, environments, history and cookies in a
+  SQLite database in its own app-data folder.
+- It reads and writes one data key in Windows Credential Manager, so that
+  passwords, bearer tokens and API keys the user saves are encrypted rather
+  than stored in plain text.
+- It opens and saves files the user chooses in the system dialog: file parts
+  for multipart uploads, OpenAPI documents to import, and response bodies
+  saved to disk.
+- It hosts its interface in the Microsoft Edge WebView2 Runtime and places an
+  icon in the notification area.
+
+The app has no accounts, no telemetry and no analytics, collects nothing, and
+contacts no service operated by the developer. Requests go only to the
+addresses the user types. Privacy policy:
+https://zoran-php.github.io/responderhttp/privacy-policy.html
+```
+
 ## Privacy policy URL
 
-`store/privacy-policy.md` in this repository is the text. Partner Center wants
-a public URL, so it needs hosting — GitHub Pages on
-`zoran-php/responderhttp` is the free option, which would give roughly:
+The `docs/` folder is the GitHub Pages site: three hand-written pages —
+`index.html` (overview), `privacy-policy.html` and `terms.html` — plus a
+`.nojekyll` marker, so what is committed is served verbatim. Paste:
 
 ```
-https://zoran-php.github.io/responderhttp/privacy-policy
+https://zoran-php.github.io/responderhttp/privacy-policy.html
 ```
 
-**Not done yet — this is the one submission blocker that needs a decision.**
+The extensionless `/privacy-policy` resolves to the same page; the `.html` form
+is the one that cannot surprise anyone. Check it in a browser before pasting —
+a reviewer will.
 
 ## Price
 

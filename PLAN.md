@@ -3710,8 +3710,19 @@ missing, `pnpm tauri build --no-bundle`, stage, pack.
   target-size variant, which is a long list to keep by hand. Existing icons
   are untouched.
 
-**Listing drafts** are in `store/listing.md`; the privacy policy text is
-`store/privacy-policy.md`. Both were refreshed on 2026-09-23 to cover what
+**Listing drafts** are in `store/listing.md`. The privacy policy lives on the
+GitHub Pages site built from `docs/`: `index.html` (an overview built from the
+README), `privacy-policy.html` and `terms.html`, plus `.nojekyll` so the
+committed HTML is served verbatim instead of being run through Jekyll. That is
+where the public privacy-policy URL Partner Center asks for comes from.
+Licensing is `LICENSE` at the repo root — free to use, no distribution of
+modified versions — and `terms.html` is its plain-language twin. **GPLv3 was
+considered and rejected on 2026-09-23:** it guarantees the right to modify and
+redistribute, which is the one thing this licence withholds, and §10 forbids a
+licensor from adding that restriction back. Copyleft is a coherent choice for
+this app, just not this one; if it is ever revisited, the licence, `terms.html`,
+the README and the Store text all have to move together. The listing and
+the policy were both refreshed on 2026-09-23 to cover what
 shipped after they were first written — Markdown documentation (Phase 12),
 WebSocket requests (Phase 13) and server-sent events (Phase 14). The policy
 gained those in its stored-data list, widened "network requests" to include
