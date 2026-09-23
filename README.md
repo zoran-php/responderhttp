@@ -9,7 +9,7 @@ curl is not a dependency. libcurl is compiled into the binary, so there is no
 curl to install, no runtime to add, and no system SSL library to keep patched.
 
 - **No accounts, no telemetry, no analytics, no crash reporting.** The app has
-  no server to talk to. See [`docs/privacy-policy.md`](docs/privacy-policy.md).
+  no server to talk to. See [`store/privacy-policy.md`](store/privacy-policy.md).
 - **One file.** A release build imports only Windows system DLLs — that is
   checked on every release.
 - **Your data stays put.** A single SQLite database in your user profile.
@@ -425,7 +425,7 @@ Architecture, conventions and the rules the code is held to are in
 
 ## Privacy and contact
 
-The full policy is [`docs/privacy-policy.md`](docs/privacy-policy.md). The
+The full policy is [`store/privacy-policy.md`](store/privacy-policy.md). The
 short version: nothing is collected, nothing is sent anywhere except the
 addresses you type, and everything the app keeps stays on your computer.
 
