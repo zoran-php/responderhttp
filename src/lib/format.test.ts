@@ -1,7 +1,7 @@
 // http_client/src/lib/format.test.ts
 import { describe, expect, it } from "vitest";
 
-import { formatBytes, formatDuration, statusClass } from "@/lib/format";
+import { formatBytes, formatClockTime, formatDuration, statusClass } from "@/lib/format";
 
 describe("formatDuration", () => {
   it("shows whole milliseconds below a second", () => {
@@ -41,5 +41,18 @@ describe("statusClass", () => {
     expect(statusClass(404)).toBe("clientError");
     expect(statusClass(503)).toBe("serverError");
     expect(statusClass(0)).toBe("unknown");
+  });
+});
+
+describe("formatClockTime", () => {
+  it("shows local hours, minutes, seconds and zero-padded milliseconds", () => {
+    // Built from local components, so the test passes in any time zone.
+    const epochMs = new Date(2026, 8, 22, 7, 5, 3, 9).getTime();
+
+    expect(formatClockTime(epochMs)).toBe("07:05:03.009");
+  });
+
+  it("shows a dash for a time that is not a number", () => {
+    expect(formatClockTime(Number.NaN)).toBe("—");
   });
 });

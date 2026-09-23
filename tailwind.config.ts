@@ -72,6 +72,13 @@ export default {
           teal: "hsl(var(--frost-teal))",
           deep: "hsl(var(--frost-deep))",
         },
+        // The WebSocket log's direction colours and the live-connection
+        // green (PLAN-WEBSOCKET.md 13f).
+        ws: {
+          sent: "hsl(var(--ws-sent))",
+          received: "hsl(var(--ws-received))",
+          ok: "hsl(var(--ws-ok))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

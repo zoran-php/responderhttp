@@ -2,16 +2,16 @@
 //
 // Presentational: props in, events out. It does not know about invoke(),
 // the store, or how a request is assembled.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
 
 import { KeyValueTable } from "@/components/KeyValueTable";
+import { useBuilderPanelHeight } from "@/hooks/useBuilderPanelHeight";
 import { ResizeHandle } from "@/components/ResizeHandle";
 import { IANA_HEADER_NAMES } from "@/lib/http-header-names";
 import { headerValueSuggestions } from "@/lib/http-header-values";
 import { methodTextColor } from "@/lib/http-method-colors";
 import type { KeyValueRow } from "@/lib/key-values";
-import { clampPaneSize, MIN_BUILDER_PANEL_HEIGHT, MIN_RESPONSE_HEIGHT } from "@/lib/split-pane";
 import type { MultipartRow } from "@/lib/multipart-rows";
 import { AuthPanel } from "@/features/request-builder/AuthPanel";
 import { BodyEditor } from "@/features/request-builder/BodyEditor";
@@ -78,47 +78,11 @@ interface RequestBuilderProps {
 export function RequestBuilder(props: RequestBuilderProps) {
   const [tab, setTab] = useState<Tab>("Params");
   const { method, url, isSending, panelHeight, responseCollapsed, onPanelHeightChange } = props;
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  const applyHeight = useCallback(
-    (desired: number) => {
-      const panel = panelRef.current;
-      onPanelHeightChange(
-        clampPaneSize(desired, {
-          // Space from the top of the panel to the bottom of the area it
-          // shares with the response. The app is one h-screen column with
-          // nothing below the response viewer, so the window bottom *is* that
-          // edge. Add a status bar down there and this has to become a
-          // measured container instead.
-          //
-          // The panel's top does not move while dragging — the URL bar and
-          // the tab row above it are fixed — so reading it mid-drag is stable.
-          available: panel
-            ? window.innerHeight - panel.getBoundingClientRect().top
-            : desired + MIN_RESPONSE_HEIGHT,
-          minStart: MIN_BUILDER_PANEL_HEIGHT,
-          minEnd: MIN_RESPONSE_HEIGHT,
-        }),
-      );
-    },
-    [onPanelHeightChange],
-  );
-
-  // Shrinking the window can make a stored height illegal, which would push
-  // the response off the bottom with no way back. Re-clamping on resize is
-  // what stops the divider being a one-way trip.
-  useEffect(() => {
-    // Pointless while the response is collapsed: the panel is flex-sized then,
-    // and re-clamping would fight the layout rather than help it.
-    if (responseCollapsed) {
-      return;
-    }
-    function reclamp() {
-      applyHeight(panelHeight);
-    }
-    window.addEventListener("resize", reclamp);
-    return () => window.removeEventListener("resize", reclamp);
-  }, [applyHeight, panelHeight, responseCollapsed]);
+  const { panelRef, applyHeight } = useBuilderPanelHeight({
+    panelHeight,
+    responseCollapsed,
+    onPanelHeightChange,
+  });
 
   return (
     // No border-b: the resize handle at the bottom is the separator now.

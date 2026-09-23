@@ -1,7 +1,14 @@
 // http_client/src/lib/variables.test.ts
 import { describe, expect, it } from "vitest";
 
-import { substitute, substituteRequestInput, variableMap } from "@/lib/variables";
+import {
+  substitute,
+  substituteMessage,
+  substituteRequestInput,
+  substituteWebSocketRequest,
+  variableMap,
+} from "@/lib/variables";
+import { DEFAULT_WS_SETTINGS } from "@/types/websocket";
 import { AUTH_NONE, DEFAULT_SETTINGS, type KeyValue, type SendRequestInput } from "@/types/http";
 
 const vars: KeyValue[] = [
@@ -153,5 +160,38 @@ describe("leaving secrets as placeholders", () => {
     const map = variableMap([{ name: "host", value: "h" }], { leaveSecrets: true });
 
     expect(map.get("host")).toBe("h");
+  });
+});
+
+describe("substituteWebSocketRequest and substituteMessage", () => {
+  const variables = [
+    { name: "host", value: "echo.test" },
+    { name: "token", value: "s3cret", secret: true },
+  ];
+  const request = {
+    url: "wss://{{host}}/live",
+    headers: [{ name: "Authorization", value: "Bearer {{token}}" }],
+    settings: DEFAULT_WS_SETTINGS,
+  };
+
+  it("resolves the URL and handshake headers, leaving unknown names as written", () => {
+    const resolved = substituteWebSocketRequest(
+      { ...request, url: "wss://{{host}}/{{missing}}" },
+      variables,
+    );
+
+    expect(resolved.url).toBe("wss://echo.test/{{missing}}");
+    expect(resolved.headers).toEqual([{ name: "Authorization", value: "Bearer s3cret" }]);
+  });
+
+  it("can leave secrets as placeholders, for the log", () => {
+    const display = substituteWebSocketRequest(request, variables, { leaveSecrets: true });
+
+    expect(display.url).toBe("wss://echo.test/live");
+    expect(display.headers[0]?.value).toBe("Bearer {{token}}");
+    expect(substituteMessage("{{token}}@{{host}}", variables, { leaveSecrets: true })).toBe(
+      "{{token}}@echo.test",
+    );
+    expect(substituteMessage("{{token}}", variables)).toBe("s3cret");
   });
 });

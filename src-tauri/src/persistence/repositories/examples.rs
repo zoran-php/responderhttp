@@ -8,6 +8,7 @@ use crate::domain::ports::ExampleRepository;
 use crate::persistence::database::{to_storage_error, Database};
 use crate::persistence::repositories::collections::missing_if_zero;
 use crate::persistence::repositories::json;
+use crate::persistence::repositories::request_kind::RequestKind;
 use crate::persistence::repositories::saved_requests::now_iso8601;
 
 const SELECT_COLUMNS: &str = "id, request_id, name, created_at, method, url,
@@ -82,11 +83,13 @@ impl ExampleRepository for SqliteExampleRepository {
         let mut guard = self.database.lock();
         let transaction = guard.transaction().map_err(to_storage_error)?;
         // Checked rather than left to the foreign key, so a stale request id
-        // reports NotFound instead of an opaque constraint failure.
+        // reports NotFound instead of an opaque constraint failure. HTTP only:
+        // a WebSocket has no single response to keep, so an example cannot
+        // hang off one (PLAN.md Phase 13d).
         let exists: i64 = transaction
             .query_row(
-                "SELECT COUNT(*) FROM requests WHERE id = ?1",
-                params![example.request_id],
+                "SELECT COUNT(*) FROM requests WHERE id = ?1 AND kind = ?2",
+                params![example.request_id, RequestKind::Http.as_str()],
                 |row| row.get(0),
             )
             .map_err(to_storage_error)?;

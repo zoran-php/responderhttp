@@ -56,6 +56,12 @@
        (2026-09-13); free to reuse anywhere else a frost accent is needed. */
     --frost-teal: 178.7 25.1% 64.9%; /* nord7 #8fbcbb */
     --frost-deep: 213.1 32% 52.2%; /* nord10 #5e81ac */
+
+    /* WebSocket log (PLAN-WEBSOCKET.md 13f): sent is amber, received blue, a
+       live connection green, as the reference screenshots show. */
+    --ws-sent: 40 70.6% 73.3%; /* nord13 #ebcb8b */
+    --ws-received: 210 34% 63.1%; /* nord9 #81a1c1 */
+    --ws-ok: 92.4 27.8% 64.7%; /* nord14 #a3be8c */
   }
 
   .dark {
@@ -91,6 +97,10 @@
 
     --frost-teal: 178.7 25.1% 64.9%;
     --frost-deep: 213.1 32% 52.2%;
+
+    --ws-sent: 40 70.6% 73.3%;
+    --ws-received: 210 34% 63.1%;
+    --ws-ok: 92.4 27.8% 64.7%;
   }
 }
 

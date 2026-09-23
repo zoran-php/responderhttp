@@ -1,0 +1,36 @@
+[package]
+name = "ws-libcurl"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# PLAN.md Phase 13a. Standalone, not part of src-tauri, for the same reason as
+# spikes/static-link-proof: Tauri and WebView2 would crowd the import table and
+# blur what the WebSocket path itself needs.
+#
+# Cargo.lock is a copy of src-tauri's, so curl, curl-sys, rustls-ffi and the
+# libcurl snapshot resolve to exactly the versions the app ships.
+
+[dependencies]
+# Must stay identical to the curl line in src-tauri/Cargo.toml.
+curl = { version = "0.4", default-features = false, features = [
+  "static-curl",
+  "rustls",
+  "http2",
+] }
+# Named directly only so its statically built libcurl is linked for the
+# hand-declared curl_ws_* functions (src/ffi.rs). Features come from `curl`
+# above, so this is the same build, not a second one.
+curl-sys = { version = "0.4", default-features = false }
+
+[lints.rust]
+# The cloud build of the same source uses `rustc --cfg raw_libcurl`.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(raw_libcurl)"] }
+
+# Same as src-tauri's release profile, so the spike links the way the app does.
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

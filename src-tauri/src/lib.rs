@@ -3,6 +3,12 @@
 // App entry point as a library; main.rs is a thin binary wrapper. This is
 // the composition root: concrete adapters are chosen here and nowhere else
 // (CLAUDE.md section 7, dependency inversion).
+
+// Unsafe code is refused everywhere except http/curl_ws_ffi.rs, which binds
+// libcurl's WebSocket API by hand and is allowed in http/mod.rs. A second
+// exception has to be argued for there, in review, rather than slipping in.
+#![deny(unsafe_code)]
+
 pub mod commands;
 pub mod desktop;
 pub mod domain;
@@ -16,7 +22,7 @@ use std::sync::Arc;
 
 use tauri::Manager;
 
-use crate::desktop::{toast, tray, webview, window};
+use crate::desktop::{startup_error, toast, tray, webview, window};
 use crate::domain::ports::{CookieRepository, HttpClient};
 use crate::domain::services::collections::Collections;
 use crate::domain::services::cookies::Cookies;
@@ -28,8 +34,11 @@ use crate::domain::services::openapi::OpenApiExport;
 use crate::domain::services::openapi_import::OpenApiImport;
 use crate::domain::services::send_request::SendRequest;
 use crate::domain::services::tray_notice::TrayNotice;
+use crate::domain::services::websocket::WebSocketSessions;
 use crate::http::cookie_client::CookieClient;
+use crate::http::cookie_websocket::CookieWebSocketConnector;
 use crate::http::curl_client::CurlClient;
+use crate::http::curl_websocket::CurlWebSocketConnector;
 use crate::persistence::database::Database;
 use crate::persistence::repositories::app_settings::SqliteAppSettingsRepository;
 use crate::persistence::repositories::collections::SqliteCollectionRepository;
@@ -41,6 +50,7 @@ use crate::persistence::repositories::history::SqliteHistoryRepository;
 use crate::persistence::repositories::import::SqliteImportRepository;
 use crate::persistence::repositories::saved_requests::SqliteSavedRequestRepository;
 use crate::persistence::repositories::secret_upgrade::upgrade_plaintext_secrets;
+use crate::persistence::repositories::web_sockets::SqliteWebSocketRepository;
 use crate::secrets::keychain::KeychainDataKeyStore;
 use crate::secrets::{open_cipher, without_key, CipherOrigin};
 
@@ -56,6 +66,7 @@ fn unix_now() -> u64 {
 /// Injected dependencies, reachable from command handlers via `State`.
 pub struct AppState {
     pub send_request: SendRequest,
+    pub websockets: WebSocketSessions,
     pub collections: Collections,
     pub environments: Environments,
     pub cookies: Cookies,
@@ -184,7 +195,16 @@ pub fn run() -> Result<(), StartupError> {
             // resolves per platform; it is created on first run.
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
-            let database = Database::open(&data_dir.join(DATABASE_FILE))?;
+            // A database this build cannot open ends the app, but with a
+            // dialog saying why. Before this, a database written by a newer
+            // version quit without a word (PLAN-WEBSOCKET.md 13d).
+            let database = match Database::open(&data_dir.join(DATABASE_FILE)) {
+                Ok(database) => database,
+                Err(error) => {
+                    startup_error::report_database_failure(&error.to_string(), &data_dir);
+                    return Err(error.into());
+                }
+            };
 
             // Secrets are sealed with a data key from the OS credential store
             // (PLAN.md Phase 9). A store that cannot be used does not stop the
@@ -220,9 +240,16 @@ pub fn run() -> Result<(), StartupError> {
                 Arc::new(CurlClient::new()),
                 cookie_jar.clone(),
             ));
+            // The same jar, wrapped the same way: a handshake is an HTTP
+            // request and gets the host's cookies like any other.
+            let websockets = WebSocketSessions::new(Arc::new(CookieWebSocketConnector::new(
+                Arc::new(CurlWebSocketConnector::new()),
+                cookie_jar.clone(),
+            )));
 
             app.manage(AppState {
                 send_request: SendRequest::new(http_client),
+                websockets,
                 collections: Collections::new(
                     Arc::new(SqliteCollectionRepository::new(database.clone())),
                     Arc::new(SqliteFolderRepository::new(database.clone())),
@@ -231,6 +258,7 @@ pub fn run() -> Result<(), StartupError> {
                         cipher.clone(),
                     )),
                     Arc::new(SqliteExampleRepository::new(database.clone())),
+                    Arc::new(SqliteWebSocketRepository::new(database.clone())),
                 ),
                 environments: Environments::new(Arc::new(SqliteEnvironmentRepository::new(
                     database.clone(),
@@ -275,6 +303,10 @@ pub fn run() -> Result<(), StartupError> {
             commands::request::send_request,
             commands::request::cancel_request,
             commands::request::send_and_download,
+            commands::websocket::connect_web_socket,
+            commands::websocket::send_web_socket_message,
+            commands::websocket::disconnect_web_socket,
+            commands::websocket::disconnect_all_web_sockets,
             commands::files::choose_file,
             commands::collections::list_collections,
             commands::collections::collection_contents,
@@ -289,6 +321,8 @@ pub fn run() -> Result<(), StartupError> {
             commands::collections::rename_request,
             commands::collections::move_request,
             commands::collections::delete_request,
+            commands::collections::save_web_socket,
+            commands::collections::load_web_socket,
             commands::collections::save_example,
             commands::collections::load_example,
             commands::collections::rename_example,

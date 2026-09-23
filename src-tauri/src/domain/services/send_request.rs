@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use crate::domain::cancellation::CancellationToken;
 use crate::domain::error::AppError;
 use crate::domain::models::{HttpRequest, HttpResponse, MultipartPart, RequestBody};
-use crate::domain::ports::HttpClient;
+use crate::domain::ports::{HttpClient, HttpStreamSink};
 
 /// Identifies one in-flight request so it can be cancelled while running.
 /// Minted by the caller (the UI), because the UI needs the id before the
@@ -29,7 +29,29 @@ impl SendRequest {
         }
     }
 
+    /// The same as `execute`, reporting the response's headers and every
+    /// event-stream block as they arrive (PLAN-SSE.md). A response that is
+    /// not an event stream reports its headers and nothing else, and comes
+    /// back exactly as `execute` would return it.
+    pub fn execute_streaming(
+        &self,
+        id: RequestId,
+        request: HttpRequest,
+        on_update: HttpStreamSink<'_>,
+    ) -> Result<HttpResponse, AppError> {
+        self.run(id, request, Some(on_update))
+    }
+
     pub fn execute(&self, id: RequestId, request: HttpRequest) -> Result<HttpResponse, AppError> {
+        self.run(id, request, None)
+    }
+
+    fn run(
+        &self,
+        id: RequestId,
+        request: HttpRequest,
+        on_update: Option<HttpStreamSink<'_>>,
+    ) -> Result<HttpResponse, AppError> {
         validate_url(&request.url)?;
         validate_proxy(request.settings.proxy.as_deref())?;
         validate_multipart(&request.body)?;
@@ -37,7 +59,10 @@ impl SendRequest {
         let token = CancellationToken::new();
         self.register(id.clone(), token.clone());
 
-        let result = self.client.send(&request, &token);
+        let result = match on_update {
+            Some(sink) => self.client.send_streaming(&request, &token, sink),
+            None => self.client.send(&request, &token),
+        };
         self.forget(&id);
 
         // libcurl reports an aborted transfer as a generic failure; the token
@@ -123,8 +148,9 @@ fn validate_url(url: &str) -> Result<(), AppError> {
 }
 
 /// A proxy without a scheme is ambiguous to libcurl and silently behaves as
-/// HTTP, which is a surprising way to leak traffic.
-fn validate_proxy(proxy: Option<&str>) -> Result<(), AppError> {
+/// HTTP, which is a surprising way to leak traffic. Shared with
+/// `WebSocketSessions`, which goes through the same proxy option.
+pub(crate) fn validate_proxy(proxy: Option<&str>) -> Result<(), AppError> {
     let Some(proxy) = proxy.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(());
     };
@@ -144,7 +170,10 @@ mod tests {
     use super::*;
     use crate::domain::models::{
         Auth, HttpMethod, KeyValue, RequestBody, RequestSettings, ResponseBody, Timing,
+        TransferSizes,
     };
+    use crate::domain::ports::HttpStreamUpdate;
+    use crate::domain::sse::{SseBlock, SseBlockKind};
 
     #[derive(Default)]
     struct MockHttpClient {
@@ -174,12 +203,55 @@ mod tests {
         }
     }
 
+    /// A client that streams: it reports headers and two blocks, the way
+    /// CurlClient does for a `text/event-stream` response.
+    struct StreamingClient;
+
+    impl HttpClient for StreamingClient {
+        fn send(
+            &self,
+            _request: &HttpRequest,
+            _cancel: &CancellationToken,
+        ) -> Result<HttpResponse, AppError> {
+            Ok(ok_response())
+        }
+
+        fn send_streaming(
+            &self,
+            _request: &HttpRequest,
+            _cancel: &CancellationToken,
+            on_update: HttpStreamSink<'_>,
+        ) -> Result<HttpResponse, AppError> {
+            on_update(HttpStreamUpdate::Headers {
+                status: 200,
+                headers: vec![KeyValue::new("content-type", "text/event-stream")],
+                bytes: 64,
+            });
+            for data in ["one", "two"] {
+                on_update(HttpStreamUpdate::Block {
+                    at_ms: 1,
+                    block: SseBlock {
+                        kind: SseBlockKind::Event {
+                            name: "message".into(),
+                            data: data.into(),
+                            id: None,
+                            retry: None,
+                        },
+                        raw: format!("data: {data}\n"),
+                    },
+                });
+            }
+            Ok(ok_response())
+        }
+    }
+
     fn ok_response() -> HttpResponse {
         HttpResponse {
             status: 200,
             headers: vec![KeyValue::new("content-type", "text/plain")],
             body: ResponseBody::Text("hello".into()),
             timing: Timing::default(),
+            sizes: TransferSizes::default(),
             set_cookies: Vec::new(),
         }
     }
@@ -344,5 +416,49 @@ mod tests {
             .expect("should succeed");
 
         assert!(service.lock_in_flight().is_empty());
+    }
+
+    /// A streaming send reports as it goes and still returns the response
+    /// the caller would have got from `execute`.
+    #[test]
+    fn a_streaming_request_reports_its_headers_and_every_block() {
+        let service = SendRequest::new(Arc::new(StreamingClient));
+        let mut seen = Vec::new();
+
+        let response = service
+            .execute_streaming(
+                "req-1".into(),
+                request("https://example.com/"),
+                &mut |update| {
+                    seen.push(update);
+                    true
+                },
+            )
+            .expect("should send");
+
+        assert_eq!(response.status, 200);
+        assert!(matches!(
+            seen[0],
+            HttpStreamUpdate::Headers { status: 200, .. }
+        ));
+        assert_eq!(seen.len(), 3);
+    }
+
+    /// A client with nothing to stream is still substitutable: the default
+    /// on the port calls `send`, and the caller gets the same response.
+    #[test]
+    fn a_client_that_does_not_stream_still_answers_a_streaming_send() {
+        let service = SendRequest::new(Arc::new(MockHttpClient::default()));
+        let mut seen = 0;
+
+        let response = service
+            .execute_streaming("req-1".into(), request("https://example.com/"), &mut |_| {
+                seen += 1;
+                true
+            })
+            .expect("should send");
+
+        assert_eq!(response.status, 200);
+        assert_eq!(seen, 0);
     }
 }

@@ -37,14 +37,34 @@ import {
 } from "@/lib/multipart-rows";
 import { foldLegacyParams, queryPairs, withQueryPairs } from "@/lib/query-sync";
 import { emptyRequestInput, requestInputsEqual } from "@/lib/request-defaults";
-import { substituteRequestInput } from "@/lib/variables";
+import {
+  substituteMessage,
+  substituteRequestInput,
+  substituteWebSocketRequest,
+} from "@/lib/variables";
+import {
+  appendCapped,
+  clearAll,
+  EMPTY_WS_LOG,
+  logEntries,
+  takePendingSend,
+  type PendingSend,
+  type WsLog,
+  type WsLogFilter,
+} from "@/lib/ws-log";
+import { beautify, isBeautifiable } from "@/lib/beautify";
+import { applyStreamEvents, EMPTY_STREAM, type ResponseStream } from "@/lib/sse-log";
+import { encodeOutgoing } from "@/lib/ws-payload";
+import type { WsConnectionState } from "@/lib/ws-status";
+import { webSocketShapesEqual, type WebSocketShape } from "@/lib/ws-request";
 // Reading the active environment here, rather than threading it through
 // every caller, keeps `currentInput()` the raw template that Save stores.
 import { useEnvironmentsStore } from "@/store/environments-store";
 import { useHistoryStore } from "@/store/history-store";
 import { itemDocs, setItemDocs } from "@/services/docs";
 import { cancelRequest, sendAndDownload, sendRequest } from "@/services/http-client";
-import type { SavedRequest } from "@/types/collections";
+import { connectWebSocket, disconnectWebSocket, sendWebSocketMessage } from "@/services/websocket";
+import type { SavedRequest, SavedWebSocket } from "@/types/collections";
 import { sameDocsTarget, type DocsTarget } from "@/types/docs";
 import {
   AUTH_NONE,
@@ -54,11 +74,20 @@ import {
   type DownloadResult,
   type HttpMethod,
   type HttpResponse,
+  type HttpStreamEvent,
   type RequestBody,
   type RequestSettings,
   type SecretState,
   type SendRequestInput,
 } from "@/types/http";
+import {
+  DEFAULT_WS_SETTINGS,
+  EMPTY_WS_DRAFT,
+  type WebSocketSettings,
+  type WsDraft,
+  type WsEvent,
+  type WsPayload,
+} from "@/types/websocket";
 
 export type BodyKind = RequestBody["kind"];
 type RequestStatus = "idle" | "sending";
@@ -109,6 +138,13 @@ export interface RequestTab {
    * `{{placeholders}}` so no secret reaches the example (PLAN.md Phase 9).
    */
   sentRequest: SendRequestInput | null;
+  /**
+   * What the in-flight (or last) request reported before it finished: its
+   * status and headers as soon as they arrived, and, for a
+   * `text/event-stream` response, every block as it was parsed (PLAN-SSE.md,
+   * 14d). Reset at the start of every send.
+   */
+  stream: ResponseStream;
 
   /** Set once the tab has been saved or loaded from a collection; null for
    * a request that has never been saved. */
@@ -168,7 +204,39 @@ export interface DocsTab {
   saveError: string | null;
 }
 
-export type Tab = RequestTab | EnvironmentTab | ExampleTab | DocsTab;
+/**
+ * A WebSocket request (PLAN.md Phase 13e). The store owns the connection's
+ * lifetime: closing the tab disconnects it, so leaving a tab never leaks a
+ * socket.
+ */
+export interface WebSocketTab {
+  kind: "websocket";
+  id: string;
+
+  url: string;
+  headerRows: KeyValueRow[];
+  /** A view of `url`'s query string, as on a request tab. */
+  paramRows: KeyValueRow[];
+  settings: WebSocketSettings;
+  draft: WsDraft;
+
+  connection: WsConnectionState;
+  /** Set while reconnecting, for the badge's "n/N". */
+  reconnectAttempt: { attempt: number; maxAttempts: number } | null;
+  /** The live connection, or the most recent one. Null before the first
+   * connect. */
+  connectionId: string | null;
+  log: WsLog;
+  logFilter: WsLogFilter;
+  logQuery: string;
+  /** Why the last Send did not go: hex that does not parse, or a refusal. */
+  composerError: string | null;
+
+  loadedRequest: LoadedRequestRef | null;
+  savedSnapshot: WebSocketShape;
+}
+
+export type Tab = RequestTab | EnvironmentTab | ExampleTab | DocsTab | WebSocketTab;
 
 interface TabsState {
   tabs: Tab[];
@@ -225,6 +293,36 @@ interface TabsState {
    * storage — called right after Save succeeds. Clears the dirty flag and
    * updates the tab's name/location without touching any builder field. */
   markSaved: (loaded: LoadedRequestRef) => void;
+
+  // WebSocket tabs. Like the request setters, these act on the active tab
+  // and do nothing while it is not a WebSocket tab.
+  activeWebSocketTab: () => WebSocketTab | null;
+  openBlankWebSocketTab: () => string;
+  /** Focuses the tab already open for this saved WebSocket, if there is one;
+   * otherwise opens a new tab loaded with it. */
+  openSavedWebSocket: (saved: SavedWebSocket) => void;
+  /** Ignored unless disconnected: Params is a view of the URL, and the URL
+   * of a live connection cannot change under it. */
+  setWsUrl: (url: string) => void;
+  setWsParamRows: (rows: KeyValueRow[]) => void;
+  setWsHeaderRows: (rows: KeyValueRow[]) => void;
+  setWsSettings: (patch: Partial<WebSocketSettings>) => void;
+  setWsDraft: (patch: Partial<WsDraft>) => void;
+  /** Reformats the draft (JSON, XML, HTML). Text that does not parse is left
+   * exactly as typed, and the reason shows as the composer's error. */
+  beautifyWsDraft: () => void;
+  /** What Save writes: the template, `{{placeholders}}` intact. */
+  currentWebSocketShape: () => WebSocketShape;
+  connect: () => Promise<void>;
+  /** Also cancels a handshake or a reconnect in progress. */
+  disconnect: () => void;
+  sendMessage: () => Promise<void>;
+  /** Empties the log: every entry from every connection. Leaves the
+   * connection, the draft, the filter and the search alone. */
+  clearMessages: () => void;
+  setLogFilter: (filter: WsLogFilter) => void;
+  setLogQuery: (query: string) => void;
+  markWebSocketSaved: (loaded: LoadedRequestRef) => void;
 }
 
 let nextRequestId = 0;
@@ -233,6 +331,15 @@ let nextRequestId = 0;
 function newRequestId(): string {
   nextRequestId += 1;
   return `req-${nextRequestId}`;
+}
+
+let nextConnectionId = 0;
+
+/** Minted here, before the handshake, so Disconnect can cancel a connect
+ * that has not finished. */
+function newConnectionId(): string {
+  nextConnectionId += 1;
+  return `ws-${nextConnectionId}`;
 }
 
 let nextTabId = 0;
@@ -293,6 +400,7 @@ function buildBlankTab(): RequestTab {
     download: null,
     error: null,
     sentRequest: null,
+    stream: EMPTY_STREAM,
     loadedRequest: null,
     savedSnapshot: emptyRequestInput(),
   };
@@ -335,6 +443,7 @@ function buildTabFromRequest(stored: SendRequestInput): RequestTab {
     download: null,
     error: null,
     sentRequest: null,
+    stream: EMPTY_STREAM,
     loadedRequest: null,
     // Clean on arrival: the tab matches what it was opened with, so
     // closing it without touching anything does not prompt. Save still
@@ -355,6 +464,59 @@ function buildTabFromSaved(saved: SavedRequest): RequestTab {
       name: saved.name,
     },
   };
+}
+
+function buildBlankWebSocketTab(): WebSocketTab {
+  return {
+    kind: "websocket",
+    id: newTabId(),
+    url: "",
+    headerRows: [emptyRow()],
+    paramRows: [emptyRow()],
+    settings: DEFAULT_WS_SETTINGS,
+    draft: EMPTY_WS_DRAFT,
+    connection: "idle",
+    reconnectAttempt: null,
+    connectionId: null,
+    log: EMPTY_WS_LOG,
+    logFilter: "all",
+    logQuery: "",
+    composerError: null,
+    loadedRequest: null,
+    savedSnapshot: shapeFromTabFields("", [], DEFAULT_WS_SETTINGS, EMPTY_WS_DRAFT),
+  };
+}
+
+function buildWebSocketTabFromSaved(saved: SavedWebSocket): WebSocketTab {
+  const { request, draft } = saved;
+  return {
+    ...buildBlankWebSocketTab(),
+    url: request.url,
+    headerRows: rowsFromKeyValues(request.headers),
+    paramRows: rowsFromKeyValues(queryPairs(request.url)),
+    settings: request.settings,
+    draft,
+    loadedRequest: {
+      id: saved.id,
+      collectionId: saved.collectionId,
+      folderId: saved.folderId,
+      name: saved.name,
+    },
+    savedSnapshot: { request, draft },
+  };
+}
+
+function shapeFromTabFields(
+  url: string,
+  headers: WebSocketShape["request"]["headers"],
+  settings: WebSocketSettings,
+  draft: WsDraft,
+): WebSocketShape {
+  return { request: { url: url.trim(), headers, settings }, draft };
+}
+
+function webSocketShapeFromTab(tab: WebSocketTab): WebSocketShape {
+  return shapeFromTabFields(tab.url, toKeyValues(tab.headerRows), tab.settings, tab.draft);
 }
 
 /** An invariant helper, not a domain lookup: every call site only reaches
@@ -379,6 +541,23 @@ function findActiveRequest(state: Pick<TabsState, "tabs" | "activeTabId">): Requ
   return found !== undefined && found.kind === "request" ? found : null;
 }
 
+function findActiveWebSocket(state: Pick<TabsState, "tabs" | "activeTabId">): WebSocketTab | null {
+  const found = state.tabs.find((tab) => tab.id === state.activeTabId);
+  return found !== undefined && found.kind === "websocket" ? found : null;
+}
+
+/** Patches one WebSocket tab, by id. Events arrive for a tab whether or not
+ * it is in front, so unlike the request setters this is not "active only". */
+function updateWebSocketTab(
+  tabs: Tab[],
+  tabId: string,
+  update: (tab: WebSocketTab) => Partial<WebSocketTab>,
+): Tab[] {
+  return tabs.map((tab) =>
+    tab.id === tabId && tab.kind === "websocket" ? { ...tab, ...update(tab) } : tab,
+  );
+}
+
 /**
  * Patches the active tab only when it is a request tab, which makes every
  * field setter a no-op while an environment tab is in front instead of each
@@ -387,6 +566,22 @@ function findActiveRequest(state: Pick<TabsState, "tabs" | "activeTabId">): Requ
 function replaceActiveTab(tabs: Tab[], activeTabId: string, patch: Partial<RequestTab>): Tab[] {
   return tabs.map((tab) =>
     tab.id === activeTabId && tab.kind === "request" ? { ...tab, ...patch } : tab,
+  );
+}
+
+/**
+ * The same, for a patch built from the tab's own previous state. A stream
+ * arrives in batches, each folded into what the last one left — and by a
+ * tab id rather than the active tab, because the user is free to switch
+ * tabs while a request is still running.
+ */
+function updateRequestTab(
+  tabs: Tab[],
+  tabId: string,
+  patch: (tab: RequestTab) => Partial<RequestTab>,
+): Tab[] {
+  return tabs.map((tab) =>
+    tab.id === tabId && tab.kind === "request" ? { ...tab, ...patch(tab) } : tab,
   );
 }
 
@@ -410,6 +605,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     // tab is for. A failed save keeps it lit.
     if (tab.kind === "docs") {
       return tab.markdown !== tab.savedMarkdown;
+    }
+    if (tab.kind === "websocket") {
+      return !webSocketShapesEqual(webSocketShapeFromTab(tab), tab.savedSnapshot);
     }
     // An environment tab saves explicitly, so it is never "unsaved".
     if (tab.kind !== "request") {
@@ -582,6 +780,17 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     // Fire-and-forget, because closing must not wait on a disk write.
     void get().saveDocs(id);
 
+    // A tab's connection ends with the tab. Its last events find no tab and
+    // are dropped; the connection's bookkeeping goes with its `closed`.
+    const closingTab = get().tabs.find((tab) => tab.id === id);
+    if (
+      closingTab?.kind === "websocket" &&
+      closingTab.connection !== "idle" &&
+      closingTab.connectionId !== null
+    ) {
+      void disconnectWebSocket(closingTab.connectionId);
+    }
+
     set((state) => {
       const index = state.tabs.findIndex((tab) => tab.id === id);
       if (index === -1) {
@@ -706,6 +915,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         download: null,
         error: null,
         sentRequest: null,
+        stream: EMPTY_STREAM,
       }),
     }));
 
@@ -714,7 +924,15 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const resolved = substituteRequestInput(template, variables);
     const snapshot = substituteRequestInput(template, variables, { leaveSecrets: true });
     const startedAt = performance.now();
-    const result = await sendRequest(id, resolved, snapshot.url);
+    // Batched by the service: one update a frame however fast the stream is.
+    const onStream = (events: HttpStreamEvent[]): void => {
+      set((state) => ({
+        tabs: updateRequestTab(state.tabs, activeTabId, (tab) => ({
+          stream: applyStreamEvents(tab.stream, events),
+        })),
+      }));
+    };
+    const result = await sendRequest(id, resolved, snapshot.url, onStream);
 
     set((state) => ({
       tabs: replaceActiveTab(state.tabs, activeTabId, {
@@ -761,6 +979,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         download: null,
         error: null,
         sentRequest: null,
+        stream: EMPTY_STREAM,
       }),
     }));
 
@@ -818,7 +1037,359 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         }),
       };
     }),
+
+  activeWebSocketTab: () => findActiveWebSocket(get()),
+
+  openBlankWebSocketTab: () => {
+    const tab = buildBlankWebSocketTab();
+    set((state) => ({ tabs: [...state.tabs, tab], activeTabId: tab.id }));
+    return tab.id;
+  },
+
+  openSavedWebSocket: (saved) => {
+    const existing = get().tabs.find(
+      (tab) => tab.kind === "websocket" && tab.loadedRequest?.id === saved.id,
+    );
+    if (existing) {
+      set({ activeTabId: existing.id });
+      return;
+    }
+    const tab = buildWebSocketTabFromSaved(saved);
+    set((state) => ({ tabs: [...state.tabs, tab], activeTabId: tab.id }));
+  },
+
+  setWsUrl: (url) =>
+    set((state) => {
+      const active = findActiveWebSocket(state);
+      if (active === null || active.connection !== "idle") {
+        return {};
+      }
+      return {
+        tabs: updateWebSocketTab(state.tabs, active.id, (tab) => ({
+          url,
+          paramRows: rowsKeepingIds(tab.paramRows, queryPairs(url)),
+        })),
+      };
+    }),
+
+  setWsParamRows: (paramRows) =>
+    set((state) => {
+      const active = findActiveWebSocket(state);
+      if (active === null || active.connection !== "idle") {
+        return {};
+      }
+      const rows = withTrailingBlank(paramRows);
+      return {
+        tabs: updateWebSocketTab(state.tabs, active.id, (tab) => ({
+          paramRows: rows,
+          url: withQueryPairs(tab.url, rows),
+        })),
+      };
+    }),
+
+  // Headers, settings and the draft stay editable while connected; they
+  // apply from the next connect (assumption 10).
+  setWsHeaderRows: (headerRows) =>
+    set((state) => {
+      const active = findActiveWebSocket(state);
+      return active === null
+        ? {}
+        : {
+            tabs: updateWebSocketTab(state.tabs, active.id, () => ({
+              headerRows: withTrailingBlank(headerRows),
+            })),
+          };
+    }),
+
+  setWsSettings: (patch) =>
+    set((state) => {
+      const active = findActiveWebSocket(state);
+      return active === null
+        ? {}
+        : {
+            tabs: updateWebSocketTab(state.tabs, active.id, (tab) => ({
+              settings: { ...tab.settings, ...patch },
+            })),
+          };
+    }),
+
+  setWsDraft: (patch) =>
+    set((state) => {
+      const active = findActiveWebSocket(state);
+      return active === null
+        ? {}
+        : {
+            tabs: updateWebSocketTab(state.tabs, active.id, (tab) => ({
+              draft: { ...tab.draft, ...patch },
+              composerError: null,
+            })),
+          };
+    }),
+
+  beautifyWsDraft: () =>
+    set((state) => {
+      const active = findActiveWebSocket(state);
+      if (active === null || !isBeautifiable(active.draft.format)) {
+        return {};
+      }
+      const result = beautify(active.draft.format, active.draft.text);
+      return {
+        tabs: updateWebSocketTab(state.tabs, active.id, (tab) =>
+          result.ok
+            ? { draft: { ...tab.draft, text: result.text }, composerError: null }
+            : { composerError: result.reason },
+        ),
+      };
+    }),
+
+  currentWebSocketShape: () => {
+    const active = findActiveWebSocket(get());
+    return active === null
+      ? shapeFromTabFields("", [], DEFAULT_WS_SETTINGS, EMPTY_WS_DRAFT)
+      : webSocketShapeFromTab(active);
+  },
+
+  connect: async () => {
+    const active = findActiveWebSocket(get());
+    if (active === null || active.connection !== "idle") {
+      return;
+    }
+    const tabId = active.id;
+    const connectionId = newConnectionId();
+    set((state) => ({
+      tabs: updateWebSocketTab(state.tabs, tabId, () => ({
+        connection: "connecting",
+        connectionId,
+        reconnectAttempt: null,
+      })),
+    }));
+
+    const template = webSocketShapeFromTab(active).request;
+    const variables = useEnvironmentsStore.getState().activeVariables();
+    const resolved = substituteWebSocketRequest(template, variables);
+    // What the log and the log file show: a secret variable's value never
+    // reaches either (PLAN.md Phase 9).
+    const display = substituteWebSocketRequest(template, variables, { leaveSecrets: true });
+    displayUrlByConnection.set(connectionId, display.url);
+
+    const result = await connectWebSocket(connectionId, resolved, display.url, (events) => {
+      const shown = events.map((event) => forDisplay(connectionId, event));
+      set((state) => ({
+        tabs: updateWebSocketTab(state.tabs, tabId, (tab) => applyEvents(tab, connectionId, shown)),
+      }));
+      if (events.some((event) => event.type === "closed")) {
+        forgetConnection(connectionId);
+      }
+    });
+    if (result.ok) {
+      return;
+    }
+
+    // A failed handshake reports nothing on the channel, so its row in the
+    // log is written here.
+    const failure: WsEvent = {
+      type: "error",
+      atMs: Date.now(),
+      message:
+        result.error.kind === "cancelled"
+          ? "Connection cancelled"
+          : `Could not connect: ${result.error.message}`,
+    };
+    set((state) => ({
+      tabs: updateWebSocketTab(state.tabs, tabId, (tab) => ({
+        log: appendCapped(tab.log, logEntries(connectionId, [failure])),
+        ...(tab.connectionId === connectionId
+          ? { connection: "idle" as const, reconnectAttempt: null }
+          : {}),
+      })),
+    }));
+    forgetConnection(connectionId);
+  },
+
+  disconnect: () => {
+    const active = findActiveWebSocket(get());
+    if (
+      active === null ||
+      active.connectionId === null ||
+      active.connection === "idle" ||
+      active.connection === "disconnecting"
+    ) {
+      return;
+    }
+    const { connectionId } = active;
+    set((state) => ({
+      tabs: updateWebSocketTab(state.tabs, active.id, () => ({ connection: "disconnecting" })),
+    }));
+    void disconnectWebSocket(connectionId);
+  },
+
+  sendMessage: async () => {
+    const active = findActiveWebSocket(get());
+    if (active === null || active.connection !== "connected" || active.connectionId === null) {
+      return;
+    }
+    const { connectionId, draft } = active;
+    const variables = useEnvironmentsStore.getState().activeVariables();
+    const outgoing = encodeOutgoing(
+      draft.format,
+      draft.binaryEncoding,
+      substituteMessage(draft.text, variables),
+    );
+    if (!outgoing.ok) {
+      set((state) => ({
+        tabs: updateWebSocketTab(state.tabs, active.id, () => ({ composerError: outgoing.error })),
+      }));
+      return;
+    }
+
+    const pending: PendingSend = {
+      resolved: outgoing.payload,
+      display: displayPayload(
+        draft,
+        substituteMessage(draft.text, variables, { leaveSecrets: true }),
+      ),
+    };
+    pendingSendsByConnection.set(connectionId, [
+      ...(pendingSendsByConnection.get(connectionId) ?? []),
+      pending,
+    ]);
+    set((state) => ({
+      tabs: updateWebSocketTab(state.tabs, active.id, () => ({ composerError: null })),
+    }));
+
+    const result = await sendWebSocketMessage(connectionId, outgoing.payload);
+    if (!result.ok) {
+      const queued = pendingSendsByConnection.get(connectionId);
+      if (queued !== undefined) {
+        pendingSendsByConnection.set(
+          connectionId,
+          queued.filter((entry) => entry !== pending),
+        );
+      }
+      set((state) => ({
+        tabs: updateWebSocketTab(state.tabs, active.id, () => ({
+          composerError: result.error.message,
+        })),
+      }));
+    }
+  },
+
+  clearMessages: () =>
+    set((state) => {
+      const active = findActiveWebSocket(state);
+      return active === null
+        ? {}
+        : { tabs: updateWebSocketTab(state.tabs, active.id, () => ({ log: clearAll() })) };
+    }),
+
+  setLogFilter: (logFilter) =>
+    set((state) => {
+      const active = findActiveWebSocket(state);
+      return active === null
+        ? {}
+        : { tabs: updateWebSocketTab(state.tabs, active.id, () => ({ logFilter })) };
+    }),
+
+  setLogQuery: (logQuery) =>
+    set((state) => {
+      const active = findActiveWebSocket(state);
+      return active === null
+        ? {}
+        : { tabs: updateWebSocketTab(state.tabs, active.id, () => ({ logQuery })) };
+    }),
+
+  markWebSocketSaved: (loaded) =>
+    set((state) => {
+      const active = findActiveWebSocket(state);
+      return active === null
+        ? {}
+        : {
+            tabs: updateWebSocketTab(state.tabs, active.id, (tab) => ({
+              loadedRequest: loaded,
+              savedSnapshot: webSocketShapeFromTab(tab),
+            })),
+          };
+    }),
 }));
+
+/**
+ * Per-connection bookkeeping, outside the store for the same reason as
+ * `inFlightByTab`: nothing renders it. Both are dropped when the
+ * connection's `closed` arrives, or when its connect fails.
+ */
+const pendingSendsByConnection = new Map<string, PendingSend[]>();
+const displayUrlByConnection = new Map<string, string>();
+
+function forgetConnection(connectionId: string): void {
+  pendingSendsByConnection.delete(connectionId);
+  displayUrlByConnection.delete(connectionId);
+}
+
+/**
+ * The event as the log should keep it. Rust reports what went over the
+ * wire, resolved; the log keeps secret variables as `{{placeholders}}`. A
+ * message the server echoes back is the server's data and is shown as it
+ * arrived.
+ */
+function forDisplay(connectionId: string, event: WsEvent): WsEvent {
+  if (event.type === "connected") {
+    return { ...event, url: displayUrlByConnection.get(connectionId) ?? event.url };
+  }
+  if (event.type === "sent") {
+    const { display, rest } = takePendingSend(
+      pendingSendsByConnection.get(connectionId) ?? [],
+      event.payload,
+    );
+    pendingSendsByConnection.set(connectionId, rest);
+    return { ...event, payload: display };
+  }
+  return event;
+}
+
+/**
+ * The display twin of a message about to be sent. Hex with a secret
+ * placeholder in it does not parse as hex, and the secret must still not
+ * show, so it is kept as the text that was typed.
+ */
+function displayPayload(draft: WsDraft, displayText: string): WsPayload {
+  const encoded = encodeOutgoing(draft.format, draft.binaryEncoding, displayText);
+  return encoded.ok ? encoded.payload : { kind: "text", text: displayText };
+}
+
+/**
+ * Appends a batch to the log and moves the connection state. Events of an
+ * earlier connection, arriving after a new connect, still join the log (they
+ * belong to their own session) but no longer move the state.
+ */
+function applyEvents(
+  tab: WebSocketTab,
+  connectionId: string,
+  events: readonly WsEvent[],
+): Partial<WebSocketTab> {
+  let { connection, reconnectAttempt } = tab;
+  if (tab.connectionId === connectionId) {
+    for (const event of events) {
+      if (event.type === "connected") {
+        connection = "connected";
+        reconnectAttempt = null;
+      } else if (event.type === "reconnecting") {
+        // Disconnect pressed during the wait wins over the next attempt.
+        if (connection !== "disconnecting") {
+          connection = "reconnecting";
+        }
+        reconnectAttempt = { attempt: event.attempt, maxAttempts: event.maxAttempts };
+      } else if (event.type === "closed") {
+        connection = "idle";
+        reconnectAttempt = null;
+      }
+    }
+  }
+  return {
+    connection,
+    reconnectAttempt,
+    log: appendCapped(tab.log, logEntries(connectionId, events)),
+  };
+}
 
 /**
  * Outside the store: per-tab transport bookkeeping, not something any

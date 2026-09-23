@@ -1,0 +1,40 @@
+INFO S00         build: cargo (curl-sys, static libcurl, rustls)
+INFO S00         libcurl: libcurl/8.21.0-DEV rustls-ffi/0.15.3/rustls/0.23.39/aws-lc-rs zlib/1.3.2 nghttp2/1.68.1
+INFO S00         target: windows x86_64
+PASS S00         test server SHA-1 self-check
+INFO S00         local test server on 127.0.0.1:55969
+PASS S01  [gate] handshake: status 101, 6 header lines captured
+PASS S01  [gate] Sleep: text echo 'hello'
+PASS S01  [gate] handshake: status 101, 6 header lines captured
+PASS S01  [gate] Socket: text echo 'hello'
+PASS S02  [gate] binary echo, all 256 byte values intact
+INFO S03         Sleep: 200 echo round trips, median 10243 us, p95 10570 us
+INFO S03         Sleep: idle for 2.0 s cost 196 wake-ups
+INFO S03         Socket: 200 echo round trips, median 56 us, p95 65 us
+INFO S03         Socket: idle for 2.0 s cost 196 wake-ups
+PASS S04  [gate] 3 server fragments reassembled to 'hello world': [TEXT|CONT off=0 left=0 len=3] [TEXT|CONT off=0 left=0 len=3] [TEXT off=0 left=0 len=5]
+PASS S05  [gate] 200000 byte frame arrived in 4 chunks (bytesleft: 134730, 69450, 3914, 0)
+INFO S06         (a) auto-pong while only receiving: server got a pong=false; app recv: timeout after 163 waits; server saw: ["ping: no pong within 3 s (A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond. (os error 10060))"]
+PASS S06  [gate] (b) NOAUTOPONG: PING "p1" surfaced, app answered it (send Ok(1)), server got the pong
+PASS S07  [gate] server close surfaced as a CLOSE message: code=Some(1001) reason="bye"
+INFO S07         (a) no reply sent by the app; next recv: curl error 52 (Server returned nothing (no headers, no data))
+INFO S07         (a) libcurl answered the close on its own: false; server saw: ["server-close: client did not answer within 3 s (timed out)"]
+PASS S07  [gate] (b) app replied with close: send=Ok(1); next recv: curl error 52 (Server returned nothing (no headers, no data)); server saw: ["server-close: client answered with a close frame, code=Some(1001)"]
+PASS S08  [gate] client close 1000 'done' reached the server; its echo came back as code=Some(1000) reason="done"; next recv: curl error 52 (Server returned nothing (no headers, no data))
+PASS S09  [gate] /401: refused with curl 22 (HTTP response code said error) [Refused WebSocket upgrade: 401], status 401 readable
+PASS S09  [gate] /403: refused with curl 22 (HTTP response code said error) [Refused WebSocket upgrade: 403], status 403 readable
+PASS S09  [gate] /200: refused with curl 22 (HTTP response code said error) [Refused WebSocket upgrade: 200], status 200 readable
+PASS S10  [gate] ws://127.0.0.1:1/: curl 7 (Could not connect to server) [Failed to connect to 127.0.0.1:1 after 2014 ms: Could not connect to server]
+PASS S10  [gate] ws://no-such-host.invalid/: curl 6 (Could not resolve hostname) [Could not resolve host: no-such-host.invalid]
+INFO S11         CURLOPT_TIMEOUT_MS=1500, idle 2.5 s, then send: Ok(1), recv: message flags=TEXT len=4 chunks=1 => the timeout does NOT limit an open WebSocket
+PASS S12  [gate] custom header, Cookie and subprotocol reached the handshake; protocol in 101 response: true
+PASS S13  [gate] 8 MiB to a reader stalled 1.5 s: 9 calls, 4 partial, 4 CURLE_AGAIN, 1.51 s; server confirmed length and hash
+PASS S14  [gate] TCP dropped without a close frame: first recv message flags=TEXT len=8 chunks=1, then recv curl error 52 (Server returned nothing (no headers, no data)), then send Ok(1)
+PASS S15  [gate] Easy2 did the handshake (status 101), frames over easy.raw()
+PASS S16  [gate] wss://echo.websocket.org: echo over TLS (status 101); before it: ["Request served by 4d896d95b55478"]
+PASS S17  [gate] wss://expired.badssl.com/: refused, curl 60 (SSL peer certificate or SSH remote key was not OK) [rustls_connection_process_new_packets: invalid peer certificate: Expired]
+PASS S17  [gate] wss://self-signed.badssl.com/: refused, curl 60 (SSL peer certificate or SSH remote key was not OK) [rustls_connection_process_new_packets: invalid peer certificate: UnknownIssuer]
+INFO S17         verify off: got past TLS to curl 22 (HTTP response code said error) [Refused WebSocket upgrade: 200] status 200
+SKIP S18         set SPIKE_PROXY=http://host:port to test a proxied handshake
+INFO END         0 failure(s) in total
+VERDICT: every gate passed in this build.

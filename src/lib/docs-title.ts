@@ -35,7 +35,10 @@ export function docsTargetName(
   }
 
   for (const contents of Object.values(contentsById)) {
-    const items = target.kind === "folder" ? contents.folders : contents.requests;
+    // A WebSocket request is a "request" target too: it shares the requests
+    // table, and its docs are reached by the same id.
+    const items: readonly { id: string; name: string }[] =
+      target.kind === "folder" ? contents.folders : [...contents.requests, ...contents.webSockets];
     const found = items.find((item) => item.id === target.id);
     if (found !== undefined) {
       return found.name;

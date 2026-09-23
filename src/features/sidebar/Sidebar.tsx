@@ -7,7 +7,7 @@ import { useState } from "react";
 import { CollectionsSidebar } from "@/features/collections/CollectionsSidebar";
 import { EnvironmentsPanel } from "@/features/environments/EnvironmentsPanel";
 import { HistoryPanel } from "@/features/history/HistoryPanel";
-import type { SavedRequest } from "@/types/collections";
+import type { SavedRequest, SavedWebSocket } from "@/types/collections";
 import type { DocsTarget } from "@/types/docs";
 import type { SendRequestInput } from "@/types/http";
 
@@ -20,6 +20,7 @@ interface SidebarProps {
   width: number;
   loadedRequestId: string | null;
   onOpenRequest: (saved: SavedRequest) => void;
+  onOpenWebSocket: (saved: SavedWebSocket) => void;
   onOpenEnvironment: (environmentId: string) => void;
   onOpenExample: (exampleId: string) => void;
   onOpenHistoryEntry: (request: SendRequestInput) => void;
@@ -30,6 +31,7 @@ export function Sidebar({
   width,
   loadedRequestId,
   onOpenRequest,
+  onOpenWebSocket,
   onOpenEnvironment,
   onOpenExample,
   onOpenHistoryEntry,
@@ -63,6 +65,7 @@ export function Sidebar({
           onOpenDocs={onOpenDocs}
           onOpenExample={onOpenExample}
           onOpenRequest={onOpenRequest}
+          onOpenWebSocket={onOpenWebSocket}
         />
       )}
       {panel === "Environments" && <EnvironmentsPanel onOpenEnvironment={onOpenEnvironment} />}

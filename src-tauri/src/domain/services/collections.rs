@@ -5,9 +5,11 @@ use crate::domain::error::AppError;
 use crate::domain::ids::new_id;
 use crate::domain::models::{
     Collection, Example, ExampleSummary, Folder, HttpRequest, KeyValue, NewExample, SavedRequest,
+    SavedWebSocket, WebSocketRequest, WsDraft,
 };
 use crate::domain::ports::{
     CollectionRepository, ExampleRepository, FolderRepository, SavedRequestRepository,
+    WebSocketRepository,
 };
 use crate::domain::secrets::{request_without_literal_secrets, SecretState};
 use crate::domain::services::validation::validated_name;
@@ -26,16 +28,20 @@ pub struct CollectionContents {
     pub folders: Vec<Folder>,
     pub requests: Vec<SavedRequest>,
     pub examples: Vec<ExampleSummary>,
+    /// Beside `requests` rather than mixed into it: they are separate types
+    /// (see `SavedWebSocket`), and the tree interleaves them by name.
+    pub web_sockets: Vec<SavedWebSocket>,
 }
 
-/// Use-cases over the four storage aggregates. Cheap to clone (Arc), so the
-/// command layer can move a clone into a blocking task.
+/// Use-cases over the storage aggregates of a collection. Cheap to clone
+/// (Arc), so the command layer can move a clone into a blocking task.
 #[derive(Clone)]
 pub struct Collections {
     collections: Arc<dyn CollectionRepository>,
     folders: Arc<dyn FolderRepository>,
     requests: Arc<dyn SavedRequestRepository>,
     examples: Arc<dyn ExampleRepository>,
+    web_sockets: Arc<dyn WebSocketRepository>,
 }
 
 impl Collections {
@@ -44,12 +50,14 @@ impl Collections {
         folders: Arc<dyn FolderRepository>,
         requests: Arc<dyn SavedRequestRepository>,
         examples: Arc<dyn ExampleRepository>,
+        web_sockets: Arc<dyn WebSocketRepository>,
     ) -> Self {
         Self {
             collections,
             folders,
             requests,
             examples,
+            web_sockets,
         }
     }
 
@@ -62,6 +70,7 @@ impl Collections {
             folders: self.folders.list_by_collection(collection_id)?,
             requests: self.requests.list_by_collection(collection_id)?,
             examples: self.examples.list_summaries_by_collection(collection_id)?,
+            web_sockets: self.web_sockets.list_by_collection(collection_id)?,
         })
     }
 
@@ -133,6 +142,38 @@ impl Collections {
         self.requests.delete(id)
     }
 
+    /// The WebSocket counterpart of `save_request`: an id of None saves a new
+    /// one, an existing id overwrites it. Ids share the `req` prefix because
+    /// the rows share a table, and rename, move, delete and docs reach a
+    /// WebSocket through the request commands by that id.
+    ///
+    /// No URL check here, as there is none on the HTTP side: a half-typed
+    /// draft is worth saving. The scheme is checked when connecting.
+    pub fn save_web_socket(
+        &self,
+        id: Option<String>,
+        collection_id: &str,
+        folder_id: Option<&str>,
+        name: &str,
+        request: WebSocketRequest,
+        draft: WsDraft,
+    ) -> Result<SavedWebSocket, AppError> {
+        let saved = SavedWebSocket {
+            id: id.unwrap_or_else(|| new_id("req")),
+            collection_id: collection_id.to_string(),
+            folder_id: folder_id.map(str::to_string),
+            name: validated_name(name)?.to_string(),
+            request,
+            draft,
+        };
+        self.web_sockets.save(&saved)?;
+        Ok(saved)
+    }
+
+    pub fn load_web_socket(&self, id: &str) -> Result<SavedWebSocket, AppError> {
+        self.web_sockets.get(id)
+    }
+
     /// An example always hangs off a stored request, so the caller must save
     /// the request first — there is no place to put one otherwise.
     pub fn save_example(
@@ -183,7 +224,9 @@ impl Collections {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::models::{Auth, HttpMethod, RequestBody, RequestSettings};
+    use crate::domain::models::{
+        Auth, HttpMethod, RequestBody, RequestSettings, WebSocketSettings, WsMessageFormat,
+    };
     use std::sync::Mutex;
 
     #[derive(Default)]
@@ -328,12 +371,39 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct SpyWebSockets {
+        saved: Mutex<Vec<SavedWebSocket>>,
+    }
+
+    impl WebSocketRepository for SpyWebSockets {
+        fn list_by_collection(
+            &self,
+            _collection_id: &str,
+        ) -> Result<Vec<SavedWebSocket>, AppError> {
+            Ok(self.saved.lock().expect("spy lock poisoned").clone())
+        }
+        fn get(&self, id: &str) -> Result<SavedWebSocket, AppError> {
+            Err(AppError::NotFound(format!(
+                "WebSocket request {id} does not exist"
+            )))
+        }
+        fn save(&self, saved: &SavedWebSocket) -> Result<(), AppError> {
+            self.saved
+                .lock()
+                .expect("spy lock poisoned")
+                .push(saved.clone());
+            Ok(())
+        }
+    }
+
     fn service(collections: Arc<SpyCollections>, requests: Arc<SpyRequests>) -> Collections {
         Collections::new(
             collections,
             Arc::new(StubFolders),
             requests,
             Arc::new(SpyExamples::default()),
+            Arc::new(SpyWebSockets::default()),
         )
     }
 
@@ -343,7 +413,34 @@ mod tests {
             Arc::new(StubFolders),
             Arc::new(SpyRequests::default()),
             examples,
+            Arc::new(SpyWebSockets::default()),
         )
+    }
+
+    fn web_socket_service(web_sockets: Arc<SpyWebSockets>) -> Collections {
+        Collections::new(
+            Arc::new(SpyCollections::default()),
+            Arc::new(StubFolders),
+            Arc::new(SpyRequests::default()),
+            Arc::new(SpyExamples::default()),
+            web_sockets,
+        )
+    }
+
+    fn web_socket_request() -> WebSocketRequest {
+        WebSocketRequest {
+            url: "wss://echo.websocket.org".into(),
+            headers: vec![KeyValue::new("Sec-WebSocket-Protocol", "chat")],
+            settings: WebSocketSettings::default(),
+        }
+    }
+
+    fn draft() -> WsDraft {
+        WsDraft {
+            format: WsMessageFormat::Json,
+            text: "{\"hello\":1}".into(),
+            ..WsDraft::default()
+        }
     }
 
     fn request() -> HttpRequest {
@@ -452,6 +549,73 @@ mod tests {
             .lock()
             .expect("spy lock poisoned")
             .is_empty());
+    }
+
+    #[test]
+    fn a_web_socket_gets_a_request_id_keeps_it_on_re_save_and_has_its_name_trimmed() {
+        let web_sockets = Arc::new(SpyWebSockets::default());
+        let service = web_socket_service(web_sockets.clone());
+
+        let first = service
+            .save_web_socket(
+                None,
+                "col_1",
+                Some("fld_1"),
+                "  Echo  ",
+                web_socket_request(),
+                draft(),
+            )
+            .expect("should save");
+        service
+            .save_web_socket(
+                Some(first.id.clone()),
+                "col_1",
+                Some("fld_1"),
+                "Echo",
+                web_socket_request(),
+                draft(),
+            )
+            .expect("should re-save");
+
+        let saved = web_sockets.saved.lock().expect("spy lock poisoned");
+        assert!(saved[0].id.starts_with("req_"));
+        assert_eq!(saved[0].id, saved[1].id);
+        assert_eq!(saved[0].name, "Echo");
+        assert_eq!(saved[0].folder_id.as_deref(), Some("fld_1"));
+        assert_eq!(saved[0].draft, draft());
+    }
+
+    #[test]
+    fn a_web_socket_name_goes_through_the_same_validation_as_every_other_name() {
+        let web_sockets = Arc::new(SpyWebSockets::default());
+        let service = web_socket_service(web_sockets.clone());
+
+        let error = service
+            .save_web_socket(None, "col_1", None, "   ", web_socket_request(), draft())
+            .expect_err("should reject");
+
+        assert!(matches!(error, AppError::InvalidRequest(_)));
+        assert!(web_sockets
+            .saved
+            .lock()
+            .expect("spy lock poisoned")
+            .is_empty());
+    }
+
+    /// Mixed collections are the point of the feature: the contents call
+    /// carries both kinds, side by side.
+    #[test]
+    fn contents_carry_web_sockets_beside_http_requests() {
+        let web_sockets = Arc::new(SpyWebSockets::default());
+        let service = web_socket_service(web_sockets);
+        service
+            .save_web_socket(None, "col_1", None, "Echo", web_socket_request(), draft())
+            .expect("should save");
+
+        let contents = service.contents("col_1").expect("should list");
+
+        assert_eq!(contents.web_sockets.len(), 1);
+        assert_eq!(contents.web_sockets[0].name, "Echo");
     }
 
     #[test]

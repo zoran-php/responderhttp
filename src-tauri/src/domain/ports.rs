@@ -3,9 +3,13 @@
 // Trait boundary between domain and infrastructure. Domain services depend
 // on these; concrete implementations (CurlClient, SQLite repositories) are
 // injected at startup in lib.rs.
+use std::time::Duration;
+
 use crate::domain::cancellation::CancellationToken;
 use crate::domain::error::AppError;
-use crate::domain::models::{HttpRequest, HttpResponse};
+use crate::domain::models::{HttpRequest, HttpResponse, KeyValue, WebSocketRequest, WsHandshake};
+use crate::domain::sse::SseBlock;
+use crate::domain::ws_frames::{FrameChunk, FrameKind};
 
 /// Blocking on purpose: the caller decides how to get off the UI thread
 /// (the command layer uses a blocking task), and a blocking trait keeps the
@@ -16,12 +20,107 @@ pub trait HttpClient: Send + Sync {
         request: &HttpRequest,
         cancel: &CancellationToken,
     ) -> Result<HttpResponse, AppError>;
+
+    /// The same request, reporting what arrives while it is still running:
+    /// the response headers as soon as they land, and, when the response is
+    /// an event stream, every block as it is parsed (PLAN-SSE.md).
+    ///
+    /// The default ignores the sink and calls `send`, so a client that has
+    /// nothing to stream — a test double, or one that wraps another — needs
+    /// no code to stay substitutable (CLAUDE.md section 7, Liskov).
+    fn send_streaming(
+        &self,
+        request: &HttpRequest,
+        cancel: &CancellationToken,
+        _on_update: HttpStreamSink<'_>,
+    ) -> Result<HttpResponse, AppError> {
+        self.send(request, cancel)
+    }
+}
+
+/// What a request reports before it has finished.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HttpStreamUpdate {
+    /// The response's status and headers, as soon as they are complete. A
+    /// redirect hop reports its own, so the last one is the response's.
+    /// `bytes` is that header block's size, for the running size total.
+    Headers {
+        status: u16,
+        headers: Vec<KeyValue>,
+        bytes: u64,
+    },
+    /// One block of a `text/event-stream` response.
+    Block { at_ms: u64, block: SseBlock },
+}
+
+/// Where those updates go. Returning false means nobody is listening any
+/// more, and the transfer is abandoned rather than run on unseen — the same
+/// rule as a WebSocket's event sink.
+pub type HttpStreamSink<'a> = &'a mut (dyn FnMut(HttpStreamUpdate) -> bool + Send);
+
+/// Why a WebSocket handshake did not produce a connection. A refusal is its
+/// own case because it decides whether reconnecting is allowed: a server that
+/// answered 401 must not be asked again every few seconds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WsConnectError {
+    /// The server answered the upgrade with something other than 101.
+    Refused {
+        status: u16,
+    },
+    Cancelled,
+    /// Unreachable, unresolvable, TLS failure, timeout...
+    Failed(String),
+}
+
+impl From<WsConnectError> for AppError {
+    fn from(error: WsConnectError) -> Self {
+        match error {
+            WsConnectError::Refused { status } => AppError::Transport(format!(
+                "server refused the WebSocket upgrade: HTTP {status}"
+            )),
+            WsConnectError::Cancelled => AppError::Cancelled,
+            WsConnectError::Failed(message) => AppError::Transport(message),
+        }
+    }
+}
+
+/// What one wait on a WebSocket connection turned up.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WsPoll {
+    Chunk(FrameChunk),
+    /// Nothing arrived within the timeout.
+    Idle,
+    /// The connection is gone. After a close frame that is the normal end;
+    /// without one it is a drop (PLAN.md Phase 13a, finding 8).
+    Ended,
+}
+
+/// Opens WebSocket connections. The port that keeps `WebSocketSessions` —
+/// the registry, the owner loop, reconnecting — testable against a scripted
+/// connection with no network, as `SendRequest` is against `HttpClient`.
+pub trait WebSocketConnector: Send + Sync {
+    /// Blocking until the handshake is done. `cancel` abandons it.
+    fn connect(
+        &self,
+        request: &WebSocketRequest,
+        cancel: &CancellationToken,
+    ) -> Result<Box<dyn WebSocketConnection>, WsConnectError>;
+}
+
+/// One open WebSocket. Owned by a single thread for its whole life: libcurl's
+/// easy handle is not safe to share, so nothing here needs to be Sync.
+pub trait WebSocketConnection: Send {
+    fn handshake(&self) -> &WsHandshake;
+    /// Waits up to `timeout` for the next piece of a frame.
+    fn poll(&mut self, timeout: Duration) -> Result<WsPoll, AppError>;
+    /// Writes one whole frame, blocking until it is on the wire.
+    fn send(&mut self, kind: FrameKind, payload: &[u8]) -> Result<(), AppError>;
 }
 
 use crate::domain::import_plan::{ImportPlan, ImportedIds};
 use crate::domain::models::{
     Collection, Cookie, Environment, EnvironmentVariable, Example, ExampleSummary, Folder,
-    HistoryEntry, NewExample, NewHistoryEntry, SavedRequest,
+    HistoryEntry, NewExample, NewHistoryEntry, SavedRequest, SavedWebSocket,
 };
 use crate::domain::secrets::SecretState;
 
@@ -87,10 +186,15 @@ pub trait EnvironmentRepository: Send + Sync {
     ) -> Result<(), AppError>;
 }
 
+/// HTTP requests. `list_by_collection`, `get` and `save` see HTTP rows only;
+/// the rest act on any row in the `requests` table by id, WebSocket ones
+/// included (see `WebSocketRepository`).
 pub trait SavedRequestRepository: Send + Sync {
     fn list_by_collection(&self, collection_id: &str) -> Result<Vec<SavedRequest>, AppError>;
+    /// `NotFound` for an unknown id and for the id of a WebSocket alike.
     fn get(&self, id: &str) -> Result<SavedRequest, AppError>;
-    /// Inserts when the id is new, replaces the stored row when it exists.
+    /// Inserts when the id is new, replaces the stored row when it is an HTTP
+    /// request. Refuses an id that belongs to a WebSocket.
     fn save(&self, saved: &SavedRequest) -> Result<(), AppError>;
     fn rename(&self, id: &str, name: &str) -> Result<(), AppError>;
     /// `folder_id` of None moves the request to the collection root.
@@ -101,6 +205,20 @@ pub trait SavedRequestRepository: Send + Sync {
     fn docs(&self, id: &str) -> Result<String, AppError>;
     /// Replaces this item's Markdown documentation.
     fn set_docs(&self, id: &str, markdown: &str) -> Result<(), AppError>;
+}
+
+/// Saved WebSocket requests (PLAN.md Phase 13d). Only what differs from an
+/// HTTP request lives here: listing, loading and saving the WebSocket's own
+/// shape. Renaming, moving, deleting and documenting one act on a row by id
+/// whatever its kind, so they stay on `SavedRequestRepository` rather than
+/// being written a second time.
+pub trait WebSocketRepository: Send + Sync {
+    fn list_by_collection(&self, collection_id: &str) -> Result<Vec<SavedWebSocket>, AppError>;
+    /// `NotFound` for an unknown id and for the id of an HTTP request alike.
+    fn get(&self, id: &str) -> Result<SavedWebSocket, AppError>;
+    /// Inserts when the id is new, replaces the stored row when it is a
+    /// WebSocket. Refuses an id that belongs to an HTTP request.
+    fn save(&self, saved: &SavedWebSocket) -> Result<(), AppError>;
 }
 
 /// Sent-request history. The repository owns trimming so the table stays

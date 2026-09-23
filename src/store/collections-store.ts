@@ -7,14 +7,16 @@
 import { create } from "zustand";
 
 import { emptyRequestInput } from "@/lib/request-defaults";
+import { emptyWebSocketShape } from "@/lib/ws-request";
 import * as collectionsService from "@/services/collections";
-import type { SaveExampleArgs, SaveRequestArgs } from "@/services/collections";
+import type { SaveExampleArgs, SaveRequestArgs, SaveWebSocketArgs } from "@/services/collections";
 import type {
   Collection,
   CollectionContents,
   Example,
   Folder,
   SavedRequest,
+  SavedWebSocket,
 } from "@/types/collections";
 import type { ApiError } from "@/types/http";
 
@@ -57,7 +59,17 @@ interface CollectionsState {
   deleteFolder: (collectionId: string, id: string) => Promise<boolean>;
 
   saveRequest: (args: SaveRequestArgs) => Promise<SavedRequest | null>;
-  /** Right-click "New request" on a collection or folder: the same
+  /** Rename, move and delete of a WebSocket use the request actions: they
+   * act on the row by id, whatever its kind. */
+  saveWebSocket: (args: SaveWebSocketArgs) => Promise<SavedWebSocket | null>;
+  /** Right-click "New WebSocket request": an empty one, saved at once. */
+  createWebSocket: (
+    collectionId: string,
+    folderId: string | null,
+    name: string,
+  ) => Promise<SavedWebSocket | null>;
+  loadWebSocket: (id: string) => Promise<SavedWebSocket | null>;
+  /** Right-click "New HTTP request" on a collection or folder: the same
    * save_request command as any new save, starting from a blank body. */
   createRequest: (
     collectionId: string,
@@ -190,7 +202,9 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
     }
     set({
       collections: get()
-        .collections.map((collection) => (collection.id === id ? { ...collection, name } : collection))
+        .collections.map((collection) =>
+          collection.id === id ? { ...collection, name } : collection,
+        )
         .sort(byName),
     });
     return true;
@@ -249,6 +263,30 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
       return null;
     }
     await get().refreshContents(args.collectionId);
+    return result.value;
+  },
+
+  saveWebSocket: async (args) => {
+    const result = await collectionsService.saveWebSocket(args);
+    if (!result.ok) {
+      set({ error: result.error });
+      return null;
+    }
+    await get().refreshContents(args.collectionId);
+    return result.value;
+  },
+
+  createWebSocket: async (collectionId, folderId, name) => {
+    const { request, draft } = emptyWebSocketShape();
+    return get().saveWebSocket({ id: null, collectionId, folderId, name, request, draft });
+  },
+
+  loadWebSocket: async (id) => {
+    const result = await collectionsService.loadWebSocket(id);
+    if (!result.ok) {
+      set({ error: result.error });
+      return null;
+    }
     return result.value;
   },
 
@@ -323,7 +361,7 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
       return null;
     }
     // The request node has to open, or the new example lands out of sight —
-    // the same reason "New request" expands its collection first.
+    // the same reason "New HTTP request" expands its collection first.
     get().expandRequest(args.requestId);
     set((state) => ({ examplesById: { ...state.examplesById, [result.value.id]: result.value } }));
     await get().refreshContents(collectionId);
@@ -348,9 +386,7 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
     }
     set((state) => {
       const cached = state.examplesById[id];
-      return cached
-        ? { examplesById: { ...state.examplesById, [id]: { ...cached, name } } }
-        : {};
+      return cached ? { examplesById: { ...state.examplesById, [id]: { ...cached, name } } } : {};
     });
     await get().refreshContents(collectionId);
     return true;

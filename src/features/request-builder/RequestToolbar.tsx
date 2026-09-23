@@ -12,8 +12,11 @@ import { Cookie, Copy, Save } from "lucide-react";
 interface RequestToolbarProps {
   /** Outside in, ending with the request name. See lib/request-path.ts. */
   pathSegments: string[];
-  onCopyAsCurl: () => void;
-  onManageCookies: () => void;
+  /** Omitted by the WebSocket builder: there is no cURL for a WebSocket. */
+  onCopyAsCurl?: () => void;
+  /** Omitted by the WebSocket builder, which has its Cookies link in the
+   * sub-tab row, as the reference screenshots do. */
+  onManageCookies?: () => void;
   onSave: () => void;
 }
 
@@ -66,15 +69,19 @@ export function RequestToolbar({
         <span className="shrink-0 font-medium text-foreground">{name}</span>
       </div>
 
-      <button aria-label="Copy as cURL" className={ACTION} onClick={onCopyAsCurl} type="button">
-        <Copy aria-hidden className="h-3.5 w-3.5" />
-        cURL
-      </button>
+      {onCopyAsCurl !== undefined && (
+        <button aria-label="Copy as cURL" className={ACTION} onClick={onCopyAsCurl} type="button">
+          <Copy aria-hidden className="h-3.5 w-3.5" />
+          cURL
+        </button>
+      )}
 
-      <button aria-label="Cookies" className={ACTION} onClick={onManageCookies} type="button">
-        <Cookie aria-hidden className="h-3.5 w-3.5" />
-        Cookies
-      </button>
+      {onManageCookies !== undefined && (
+        <button aria-label="Cookies" className={ACTION} onClick={onManageCookies} type="button">
+          <Cookie aria-hidden className="h-3.5 w-3.5" />
+          Cookies
+        </button>
+      )}
 
       <button aria-label="Save request" className={ACTION} onClick={onSave} type="button">
         <Save aria-hidden className="h-3.5 w-3.5" />

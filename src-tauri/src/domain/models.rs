@@ -295,12 +295,32 @@ pub struct Timing {
     pub total: Duration,
 }
 
+/// What the transfer cost, for the response pane's size breakdown.
+///
+/// The response numbers are counted as the bytes arrive, so a stream can
+/// show them growing. The request numbers come from libcurl once it has
+/// finished sending, which is why nothing reports them mid-transfer.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TransferSizes {
+    /// Every header line libcurl sent, its own additions included. A
+    /// redirect chain counts each hop's request.
+    pub request_headers: u64,
+    pub request_body: u64,
+    /// The final hop's header block, status line and closing blank line
+    /// included.
+    pub response_headers: u64,
+    /// The body as the viewer holds it. libcurl decompresses a gzip
+    /// response, so this is the decoded size rather than the wire size.
+    pub response_body: u64,
+}
+
 #[derive(Debug, Clone)]
 pub struct HttpResponse {
     pub status: u16,
     pub headers: Vec<KeyValue>,
     pub body: ResponseBody,
     pub timing: Timing,
+    pub sizes: TransferSizes,
     /// Raw Set-Cookie lines from every redirect hop, not just the last one.
     /// `headers` deliberately keeps only the final response, but a login
     /// flow sets its cookie on the 302, so the jar needs all of them.
@@ -391,6 +411,185 @@ pub struct SavedRequest {
     /// Whether the auth secret could be read back. Always `Ok` on the way
     /// in; a request whose secret was lost still loads, with the field empty.
     pub secret_state: SecretState,
+}
+
+/// How long a WebSocket handshake may take before it is abandoned. Only the
+/// handshake: libcurl's overall timeout does not limit an open WebSocket
+/// (PLAN.md Phase 13a, finding 4), and a connection that has been idle for
+/// an hour is still a working connection.
+pub const DEFAULT_WS_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The largest message a WebSocket connection accepts before closing with
+/// 1009 (message too big). The same figure as the example body cap, chosen
+/// for the same reason: it covers anything worth reading by eye, and keeps a
+/// runaway server from filling memory.
+pub const DEFAULT_WS_MAX_MESSAGE_BYTES: usize = 1024 * 1024;
+
+/// Per-request settings for a WebSocket connection. A different set from
+/// `RequestSettings`: redirects, HTTP version and the body-related options
+/// mean nothing once the connection has been upgraded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebSocketSettings {
+    /// Off is an explicit, per-request user opt-in and never the default
+    /// (CLAUDE.md section 11, rule 7).
+    pub verify_tls: bool,
+    pub proxy: Option<String>,
+    /// Send the jar's cookies with the handshake, as an HTTP request would.
+    pub send_cookies: bool,
+    pub connect_timeout: Duration,
+    pub max_message_bytes: usize,
+    /// Reconnect after an unexpected drop. Never after the user's own
+    /// Disconnect, and never after a refused handshake.
+    pub auto_reconnect: bool,
+}
+
+impl Default for WebSocketSettings {
+    fn default() -> Self {
+        Self {
+            verify_tls: true,
+            proxy: None,
+            send_cookies: true,
+            connect_timeout: DEFAULT_WS_CONNECT_TIMEOUT,
+            max_message_bytes: DEFAULT_WS_MAX_MESSAGE_BYTES,
+            auto_reconnect: false,
+        }
+    }
+}
+
+/// What a WebSocket connection is opened with. The query string lives in
+/// `url`, as it does for an HTTP request since the Params tab became a view
+/// of the URL.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebSocketRequest {
+    pub url: String,
+    /// Sent with the handshake only.
+    pub headers: Vec<KeyValue>,
+    pub settings: WebSocketSettings,
+}
+
+/// The Message tab's format selector. Every format but `Binary` goes out as
+/// a text frame exactly as typed; the format decides the editor's language
+/// and whether Beautify is offered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WsMessageFormat {
+    #[default]
+    Text,
+    Json,
+    Xml,
+    Html,
+    /// Typed in `WsDraft::binary_encoding`, sent as a binary frame.
+    Binary,
+}
+
+/// How a binary message is typed in the composer, and shown in the log.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WsBinaryEncoding {
+    #[default]
+    Base64,
+    Hex,
+}
+
+/// The unsent message in the composer, saved with the request so reopening
+/// it brings back what was being worked on. `binary_encoding` is kept even
+/// while the format is not `Binary`, so switching back restores it.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct WsDraft {
+    pub format: WsMessageFormat,
+    pub binary_encoding: WsBinaryEncoding,
+    pub text: String,
+}
+
+/// A WebSocket request the user saved. It shares the `requests` table with
+/// `SavedRequest` (migration 0010), so it can sit in any collection or
+/// folder beside HTTP requests, and renaming, moving, deleting and
+/// documenting it go through `SavedRequestRepository`, which acts by id.
+///
+/// A sibling type rather than a variant of `SavedRequest`: a union there
+/// would force every caller that sends, exports or snapshots a request to
+/// match on a case it can never handle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SavedWebSocket {
+    pub id: String,
+    pub collection_id: String,
+    pub folder_id: Option<String>,
+    pub name: String,
+    pub request: WebSocketRequest,
+    pub draft: WsDraft,
+}
+
+/// One WebSocket message's content, as sent or received.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WsPayload {
+    Text(String),
+    Binary(Vec<u8>),
+}
+
+impl WsPayload {
+    pub fn byte_length(&self) -> usize {
+        match self {
+            Self::Text(text) => text.len(),
+            Self::Binary(bytes) => bytes.len(),
+        }
+    }
+}
+
+/// What the server answered the upgrade with. `set_cookies` is kept apart
+/// from `headers` for the cookie jar, as `HttpResponse::set_cookies` is.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct WsHandshake {
+    pub status: u16,
+    pub headers: Vec<KeyValue>,
+    pub set_cookies: Vec<String>,
+}
+
+/// Who ended a WebSocket connection, which the log shows and which decides
+/// whether reconnecting is allowed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClosedBy {
+    /// The user pressed Disconnect, or closed the tab.
+    User,
+    /// The server sent a close frame.
+    Server,
+    /// Nobody chose it: the connection dropped, or a message broke a rule.
+    Error,
+}
+
+/// Everything a live WebSocket connection reports, in the order it happened.
+/// `at_ms` is Unix time in milliseconds, stamped when the frame was actually
+/// written or read, so a slow screen can never reorder the log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WsEvent {
+    Connected {
+        at_ms: u64,
+        url: String,
+        status: u16,
+        headers: Vec<KeyValue>,
+    },
+    Sent {
+        at_ms: u64,
+        payload: WsPayload,
+    },
+    Received {
+        at_ms: u64,
+        payload: WsPayload,
+    },
+    /// Always the last event of a connection, unless reconnecting follows.
+    Closed {
+        at_ms: u64,
+        code: Option<u16>,
+        reason: String,
+        by: ClosedBy,
+    },
+    Error {
+        at_ms: u64,
+        message: String,
+    },
+    Reconnecting {
+        at_ms: u64,
+        attempt: u32,
+        max_attempts: u32,
+        delay: Duration,
+    },
 }
 
 /// One request that was actually sent, kept so it can be inspected, re-run,

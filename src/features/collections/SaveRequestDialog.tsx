@@ -6,28 +6,45 @@
 // root-level only (a <select> cannot host an inline "create inside X" flow);
 // nested folders can still be picked as a target, and can be created via the
 // sidebar's own "New folder" context-menu item.
+//
+// It saves HTTP and WebSocket requests alike, into any collection and any
+// folder: nothing here is filtered, hidden or refused by protocol
+// (PLAN-WEBSOCKET.md spec section 3), because a collection is a place to put
+// requests, not a statement about which kind they are.
 import { useEffect, useState } from "react";
 
 import { Modal } from "@/components/Modal";
 import { buildFolderTree, flattenFolders } from "@/lib/collection-tree";
 import { useCollectionsStore } from "@/store/collections-store";
+import type { WebSocketShape } from "@/lib/ws-request";
 import { EMPTY_COLLECTION_CONTENTS } from "@/types/collections";
-import type { SavedRequest } from "@/types/collections";
 import type { SendRequestInput } from "@/types/http";
+
+/** What is being saved, as its tab holds it. */
+export type SavePayload =
+  { kind: "http"; request: SendRequestInput } | { kind: "websocket"; shape: WebSocketShape };
+
+/** Where the saved request now lives, whichever kind it is. */
+export interface SavedLocation {
+  id: string;
+  collectionId: string;
+  folderId: string | null;
+  name: string;
+}
 
 const NEW_COLLECTION_VALUE = "__new_collection__";
 const NEW_FOLDER_VALUE = "__new_folder__";
 const ROOT_FOLDER_VALUE = "";
 
 interface SaveRequestDialogProps {
-  request: SendRequestInput;
+  payload: SavePayload;
   defaultName: string;
   onClose: () => void;
-  onSaved: (saved: SavedRequest) => void;
+  onSaved: (saved: SavedLocation) => void;
 }
 
 export function SaveRequestDialog({
-  request,
+  payload,
   defaultName,
   onClose,
   onSaved,
@@ -109,13 +126,20 @@ export function SaveRequestDialog({
         targetFolderId = created.id;
       }
 
-      const saved = await store.saveRequest({
+      const location = {
         id: null,
         collectionId: targetCollectionId,
         folderId: targetFolderId,
         name: trimmedName,
-        request,
-      });
+      };
+      const saved =
+        payload.kind === "http"
+          ? await store.saveRequest({ ...location, request: payload.request })
+          : await store.saveWebSocket({
+              ...location,
+              request: payload.shape.request,
+              draft: payload.shape.draft,
+            });
       if (!saved) {
         setError("Could not save the request.");
         return;
@@ -127,7 +151,10 @@ export function SaveRequestDialog({
   }
 
   return (
-    <Modal onClose={onClose} title="Save request">
+    <Modal
+      onClose={onClose}
+      title={payload.kind === "http" ? "Save request" : "Save WebSocket request"}
+    >
       <div className="space-y-3 text-sm">
         <label className="block">
           <span className="mb-1 block text-muted-foreground">Name</span>

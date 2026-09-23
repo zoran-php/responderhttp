@@ -14,9 +14,9 @@ use crate::domain::cookies::{
 };
 use crate::domain::error::AppError;
 use crate::domain::models::{HttpRequest, HttpResponse, KeyValue};
-use crate::domain::ports::{CookieRepository, HttpClient};
+use crate::domain::ports::{CookieRepository, HttpClient, HttpStreamSink};
 
-const COOKIE_HEADER: &str = "Cookie";
+pub(crate) const COOKIE_HEADER: &str = "Cookie";
 
 pub struct CookieClient {
     inner: Arc<dyn HttpClient>,
@@ -41,7 +41,43 @@ impl HttpClient for CookieClient {
         };
         let now = unix_now();
 
-        let prepared = match self.cookie_header_for(request, &target, now)? {
+        let prepared = self.with_cookies(request, &target, now)?;
+
+        let response = self.inner.send(&prepared, cancel)?;
+        self.store_from(&response, &target, now);
+        Ok(response)
+    }
+
+    /// The jar applies to a streaming response exactly as it does to any
+    /// other; only the call underneath changes.
+    fn send_streaming(
+        &self,
+        request: &HttpRequest,
+        cancel: &CancellationToken,
+        on_update: HttpStreamSink<'_>,
+    ) -> Result<HttpResponse, AppError> {
+        let Some(target) = request_target(&request.url) else {
+            return self.inner.send_streaming(request, cancel, on_update);
+        };
+        let now = unix_now();
+
+        let prepared = self.with_cookies(request, &target, now)?;
+        let response = self.inner.send_streaming(&prepared, cancel, on_update)?;
+        self.store_from(&response, &target, now);
+        Ok(response)
+    }
+}
+
+impl CookieClient {
+    /// The request as it goes out: the jar's `Cookie` header added, unless
+    /// the user typed one or the request asked not to send cookies.
+    fn with_cookies(
+        &self,
+        request: &HttpRequest,
+        target: &crate::domain::cookies::RequestTarget,
+        now: u64,
+    ) -> Result<HttpRequest, AppError> {
+        Ok(match self.cookie_header_for(request, target, now)? {
             Some(header) => {
                 let mut with_cookies = request.clone();
                 with_cookies
@@ -50,35 +86,22 @@ impl HttpClient for CookieClient {
                 with_cookies
             }
             None => request.clone(),
-        };
-
-        let response = self.inner.send(&prepared, cancel)?;
-        self.store_from(&response, &target, now);
-        Ok(response)
+        })
     }
-}
 
-impl CookieClient {
     fn cookie_header_for(
         &self,
         request: &HttpRequest,
         target: &crate::domain::cookies::RequestTarget,
         now: u64,
     ) -> Result<Option<String>, AppError> {
-        if !request.settings.send_cookies {
-            return Ok(None);
-        }
-        // Same precedence as Content-Type and the Auth tab: a header the user
-        // typed wins over one the app would generate.
-        let user_set = request
-            .headers
-            .iter()
-            .any(|header| header.name.trim().eq_ignore_ascii_case(COOKIE_HEADER));
-        if user_set {
-            return Ok(None);
-        }
-        let jar = self.cookies.list()?;
-        Ok(cookie_header(&cookies_for_request(&jar, target, now)))
+        jar_cookie_header(
+            self.cookies.as_ref(),
+            &request.headers,
+            request.settings.send_cookies,
+            target,
+            now,
+        )
     }
 
     fn store_from(
@@ -87,21 +110,56 @@ impl CookieClient {
         target: &crate::domain::cookies::RequestTarget,
         now: u64,
     ) {
-        for line in &response.set_cookies {
-            let Some(cookie) = parse_set_cookie(line, target, now) else {
-                continue;
-            };
-            if let Err(error) = self.cookies.upsert(&cookie) {
-                // The response already arrived, so failing the whole request
-                // over a jar write would be worse than losing the cookie. The
-                // message carries no cookie data (CLAUDE.md section 11, rule 6).
-                log::warn!("failed to store a cookie: {error}");
-            }
+        store_set_cookies(self.cookies.as_ref(), &response.set_cookies, target, now);
+    }
+}
+
+/// The jar's Cookie header for a request, or None when it should send none.
+/// Shared with the WebSocket handshake (http/cookie_websocket.rs), so both
+/// paths follow one rule about when the jar applies.
+pub(crate) fn jar_cookie_header(
+    cookies: &dyn CookieRepository,
+    headers: &[KeyValue],
+    send_cookies: bool,
+    target: &crate::domain::cookies::RequestTarget,
+    now: u64,
+) -> Result<Option<String>, AppError> {
+    if !send_cookies {
+        return Ok(None);
+    }
+    // Same precedence as Content-Type and the Auth tab: a header the user
+    // typed wins over one the app would generate.
+    let user_set = headers
+        .iter()
+        .any(|header| header.name.trim().eq_ignore_ascii_case(COOKIE_HEADER));
+    if user_set {
+        return Ok(None);
+    }
+    let jar = cookies.list()?;
+    Ok(cookie_header(&cookies_for_request(&jar, target, now)))
+}
+
+/// Stores every cookie a response set. Shared with the WebSocket handshake.
+pub(crate) fn store_set_cookies(
+    cookies: &dyn CookieRepository,
+    lines: &[String],
+    target: &crate::domain::cookies::RequestTarget,
+    now: u64,
+) {
+    for line in lines {
+        let Some(cookie) = parse_set_cookie(line, target, now) else {
+            continue;
+        };
+        if let Err(error) = cookies.upsert(&cookie) {
+            // The response already arrived, so failing the whole request
+            // over a jar write would be worse than losing the cookie. The
+            // message carries no cookie data (CLAUDE.md section 11, rule 6).
+            log::warn!("failed to store a cookie: {error}");
         }
     }
 }
 
-fn unix_now() -> u64 {
+pub(crate) fn unix_now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|elapsed| elapsed.as_secs())
@@ -111,7 +169,9 @@ fn unix_now() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::models::{HttpMethod, RequestBody, RequestSettings, ResponseBody, Timing};
+    use crate::domain::models::{
+        HttpMethod, RequestBody, RequestSettings, ResponseBody, Timing, TransferSizes,
+    };
     use std::sync::Mutex;
 
     #[derive(Default)]
@@ -135,6 +195,7 @@ mod tests {
                 headers: Vec::new(),
                 body: ResponseBody::Text(String::new()),
                 timing: Timing::default(),
+                sizes: TransferSizes::default(),
                 set_cookies: self.set_cookies.clone(),
             })
         }

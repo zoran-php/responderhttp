@@ -2,8 +2,8 @@
 use tauri::State;
 
 use crate::commands::dto::{
-    CollectionContentsDto, CollectionDto, ExampleDto, SaveExampleInput, SavedRequestDto,
-    SendRequestInput,
+    CollectionContentsDto, CollectionDto, ExampleDto, SaveExampleInput, SaveWebSocketInput,
+    SavedRequestDto, SavedWebSocketDto, SendRequestInput,
 };
 use crate::commands::error::ApiError;
 use crate::domain::models::{HttpRequest, KeyValue};
@@ -152,6 +152,37 @@ pub async fn move_request(
 pub async fn delete_request(state: State<'_, AppState>, id: String) -> Result<(), ApiError> {
     blocking!(state, service, service.delete_request(&id))?;
     Ok(())
+}
+
+/// Rename, move, delete and docs for a WebSocket go through the request
+/// commands above: they act on a row by id, whatever its kind.
+#[tauri::command]
+pub async fn save_web_socket(
+    state: State<'_, AppState>,
+    input: SaveWebSocketInput,
+) -> Result<SavedWebSocketDto, ApiError> {
+    let saved = blocking!(
+        state,
+        service,
+        service.save_web_socket(
+            input.id,
+            &input.collection_id,
+            input.folder_id.as_deref(),
+            &input.name,
+            input.request.into(),
+            input.draft.into()
+        )
+    )?;
+    Ok(saved.into())
+}
+
+#[tauri::command]
+pub async fn load_web_socket(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<SavedWebSocketDto, ApiError> {
+    let saved = blocking!(state, service, service.load_web_socket(&id))?;
+    Ok(saved.into())
 }
 
 #[tauri::command]

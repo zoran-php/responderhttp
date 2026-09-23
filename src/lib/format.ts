@@ -43,3 +43,22 @@ export function statusClass(status: number): StatusClass {
   if (status >= 500 && status < 600) return "serverError";
   return "unknown";
 }
+
+function pad(value: number, width: number): string {
+  return String(value).padStart(width, "0");
+}
+
+/**
+ * `HH:mm:ss.SSS` in local time, as the WebSocket log shows it. Milliseconds
+ * matter there: an echo usually lands a few ms after its message.
+ */
+export function formatClockTime(epochMs: number): string {
+  if (!Number.isFinite(epochMs)) {
+    return "—";
+  }
+  const date = new Date(epochMs);
+  return (
+    `${pad(date.getHours(), 2)}:${pad(date.getMinutes(), 2)}:` +
+    `${pad(date.getSeconds(), 2)}.${pad(date.getMilliseconds(), 3)}`
+  );
+}

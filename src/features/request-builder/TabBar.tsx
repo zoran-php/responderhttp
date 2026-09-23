@@ -2,9 +2,10 @@
 //
 // App.tsx owns the confirm-before-closing-a-dirty-tab prompt, since that
 // needs the shared ConfirmDialog and knows what "dirty" means for a tab.
-import type { ReactNode } from "react";
-import { FileText, Layers, MessageSquare, Plus, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { FileText, Layers, MessageSquare, Plus, X, Zap } from "lucide-react";
 
+import { ContextMenu } from "@/features/collections/ContextMenu";
 import { methodTextColor } from "@/lib/http-method-colors";
 import type { HttpMethod } from "@/types/http";
 
@@ -18,9 +19,13 @@ export type TabBarTab =
   | { kind: "request"; id: string; label: string; method: HttpMethod; isDirty: boolean }
   | { kind: "environment"; id: string; label: string }
   | { kind: "example"; id: string; label: string }
-  | { kind: "docs"; id: string; label: string; isDirty: boolean };
+  | { kind: "docs"; id: string; label: string; isDirty: boolean }
+  | { kind: "websocket"; id: string; label: string; isDirty: boolean; live: boolean };
 
-/** Only two of the four kinds can be unsaved, so this asks rather than
+/** What the "+" button can open. */
+export type NewTabKind = "http" | "websocket";
+
+/** Only some kinds can be unsaved, so this asks rather than
  * assuming the field is there. */
 function isDirty(tab: TabBarTab): boolean {
   return "isDirty" in tab && tab.isDirty;
@@ -31,12 +36,14 @@ interface TabBarProps {
   activeTabId: string;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
-  onNew: () => void;
+  onNew: (kind: NewTabKind) => void;
   /** Sits at the far right of the strip — the active-environment selector. */
   trailing?: ReactNode;
 }
 
 export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, trailing }: TabBarProps) {
+  const [newMenuAt, setNewMenuAt] = useState<{ x: number; y: number } | null>(null);
+
   return (
     // `bg-card` (#2e3440, the sidebar surface), not `bg-muted/30`. An alpha
     // fill over `bg-background` landed within about one point of lightness of
@@ -97,6 +104,13 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, trailing }
                   </span>
                 ) : tab.kind === "environment" ? (
                   <Layers aria-hidden className="mr-1.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                ) : tab.kind === "websocket" ? (
+                  <Zap
+                    aria-hidden
+                    className={`mr-1.5 h-3.5 w-3.5 shrink-0 ${
+                      tab.live ? "text-ws-ok" : "text-muted-foreground"
+                    }`}
+                  />
                 ) : tab.kind === "docs" ? (
                   <FileText
                     aria-hidden
@@ -129,11 +143,26 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, trailing }
       <button
         aria-label="New tab"
         className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-        onClick={onNew}
+        onClick={(event) => {
+          const box = event.currentTarget.getBoundingClientRect();
+          setNewMenuAt({ x: box.left, y: box.bottom + 4 });
+        }}
         type="button"
       >
         <Plus aria-hidden className="h-4 w-4" />
       </button>
+
+      {newMenuAt !== null && (
+        <ContextMenu
+          items={[
+            { label: "HTTP request", icon: FileText, onSelect: () => onNew("http") },
+            { label: "WebSocket request", icon: Zap, onSelect: () => onNew("websocket") },
+          ]}
+          onClose={() => setNewMenuAt(null)}
+          x={newMenuAt.x}
+          y={newMenuAt.y}
+        />
+      )}
 
       {trailing}
     </div>

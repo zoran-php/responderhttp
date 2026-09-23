@@ -13,9 +13,11 @@ import type {
   Example,
   Folder,
   SavedRequest,
+  SavedWebSocket,
 } from "@/types/collections";
 import type { ApiError, KeyValue, SendRequestInput } from "@/types/http";
 import type { Result } from "@/types/result";
+import type { WebSocketRequest, WsDraft } from "@/types/websocket";
 
 export function listCollections(): Promise<Result<Collection[], ApiError>> {
   return call<Collection[]>("list_collections");
@@ -88,6 +90,26 @@ export function moveRequest(id: string, folderId: string | null): Promise<Result
 
 export function deleteRequest(id: string): Promise<Result<void, ApiError>> {
   return call<void>("delete_request", { id });
+}
+
+export interface SaveWebSocketArgs {
+  /** null saves a new WebSocket request; an existing id overwrites it. */
+  id: string | null;
+  collectionId: string;
+  folderId: string | null;
+  name: string;
+  request: WebSocketRequest;
+  draft: WsDraft;
+}
+
+/** Rename, move, delete and docs for a WebSocket use the request functions
+ * above: the commands act on a row by id, whatever its kind. */
+export function saveWebSocket(args: SaveWebSocketArgs): Promise<Result<SavedWebSocket, ApiError>> {
+  return call<SavedWebSocket>("save_web_socket", { input: args });
+}
+
+export function loadWebSocket(id: string): Promise<Result<SavedWebSocket, ApiError>> {
+  return call<SavedWebSocket>("load_web_socket", { id });
 }
 
 export interface SaveExampleArgs {

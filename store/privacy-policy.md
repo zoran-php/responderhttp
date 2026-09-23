@@ -1,6 +1,6 @@
 # ResponderHTTP — Privacy Policy
 
-_Last updated: 19 September 2026_
+_Last updated: 23 September 2026_
 
 ResponderHTTP is a desktop API client published by Zoran Davidović. This page
 describes what the app does with your data. It is short because the app does
@@ -18,7 +18,8 @@ server to send it to.
 The app keeps its data in a SQLite database in your Windows user profile,
 inside the app's own storage. That database holds:
 
-- the requests and collections you save,
+- the HTTP and WebSocket requests and collections you save,
+- the Markdown documentation you write for a collection, folder or request,
 - environments and their variables,
 - your request history,
 - cookies received from servers you sent requests to,
@@ -35,18 +36,19 @@ which only your Windows account can read. The key never leaves your computer.
 
 ## Network requests
 
-ResponderHTTP sends HTTP requests **only to the addresses you enter**. It is a
-tool for making those requests, so the destination, the headers and the body
-are entirely under your control. Requests go directly from your computer to
-the server you named; they do not pass through any service operated by the
-developer.
+ResponderHTTP sends HTTP requests, and opens WebSocket connections, **only to
+the addresses you enter**. It is a tool for making those requests, so the
+destination, the headers and the body are entirely under your control. They go
+directly from your computer to the server you named; they do not pass through
+any service operated by the developer.
 
 ## Logs
 
 The app writes a local log file to help diagnose problems. Request bodies,
-authentication headers, tokens and cookies are deliberately kept out of it,
-and a redaction step strips credentials that would otherwise ride along inside
-an error message. The log stays on your computer and is never uploaded.
+authentication headers, tokens and cookies are deliberately kept out of it, as
+are the WebSocket messages you send and receive and the events of a streamed
+response; a redaction step strips credentials that would otherwise ride along
+inside an error message. The log stays on your computer and is never uploaded.
 
 ## Files you open or save
 

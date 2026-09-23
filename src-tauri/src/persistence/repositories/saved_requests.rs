@@ -11,6 +11,7 @@ use crate::persistence::database::{to_storage_error, Database};
 use crate::persistence::repositories::collections::missing_if_zero;
 use crate::persistence::repositories::docs::{read_docs, write_docs, DocsTable};
 use crate::persistence::repositories::json::{self, SecretRead, SecretWrite};
+use crate::persistence::repositories::request_kind::{refuse_other_kind, RequestKind};
 
 /// The table name as it appears in a sealed secret's scope.
 pub const SECRET_TABLE: &str = "requests";
@@ -42,12 +43,14 @@ impl SavedRequestRepository for SqliteSavedRequestRepository {
         let mut statement = guard
             .prepare(&format!(
                 "SELECT {SELECT_COLUMNS} FROM requests
-                 WHERE collection_id = ?1
+                 WHERE collection_id = ?1 AND kind = ?2
                  ORDER BY name COLLATE NOCASE"
             ))
             .map_err(to_storage_error)?;
         let rows = statement
-            .query_map(params![collection_id], |row| self.read_row(row))
+            .query_map(params![collection_id, RequestKind::Http.as_str()], |row| {
+                self.read_row(row)
+            })
             .map_err(to_storage_error)?;
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(to_storage_error)?
@@ -59,8 +62,9 @@ impl SavedRequestRepository for SqliteSavedRequestRepository {
         let guard = self.database.lock();
         let row = guard
             .query_row(
-                &format!("SELECT {SELECT_COLUMNS} FROM requests WHERE id = ?1"),
-                params![id],
+                // A WebSocket id is NotFound here, never a mis-decoded GET.
+                &format!("SELECT {SELECT_COLUMNS} FROM requests WHERE id = ?1 AND kind = ?2"),
+                params![id, RequestKind::Http.as_str()],
                 |row| self.read_row(row),
             )
             .map_err(|error| match error {
@@ -123,6 +127,11 @@ impl SavedRequestRepository for SqliteSavedRequestRepository {
 /// The one write for a saved request, shared with the import repository.
 /// Auth secrets are sealed here, so no caller can store a request without
 /// going through the cipher.
+///
+/// The update is guarded by kind, so an HTTP save aimed at a WebSocket id is
+/// refused rather than turning that row into a half-HTTP one. `docs_md` is
+/// deliberately absent from the update: Save in the builder must not wipe a
+/// request's documentation (PLAN.md Phase 12).
 pub fn upsert_request(
     connection: &Connection,
     saved: &SavedRequest,
@@ -142,13 +151,13 @@ pub fn upsert_request(
             row_id: &saved.id,
         },
     )?;
-    connection
+    let changed = connection
         .execute(
             "INSERT INTO requests (
                  id, collection_id, folder_id, name, method, url,
                  headers_json, query_params_json, body_json, settings_json,
-                 auth_json, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)
+                 auth_json, created_at, updated_at, kind
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13)
              ON CONFLICT(id) DO UPDATE SET
                  collection_id     = excluded.collection_id,
                  folder_id         = excluded.folder_id,
@@ -160,7 +169,8 @@ pub fn upsert_request(
                  body_json         = excluded.body_json,
                  settings_json     = excluded.settings_json,
                  auth_json         = excluded.auth_json,
-                 updated_at        = excluded.updated_at",
+                 updated_at        = excluded.updated_at
+             WHERE requests.kind = excluded.kind",
             params![
                 saved.id,
                 saved.collection_id,
@@ -173,11 +183,12 @@ pub fn upsert_request(
                 body,
                 settings,
                 auth,
-                now
+                now,
+                RequestKind::Http.as_str()
             ],
         )
         .map_err(to_storage_error)?;
-    Ok(())
+    refuse_other_kind(changed, &saved.id, RequestKind::Http)
 }
 
 /// Returns a Result inside the row mapper's Result: rusqlite reports column

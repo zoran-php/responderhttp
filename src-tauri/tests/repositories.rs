@@ -2124,3 +2124,332 @@ fn a_round_trip_does_not_invent_documentation_for_an_undocumented_collection() {
         ""
     );
 }
+
+// ---------------------------------------------------------------------------
+// WebSocket requests (PLAN.md Phase 13d). They share the `requests` table with
+// HTTP requests, so most of what is tested here is that the two kinds can live
+// side by side without either one ever being read, overwritten or exported as
+// the other.
+// ---------------------------------------------------------------------------
+
+use responderhttp_lib::domain::models::{
+    SavedWebSocket, WebSocketRequest, WebSocketSettings, WsDraft, WsMessageFormat,
+};
+use responderhttp_lib::domain::ports::WebSocketRepository;
+use responderhttp_lib::persistence::repositories::web_sockets::SqliteWebSocketRepository;
+
+fn web_sockets(repos: &Repos) -> SqliteWebSocketRepository {
+    SqliteWebSocketRepository::new(repos.database.clone())
+}
+
+/// Every field away from its default, and draft text outside Latin script.
+fn rich_web_socket(id: &str, collection_id: &str, folder_id: Option<String>) -> SavedWebSocket {
+    SavedWebSocket {
+        id: id.into(),
+        collection_id: collection_id.into(),
+        folder_id,
+        name: "Echo".into(),
+        request: WebSocketRequest {
+            url: "wss://echo.websocket.org/?room={{room}}".into(),
+            headers: vec![
+                KeyValue::new("Sec-WebSocket-Protocol", "chat"),
+                KeyValue::new("X-Trace", "1"),
+            ],
+            settings: WebSocketSettings {
+                verify_tls: false,
+                proxy: Some("http://127.0.0.1:8080".into()),
+                send_cookies: false,
+                connect_timeout: Duration::from_millis(2500),
+                max_message_bytes: 4096,
+                auto_reconnect: true,
+            },
+        },
+        draft: WsDraft {
+            format: WsMessageFormat::Json,
+            text: "{\"поздрав\": \"здраво\"}".into(),
+            ..WsDraft::default()
+        },
+    }
+}
+
+fn http_request_in(repos: &Repos, id: &str, collection_id: &str) -> SavedRequest {
+    let saved = SavedRequest {
+        id: id.into(),
+        collection_id: collection_id.into(),
+        folder_id: None,
+        name: "Create user".into(),
+        request: rich_request(),
+        secret_state: SecretState::Ok,
+    };
+    repos
+        .requests
+        .save(&saved)
+        .expect("should save the HTTP request");
+    saved
+}
+
+#[test]
+fn a_web_socket_round_trips_through_every_field() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    let folder = repos
+        .folders
+        .create(&collection.id, None, "Realtime")
+        .expect("should create folder");
+    let saved = rich_web_socket("req_ws", &collection.id, Some(folder.id));
+
+    web_sockets(&repos).save(&saved).expect("should save");
+    let loaded = web_sockets(&repos).get("req_ws").expect("should load");
+
+    assert_eq!(loaded, saved);
+}
+
+/// The spec's second scenario, at the storage layer: one collection, both
+/// kinds, and each listing sees exactly its own.
+#[test]
+fn a_collection_holds_both_kinds_and_each_listing_sees_only_its_own() {
+    let repos = repos();
+    let collection = repos
+        .collections
+        .create("Auth Service")
+        .expect("should create");
+    http_request_in(&repos, "req_http", &collection.id);
+    web_sockets(&repos)
+        .save(&rich_web_socket("req_ws", &collection.id, None))
+        .expect("should save");
+
+    let http = repos
+        .requests
+        .list_by_collection(&collection.id)
+        .expect("should list HTTP");
+    let ws = web_sockets(&repos)
+        .list_by_collection(&collection.id)
+        .expect("should list WebSockets");
+
+    assert_eq!(http.len(), 1);
+    assert_eq!(http[0].id, "req_http");
+    assert_eq!(ws.len(), 1);
+    assert_eq!(ws[0].id, "req_ws");
+}
+
+#[test]
+fn loading_an_id_of_the_other_kind_is_not_found() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    http_request_in(&repos, "req_http", &collection.id);
+    web_sockets(&repos)
+        .save(&rich_web_socket("req_ws", &collection.id, None))
+        .expect("should save");
+
+    assert!(matches!(
+        repos
+            .requests
+            .get("req_ws")
+            .expect_err("a WebSocket is not an HTTP request"),
+        AppError::NotFound(_)
+    ));
+    assert!(matches!(
+        web_sockets(&repos)
+            .get("req_http")
+            .expect_err("an HTTP request is not a WebSocket"),
+        AppError::NotFound(_)
+    ));
+}
+
+/// Overwriting would leave a row whose kind and columns disagree. Both
+/// directions are refused and both rows survive untouched.
+#[test]
+fn neither_kind_can_be_saved_over_the_other() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    let http = http_request_in(&repos, "req_http", &collection.id);
+    let ws = rich_web_socket("req_ws", &collection.id, None);
+    web_sockets(&repos).save(&ws).expect("should save");
+
+    let http_over_ws = repos.requests.save(&SavedRequest {
+        id: "req_ws".into(),
+        ..http.clone()
+    });
+    let ws_over_http = web_sockets(&repos).save(&SavedWebSocket {
+        id: "req_http".into(),
+        ..ws.clone()
+    });
+
+    assert!(matches!(http_over_ws, Err(AppError::InvalidRequest(_))));
+    assert!(matches!(ws_over_http, Err(AppError::InvalidRequest(_))));
+    assert_eq!(web_sockets(&repos).get("req_ws").expect("still there"), ws);
+    assert_eq!(
+        repos
+            .requests
+            .get("req_http")
+            .expect("still there")
+            .request
+            .url,
+        http.request.url
+    );
+}
+
+#[test]
+fn saving_a_web_socket_again_updates_it_rather_than_duplicating() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    let mut saved = rich_web_socket("req_ws", &collection.id, None);
+    web_sockets(&repos).save(&saved).expect("should save");
+
+    saved.name = "Echo (renamed by save)".into();
+    saved.draft.text = "second draft".into();
+    web_sockets(&repos).save(&saved).expect("should re-save");
+
+    let all = web_sockets(&repos)
+        .list_by_collection(&collection.id)
+        .expect("should list");
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0], saved);
+}
+
+/// The Phase 12 regression, repeated for the new write path: Save in the
+/// builder must never wipe the documentation.
+#[test]
+fn saving_a_web_socket_again_leaves_its_docs_alone() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    let saved = rich_web_socket("req_ws", &collection.id, None);
+    web_sockets(&repos).save(&saved).expect("should save");
+    repos
+        .requests
+        .set_docs("req_ws", "Echoes every frame back.")
+        .expect("docs should reach a WebSocket by id");
+
+    web_sockets(&repos).save(&saved).expect("should re-save");
+
+    assert_eq!(
+        repos.requests.docs("req_ws").expect("should read docs"),
+        "Echoes every frame back."
+    );
+}
+
+/// Rename, move and delete are not duplicated for WebSockets: they act on a
+/// row by id through the request repository, whatever its kind.
+#[test]
+fn rename_move_and_delete_reach_a_web_socket_through_the_request_repository() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    let folder = repos
+        .folders
+        .create(&collection.id, None, "Realtime")
+        .expect("should create folder");
+    web_sockets(&repos)
+        .save(&rich_web_socket("req_ws", &collection.id, None))
+        .expect("should save");
+
+    repos
+        .requests
+        .rename("req_ws", "Live feed")
+        .expect("should rename");
+    repos
+        .requests
+        .move_to("req_ws", Some(&folder.id))
+        .expect("should move");
+    let moved = web_sockets(&repos).get("req_ws").expect("should load");
+    assert_eq!(moved.name, "Live feed");
+    assert_eq!(moved.folder_id, Some(folder.id));
+
+    repos.requests.delete("req_ws").expect("should delete");
+    assert!(matches!(
+        web_sockets(&repos)
+            .get("req_ws")
+            .expect_err("should be gone"),
+        AppError::NotFound(_)
+    ));
+}
+
+#[test]
+fn deleting_a_folder_or_a_collection_cascades_to_its_web_sockets() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    let folder = repos
+        .folders
+        .create(&collection.id, None, "Realtime")
+        .expect("should create folder");
+    web_sockets(&repos)
+        .save(&rich_web_socket(
+            "req_in_folder",
+            &collection.id,
+            Some(folder.id.clone()),
+        ))
+        .expect("should save");
+    web_sockets(&repos)
+        .save(&rich_web_socket("req_at_root", &collection.id, None))
+        .expect("should save");
+
+    repos
+        .folders
+        .delete(&folder.id)
+        .expect("should delete folder");
+    let left: Vec<String> = web_sockets(&repos)
+        .list_by_collection(&collection.id)
+        .expect("should list")
+        .into_iter()
+        .map(|saved| saved.id)
+        .collect();
+    assert_eq!(left, vec!["req_at_root".to_string()]);
+
+    repos
+        .collections
+        .delete(&collection.id)
+        .expect("should delete collection");
+    assert!(web_sockets(&repos)
+        .list_by_collection(&collection.id)
+        .expect("should list")
+        .is_empty());
+}
+
+/// A WebSocket has no single response to keep, so no example can hang off one.
+#[test]
+fn no_example_can_hang_off_a_web_socket() {
+    let repos = repos();
+    let collection = repos.collections.create("Work").expect("should create");
+    web_sockets(&repos)
+        .save(&rich_web_socket("req_ws", &collection.id, None))
+        .expect("should save");
+
+    let error = repos
+        .examples
+        .create(&new_example("req_ws", "Frame", 101))
+        .expect_err("should refuse");
+
+    assert!(matches!(error, AppError::NotFound(_)));
+}
+
+/// OpenAPI cannot describe a WebSocket. Until 13g adds a note saying so, the
+/// guarantee is that one in the collection changes nothing at all: not a
+/// path, not a note, not a byte.
+#[test]
+fn a_web_socket_in_the_collection_changes_nothing_in_an_openapi_export() {
+    let repos = repos();
+    let (service, collection_id) = exportable_collection(&repos);
+    let before = service
+        .export(
+            &collection_id,
+            OpenApiVersion::V3_2,
+            ExportFormat::Json,
+            true,
+        )
+        .expect("export should succeed");
+
+    web_sockets(&repos)
+        .save(&rich_web_socket("req_ws", &collection_id, None))
+        .expect("should save");
+    let after = service
+        .export(
+            &collection_id,
+            OpenApiVersion::V3_2,
+            ExportFormat::Json,
+            true,
+        )
+        .expect("export should still succeed");
+
+    assert_eq!(after.text, before.text);
+    assert_eq!(after.notes.len(), before.notes.len());
+    assert!(!after.text.contains("wss://"));
+}

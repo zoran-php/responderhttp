@@ -127,12 +127,57 @@ export interface Timing {
   totalMs: number;
 }
 
+/**
+ * Mirrors TransferSizes: what the transfer cost, in bytes. The request half
+ * comes from libcurl, which is the only side that knows what it sent; the
+ * response half is counted as the bytes arrive, which is why a stream can
+ * show it growing. A gzip response counts decoded, as the viewer holds it.
+ */
+export interface TransferSizes {
+  requestHeaders: number;
+  requestBody: number;
+  responseHeaders: number;
+  responseBody: number;
+}
+
 export interface HttpResponse {
   status: number;
   headers: KeyValue[];
   body: ResponseBody;
   timing: Timing;
+  sizes: TransferSizes;
 }
+
+/**
+ * Mirrors SseBlockDto: one block of a `text/event-stream` response, as
+ * domain/sse.rs parsed it. `raw` is the block exactly as it arrived, which
+ * is what the Raw view shows; the parsed fields are what the Events view
+ * shows. `retry` is milliseconds, reported but not acted on — this app does
+ * not reconnect a stream.
+ */
+export type SseBlock =
+  | {
+      kind: "event";
+      name: string;
+      data: string;
+      id: string | null;
+      retry: number | null;
+      raw: string;
+    }
+  | { kind: "comment"; text: string; raw: string };
+
+/**
+ * Mirrors HttpStreamEventDto: what a request reports before it finishes.
+ * Every response reports its `headers`; only a `text/event-stream` one goes
+ * on to report blocks. `atMs` is the wall clock in milliseconds since the
+ * epoch, from Rust — the same clock the WebSocket log uses.
+ */
+export type HttpStreamEvent =
+  /** `bytes` is the header block's own size, for the running size total. */
+  | { type: "headers"; status: number; headers: KeyValue[]; bytes: number }
+  /** `bytes` is the block's own size on the wire, counted in Rust: `raw` is
+   * UTF-8 and `String.length` counts UTF-16 units. */
+  | { type: "block"; atMs: number; bytes: number; block: SseBlock };
 
 /**
  * Mirrors DownloadResultDto in commands/dto.rs. Carries no body: the bytes

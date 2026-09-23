@@ -12,8 +12,9 @@ import { matchesDocsShortcut, matchesSaveShortcut } from "@/lib/shortcuts";
 import { clampPaneSize, MIN_BUILDER_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/split-pane";
 import { updateMultipartRow, withTrailingBlankPart } from "@/lib/multipart-rows";
 import { chooseFile } from "@/services/files";
+import { disconnectAllWebSockets } from "@/services/websocket";
 import { substituteRequestInput } from "@/lib/variables";
-import { SaveRequestDialog } from "@/features/collections/SaveRequestDialog";
+import { SaveRequestDialog, type SavePayload } from "@/features/collections/SaveRequestDialog";
 import { DocsEditor } from "@/features/docs/DocsEditor";
 import { ExampleViewer } from "@/features/examples/ExampleViewer";
 import { SaveExampleDialog } from "@/features/examples/SaveExampleDialog";
@@ -23,14 +24,13 @@ import { EnvironmentSelector } from "@/features/environments/EnvironmentSelector
 import { RequestBuilder } from "@/features/request-builder/RequestBuilder";
 import { TabBar, type TabBarTab } from "@/features/request-builder/TabBar";
 import { ResponseViewer } from "@/features/response-viewer/ResponseViewer";
+import type { SaveExampleAction } from "@/features/response-viewer/SaveExampleButton";
 import { Sidebar } from "@/features/sidebar/Sidebar";
+import { WebSocketView } from "@/features/websocket/WebSocketView";
 import { useCollectionsStore } from "@/store/collections-store";
 import { useEnvironmentsStore } from "@/store/environments-store";
 import { useLayoutStore } from "@/store/layout-store";
-import { useTabsStore, type RequestTab } from "@/store/request-store";
-
-/** Mirrors ResponseViewer's saveExample prop. */
-type ExampleAction = { onSave: () => void } | { disabledReason: string };
+import { useTabsStore, type RequestTab, type WebSocketTab } from "@/store/request-store";
 
 export default function App() {
   const tabsStore = useTabsStore();
@@ -56,18 +56,19 @@ export default function App() {
   const loadEnvironments = useEnvironmentsStore((state) => state.loadEnvironments);
   const activeTab = tabsStore.activeTab();
   const requestTab = activeTab.kind === "request" ? activeTab : null;
+  const webSocketTab = activeTab.kind === "websocket" ? activeTab : null;
 
   // The breadcrumb is built here rather than in the builder because the names
   // it needs live in the collections store, and RequestBuilder is props-in,
   // events-out. A tab that has never been saved has no collection and no
   // folders, so this comes back as the bare name.
-  const loaded = requestTab?.loadedRequest ?? null;
+  const loaded = requestTab?.loadedRequest ?? webSocketTab?.loadedRequest ?? null;
   const pathSegments = requestPathSegments({
     collectionName:
       collections.find((collection) => collection.id === loaded?.collectionId)?.name ?? null,
     folders: (loaded && contentsById[loaded.collectionId]?.folders) || [],
     folderId: loaded?.folderId ?? null,
-    requestName: loaded?.name ?? "Untitled Request",
+    requestName: loaded?.name ?? (webSocketTab ? "Untitled WebSocket" : "Untitled Request"),
   });
   const isSending = requestTab?.status === "sending";
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -81,6 +82,12 @@ export default function App() {
   useEffect(() => {
     void loadEnvironments();
   }, [loadEnvironments]);
+
+  // A page that is starting has no connections of its own, so any Rust still
+  // holds belong to a page that was reloaded away (PLAN-WEBSOCKET.md 13h).
+  useEffect(() => {
+    void disconnectAllWebSockets();
+  }, []);
 
   // The sidebar's own width is the whole distance from the window's left edge,
   // so the window width is the space the two panes share.
@@ -128,7 +135,7 @@ export default function App() {
     saveAction.current = handleSaveClick;
   });
 
-  const canSaveWithShortcut = activeTab.kind === "request";
+  const canSaveWithShortcut = activeTab.kind === "request" || activeTab.kind === "websocket";
   useEffect(() => {
     if (!canSaveWithShortcut) {
       return;
@@ -157,7 +164,9 @@ export default function App() {
   // survive a click elsewhere, so binding to it would make the shortcut
   // depend on something invisible.
   const docsTargetForShortcut =
-    activeTab.kind === "request" ? (activeTab.loadedRequest?.id ?? null) : null;
+    activeTab.kind === "request" || activeTab.kind === "websocket"
+      ? (activeTab.loadedRequest?.id ?? null)
+      : null;
   const openDocs = tabsStore.openDocs;
   useEffect(() => {
     if (docsTargetForShortcut === null) {
@@ -178,6 +187,11 @@ export default function App() {
   }, [docsTargetForShortcut, openDocs]);
 
   async function handleSaveClick() {
+    const socket = tabsStore.activeWebSocketTab();
+    if (socket !== null) {
+      await saveWebSocketTab(socket.loadedRequest);
+      return;
+    }
     const active = tabsStore.activeRequestTab();
     if (active === null) {
       return;
@@ -207,10 +221,43 @@ export default function App() {
     }
   }
 
+  /** The WebSocket half of Save: the dialog for a new one, an overwrite in
+   * place for one already saved. */
+  async function saveWebSocketTab(loadedSocket: WebSocketTab["loadedRequest"]) {
+    if (loadedSocket === null) {
+      setSaveDialogOpen(true);
+      return;
+    }
+    const { request, draft } = tabsStore.currentWebSocketShape();
+    const saved = await useCollectionsStore.getState().saveWebSocket({
+      id: loadedSocket.id,
+      collectionId: loadedSocket.collectionId,
+      folderId: loadedSocket.folderId,
+      name: loadedSocket.name,
+      request,
+      draft,
+    });
+    if (saved) {
+      tabsStore.markWebSocketSaved({
+        id: saved.id,
+        collectionId: saved.collectionId,
+        folderId: saved.folderId,
+        name: saved.name,
+      });
+    }
+  }
+
+  /** What the Save dialog saves: whichever kind of tab is in front. */
+  function savePayload(): SavePayload {
+    return webSocketTab !== null
+      ? { kind: "websocket", shape: tabsStore.currentWebSocketShape() }
+      : { kind: "http", request: tabsStore.currentInput() };
+  }
+
   /** An example hangs off a stored request and keeps a text body, so both
    * have to be true before the response can be saved. The reason travels with
    * the refusal so the disabled button can explain itself. */
-  function saveExampleAction(tab: RequestTab): ExampleAction {
+  function saveExampleAction(tab: RequestTab): SaveExampleAction {
     if (tab.loadedRequest === null) {
       return { disabledReason: "Save the request to a collection first" };
     }
@@ -252,7 +299,10 @@ export default function App() {
     // A Docs tab autosaves, and closeTab flushes whatever is still pending,
     // so there is nothing to lose and nothing to ask about. Only a request
     // tab, which saves explicitly, reaches the prompt.
-    if (tab?.kind !== "docs" && tabsStore.isDirty(id)) {
+    // A live WebSocket asks too: closing the tab closes the connection
+    // (assumption 11).
+    const live = tab?.kind === "websocket" && tab.connection !== "idle";
+    if ((tab?.kind !== "docs" && tabsStore.isDirty(id)) || live) {
       setClosingTabId(id);
       return;
     }
@@ -286,26 +336,49 @@ export default function App() {
         isDirty: tabsStore.isDirty(tab.id),
       };
     }
+    if (tab.kind === "websocket") {
+      return {
+        kind: "websocket",
+        id: tab.id,
+        label: tab.loadedRequest?.name ?? "Untitled WebSocket",
+        isDirty: tabsStore.isDirty(tab.id),
+        live: tab.connection === "connected",
+      };
+    }
     // "Example" until the body arrives; the store caches it after the first
     // open, so this only shows for a moment.
     return { kind: "example", id: tab.id, label: examplesById[tab.exampleId]?.name ?? "Example" };
   });
 
   const closing = tabsStore.tabs.find((tab) => tab.id === closingTabId) ?? null;
-  // Only a request tab can be dirty, so only one can reach the prompt.
+  // Only request and WebSocket tabs save explicitly, so only they reach the
+  // prompt.
   const closingName =
-    closing?.kind === "request" ? (closing.loadedRequest?.name ?? "Untitled Request") : null;
+    closing?.kind === "request"
+      ? (closing.loadedRequest?.name ?? "Untitled Request")
+      : closing?.kind === "websocket"
+        ? (closing.loadedRequest?.name ?? "Untitled WebSocket")
+        : null;
+  const closingMessage =
+    closing === null || closingName === null
+      ? ""
+      : closing.kind === "websocket" && closing.connection !== "idle"
+        ? `"${closingName}" is connected. Closing it disconnects${
+            tabsStore.isDirty(closing.id) ? " and loses its unsaved changes" : ""
+          }.`
+        : `"${closingName}" has unsaved changes. Close it anyway?`;
 
   return (
     <div className="flex h-screen bg-background text-foreground">
       {!sidebarCollapsed && (
         <Sidebar
-          loadedRequestId={requestTab?.loadedRequest?.id ?? null}
+          loadedRequestId={loaded?.id ?? null}
           onOpenDocs={(target) => tabsStore.openDocs(target)}
           onOpenEnvironment={(environmentId) => tabsStore.openEnvironment(environmentId)}
           onOpenExample={(exampleId) => tabsStore.openExample(exampleId)}
           onOpenHistoryEntry={(request) => tabsStore.openHistoryEntry(request)}
           onOpenRequest={(saved) => tabsStore.openSavedRequest(saved)}
+          onOpenWebSocket={(saved) => tabsStore.openSavedWebSocket(saved)}
           width={sidebarWidth}
         />
       )}
@@ -327,7 +400,9 @@ export default function App() {
         <TabBar
           activeTabId={tabsStore.activeTabId}
           onClose={handleCloseTab}
-          onNew={() => tabsStore.openBlankTab()}
+          onNew={(kind) =>
+            kind === "websocket" ? tabsStore.openBlankWebSocketTab() : tabsStore.openBlankTab()
+          }
           onSelect={tabsStore.setActiveTab}
           tabs={tabBarTabs}
           trailing={<EnvironmentSelector />}
@@ -339,6 +414,13 @@ export default function App() {
           <ExampleViewer exampleId={activeTab.exampleId} />
         ) : activeTab.kind === "docs" ? (
           <DocsEditor tab={activeTab} />
+        ) : activeTab.kind === "websocket" ? (
+          <WebSocketView
+            onManageCookies={() => setCookiesOpen(true)}
+            onSave={() => void handleSaveClick()}
+            pathSegments={pathSegments}
+            tab={activeTab}
+          />
         ) : (
           <>
             <RequestBuilder
@@ -401,6 +483,7 @@ export default function App() {
                 isSending={isSending === true}
                 response={activeTab.response}
                 saveExample={saveExampleAction(activeTab)}
+                stream={activeTab.stream}
               />
             )}
           </>
@@ -425,25 +508,34 @@ export default function App() {
 
       {saveDialogOpen && (
         <SaveRequestDialog
-          defaultName={requestTab?.loadedRequest?.name ?? ""}
+          defaultName={loaded?.name ?? ""}
           onClose={() => setSaveDialogOpen(false)}
           onSaved={(saved) => {
-            tabsStore.markSaved({
+            const location = {
               id: saved.id,
               collectionId: saved.collectionId,
               folderId: saved.folderId,
               name: saved.name,
-            });
+            };
+            if (webSocketTab !== null) {
+              tabsStore.markWebSocketSaved(location);
+            } else {
+              tabsStore.markSaved(location);
+            }
             setSaveDialogOpen(false);
           }}
-          request={tabsStore.currentInput()}
+          payload={savePayload()}
         />
       )}
 
       {closing && closingName !== null && (
         <ConfirmDialog
-          confirmLabel="Close without saving"
-          message={`"${closingName}" has unsaved changes. Close it anyway?`}
+          confirmLabel={
+            closing.kind === "websocket" && closing.connection !== "idle"
+              ? "Close and disconnect"
+              : "Close without saving"
+          }
+          message={closingMessage}
           onCancel={() => setClosingTabId(null)}
           onConfirm={() => {
             tabsStore.closeTab(closing.id);

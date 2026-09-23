@@ -8,7 +8,7 @@ Guidance for Claude Code (and any AI assistant) working in this repository.
 
 **ResponderHTTP** is a desktop API client that ships as **one single executable with zero external dependencies**.
 
-The app is a **UI shell over an embedded cURL engine**. It collects request parameters from the UI (URL, HTTP method, headers, query params, body, authentication), passes them to the cURL engine, and formats the response (status code, timing, response headers, response body) back to the user.
+The app is a **UI shell over an embedded cURL engine**. It collects request parameters from the UI (URL, HTTP method, headers, query params, body, authentication), passes them to the cURL engine, and formats the response (status code, timing, response headers, response body) back to the user. WebSocket requests (`ws://`, `wss://`) go through the same libcurl, using its WebSocket API (§4). A response that arrives as `text/event-stream` is shown event by event while it is still arriving, rather than after it ends (§4).
 
 **Non-negotiable constraint:** `curl` must **not** be required on the user's machine. `libcurl` is **statically linked into the binary**. Never shell out to a `curl` process, and never assume any system library is present.
 
@@ -16,7 +16,7 @@ The app is a **UI shell over an embedded cURL engine**. It collects request para
 |---|---|
 | Shell | Tauri 2.x (Rust) |
 | Frontend | React 18 + TypeScript + Vite |
-| HTTP engine | `libcurl` via the `curl` crate, statically linked |
+| HTTP engine | `libcurl` via the `curl` crate, statically linked; WebSocket through libcurl's own WS API |
 | Persistence | SQLite via `rusqlite` (bundled, statically linked) |
 | Output | `app.exe` (Windows) / single ELF binary (Linux) / `.app` (macOS) |
 
@@ -70,10 +70,11 @@ Strict three-layer separation. **Business logic never lives in a React component
 │   ├── components/               # shared presentational components
 │   ├── features/
 │   │   ├── request-builder/      # URL bar, method select, headers/params tables, body
-│   │   ├── response-viewer/      # status bar, headers table, Monaco body viewer
+│   │   ├── response-viewer/      # status bar, headers table, Monaco body viewer, live SSE events
 │   │   ├── collections/          # sidebar tree, save/rename/delete
 │   │   ├── history/
-│   │   └── environments/         # variables + {{substitution}}
+│   │   ├── environments/         # variables + {{substitution}}
+│   │   └── websocket/            # WebSocket builder, composer, message log
 │   ├── services/                 # invoke() wrappers — the ONLY place invoke appears
 │   ├── store/                    # Zustand stores (UI + session state)
 │   ├── lib/                      # pure functions: validators, formatters, curl-string builder
@@ -87,16 +88,23 @@ Strict three-layer separation. **Business logic never lives in a React component
 │   │   ├── commands/             # #[tauri::command] adapters, grouped by feature
 │   │   ├── desktop/              # shell only: tray, window lifecycle, single instance — no domain logic
 │   │   │   ├── tray.rs           # tray icon + Show/Quit menu
-│   │   │   └── window.rs         # show/focus main window, close-to-tray
+│   │   │   ├── window.rs         # show/focus main window, close-to-tray
+│   │   │   └── startup_error.rs  # dialog when the database cannot be opened
 │   │   ├── domain/
 │   │   │   ├── models.rs         # HttpRequest, HttpResponse, Auth, Collection…
 │   │   │   ├── ports.rs          # traits: HttpClient, CollectionRepository…
-│   │   │   ├── services/         # use-cases orchestrating ports
+│   │   │   ├── services/         # use-cases orchestrating ports (websocket.rs: live connections)
+│   │   │   ├── ws_frames.rs      # WebSocket frame reassembly and close codes, pure
+│   │   │   ├── sse.rs            # server-sent-events parser, pure
+│   │   │   ├── clock.rs          # now_ms(), the one wall clock the domain uses
 │   │   │   └── error.rs          # AppError + thiserror
 │   │   ├── http/
 │   │   │   ├── curl_client.rs    # libcurl implementation of HttpClient
 │   │   │   ├── auth.rs           # auth strategies
-│   │   │   └── mapping.rs        # domain ⇄ libcurl option mapping
+│   │   │   ├── mapping.rs        # domain ⇄ libcurl option mapping
+│   │   │   ├── curl_websocket.rs # libcurl implementation of WebSocketConnector
+│   │   │   ├── cookie_websocket.rs # cookie jar for WebSocket handshakes (decorator)
+│   │   │   └── curl_ws_ffi.rs    # hand-written libcurl WebSocket bindings — the ONLY unsafe
 │   │   └── persistence/
 │   │       ├── migrations/       # NNNN_name.sql, append-only
 │   │       └── repositories/     # SQLite implementations of repo traits
@@ -130,6 +138,34 @@ curl = { version = "0.4", default-features = false, features = ["static-curl", "
 - Capture and return timing breakdown (DNS, connect, TLS, TTFB, total) from `Easy2::*_time()`. Users expect it, and it is free.
 - Redirect following, timeout, max redirects, SSL verification toggle, and proxy settings are **per-request settings**, modelled in the domain, not hardcoded.
 - `lib/curl-string-builder.ts` (frontend) generates the human-readable `curl ...` command for the "Copy as cURL" button. That is a **display artifact only** — it is never executed.
+
+### WebSocket
+
+WebSocket requests use **libcurl's WebSocket API** (`CURLOPT_CONNECT_ONLY = 2`, `curl_ws_recv`, `curl_ws_send`), so they share the HTTP path's TLS stack, proxy handling, CA setup and verify-TLS toggle. Nothing else was added to the binary. The decision and the spike that proved it on Windows are in `PLAN-WEBSOCKET.md` (13a).
+
+- `curl-sys` has no bindings for that API, so `http/curl_ws_ffi.rs` declares them by hand against the libcurl that `curl-sys` builds. **It is the only file allowed `unsafe`.** `lib.rs` has `#![deny(unsafe_code)]`, and `http/mod.rs` lifts it for that one module. Every `unsafe` block carries a `SAFETY:` comment. The declarations must be re-checked against `include/curl/websockets.h` whenever `curl-sys` is upgraded; `Cargo.lock` pins the version that was proven.
+- `WebSocketConnector` / `WebSocketConnection` are traits in `domain/ports.rs`. `WebSocketSessions` (`domain/services/websocket.rs`) owns the rules — registry, reconnect policy, message-size limit, close handshake — and is tested against a scripted connection with no network.
+- **One owner thread per connection.** An easy handle is not thread-safe, so only that thread touches it. The UI reaches it through a message queue and a stop token. It reports back through an event sink, which the command layer backs with a per-connection Tauri `ipc::Channel`.
+- libcurl behaviour the design depends on (PLAN-WEBSOCKET.md 13a findings):
+  - Automatic pong is turned off, and the owner answers pings itself. libcurl's own pong is only sent lazily.
+  - The owner answers a server's close frame itself; libcurl does not.
+  - `CURLOPT_TIMEOUT_MS` does not limit an open connection, so only the handshake has a timeout.
+- Messages that arrive after Disconnect, before the server's close answer, are still reported. Messages queued before Disconnect go out before the close frame.
+- Integration tests run against the std-only local server in `src-tauri/tests/support/ws_server.rs`, never a public echo server. The one public `wss://` test is `#[ignore]`d.
+
+### Streaming responses (server-sent events)
+
+Any response whose `Content-Type` is `text/event-stream` is reported to the UI as it arrives. There is nothing to turn on and Send stays one button — it is the *response* that differs, not the request. The plan and its decisions are in `PLAN-SSE.md`.
+
+- `domain/sse.rs` is the parser: pure, no clock, no I/O. It follows the WHATWG rules with two deliberate differences, written at the top of the file — a block with fields but no `data` is still reported, and a last block with no closing blank line is reported when the stream ends. Every block keeps its own `raw` lines **including the blank line that ends it**, so concatenating every block's `raw` gives the stream back byte for byte — the Raw view and the byte total both rest on that, and a unit test pins it. A blank line that ends nothing is carried onto the next block rather than dropped.
+- `HttpClient::send_streaming` (`domain/ports.rs`) carries a sink and **has a default that calls `send`**, so every existing client, mock and decorator kept working untouched. `CurlClient` reports the status and headers the moment the header block ends, then each block as it is parsed, and runs `finish()` after the transfer so a stream cut off mid-block still reports what arrived.
+- **The total timeout lives in libcurl's progress callback, not `CURLOPT_TIMEOUT`**, and stops applying once a response proves to be an event stream: a timeout guards *getting* a response, not keeping one. A request that never answers still times out, which two integration tests pin.
+- A stream's raw body is kept to 8 MiB for the final `HttpResponse`. The events themselves are already out by then.
+- The command layer backs the sink with a **per-request `ipc::Channel`**, as WebSocket does per connection. A failed send on the channel means the webview is gone, which ends the transfer. `send_request` still resolves with the whole `HttpResponse`, so history, examples and Copy as cURL are unchanged. `send_and_download` does not stream — a download is not something to watch.
+- The frontend batches channel events into one store update per animation frame (`lib/event-batcher.ts`) and caps the viewer at 1 000 events / 32 MiB (`lib/capped-list.ts`): the same two guards the WebSocket log uses, shared rather than copied. A block's size crosses as `bytes` measured in Rust — `String.length` in the UI counts UTF-16 units and would undercount every multi-byte character — and both the running total and the cap weigh that number.
+- `Transfer-Encoding` does not appear on an HTTP/2 response, because framing is the protocol's own. Nothing filters headers; the default `auto` HTTP version simply offers h2 over TLS. A client that shows the header was talking HTTP/1.1.
+- Every response carries `TransferSizes` for the response pane's size badge. The **request** half comes from libcurl's getinfo (`request_size`, `upload_size`) — only libcurl knows what it sent, headers it added included — and so is unknown until the transfer ends; the breakdown shows an em dash for it while a stream is open. The **response** half is counted in the collector as the bytes arrive, not taken from libcurl, so that the size shown while a stream runs and the size shown once it ends are the same number. Because `accept_encoding("")` decompresses, the body figure is the decoded size, which is what the viewer holds.
+- Integration tests run against a std-only local server in `src-tauri/tests/sse.rs` that writes a stream piece by piece. `httpmock` answers in one go, which is exactly what those tests must not do.
 
 ### Auth
 
@@ -250,3 +286,4 @@ cargo fmt
 7. **Never** disable TLS verification by default — it is an explicit, visible, per-request user opt-in.
 8. **Never** hand-edit files in `components/ui/` — regenerate via the shadcn CLI.
 9. When a requirement is ambiguous, ask before inventing an abstraction.
+10. **Never** write `unsafe` outside `src-tauri/src/http/curl_ws_ffi.rs`. A second exception has to be argued for in review, not slipped in.

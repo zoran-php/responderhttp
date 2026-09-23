@@ -9,6 +9,7 @@ import {
   FileText,
   Folder as FolderIcon,
   MessageSquare,
+  Zap,
 } from "lucide-react";
 
 import { InlineTextInput } from "@/features/collections/InlineTextInput";
@@ -16,12 +17,13 @@ import type { TreeContext } from "@/features/collections/tree-types";
 import type { FolderNode } from "@/lib/collection-tree";
 import { methodTextColor } from "@/lib/http-method-colors";
 import { statusTextColor } from "@/lib/status-colors";
-import type { SavedRequest } from "@/types/collections";
+import type { SavedRequest, SavedWebSocket } from "@/types/collections";
 
 interface CollectionTreeNodeProps {
   collectionId: string;
   folders: FolderNode[];
   requests: SavedRequest[];
+  webSockets: SavedWebSocket[];
   depth: number;
   parentFolderId: string | null;
   ctx: TreeContext;
@@ -31,6 +33,7 @@ export function CollectionTreeNode({
   collectionId,
   folders,
   requests,
+  webSockets,
   depth,
   parentFolderId,
   ctx,
@@ -63,7 +66,9 @@ export function CollectionTreeNode({
               style={indent}
             >
               <button
-                aria-label={isExpanded ? `Collapse ${node.folder.name}` : `Expand ${node.folder.name}`}
+                aria-label={
+                  isExpanded ? `Collapse ${node.folder.name}` : `Expand ${node.folder.name}`
+                }
                 className="shrink-0 text-muted-foreground"
                 onClick={() => ctx.onToggleFolder(node.folder.id)}
                 type="button"
@@ -100,6 +105,7 @@ export function CollectionTreeNode({
                 folders={node.children}
                 parentFolderId={node.folder.id}
                 requests={node.requests}
+                webSockets={node.webSockets}
               />
             )}
           </div>
@@ -226,6 +232,50 @@ export function CollectionTreeNode({
         );
       })}
 
+      {webSockets.map((webSocket) => {
+        const isRenaming = ctx.renaming?.kind === "websocket" && ctx.renaming.id === webSocket.id;
+        const isLoaded = ctx.loadedRequestId === webSocket.id;
+
+        return (
+          <div
+            className={`flex items-center gap-1 rounded px-1 py-1 text-sm hover:bg-accent ${
+              isLoaded ? "bg-accent/60 font-medium" : ""
+            }`}
+            key={webSocket.id}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              ctx.onContextMenu(event, {
+                kind: "websocket",
+                id: webSocket.id,
+                collectionId,
+                folderId: webSocket.folderId,
+                name: webSocket.name,
+              });
+            }}
+            style={indent}
+          >
+            {/* A WebSocket has no saved responses, so never a chevron. */}
+            <span aria-hidden className="w-3.5 shrink-0" />
+            <Zap aria-label="WebSocket" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            {isRenaming ? (
+              <InlineTextInput
+                initialValue={webSocket.name}
+                onCancel={ctx.onCancelRename}
+                onCommit={(name) => ctx.onCommitRename("websocket", webSocket.id, name)}
+              />
+            ) : (
+              <button
+                className="min-w-0 flex-1 truncate text-left"
+                onClick={() => ctx.onOpenWebSocket(webSocket)}
+                type="button"
+              >
+                {webSocket.name}
+              </button>
+            )}
+          </div>
+        );
+      })}
+
       {showCreateHere && (
         <div className="flex items-center gap-1 py-1" style={indent}>
           <span aria-hidden className="w-3.5 shrink-0" />
@@ -241,11 +291,19 @@ export function CollectionTreeNode({
       {showCreateRequestHere && (
         <div className="flex items-center gap-1 py-1" style={indent}>
           <span aria-hidden className="w-3.5 shrink-0" />
-          <FileText aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          {ctx.creatingRequestIn?.protocol === "websocket" ? (
+            <Zap aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          ) : (
+            <FileText aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          )}
           <InlineTextInput
             onCancel={ctx.onCancelCreateRequest}
             onCommit={(name) => ctx.onCommitCreateRequest(parentFolderId, name)}
-            placeholder="Request name"
+            placeholder={
+              ctx.creatingRequestIn?.protocol === "websocket"
+                ? "WebSocket request name"
+                : "Request name"
+            }
           />
         </div>
       )}

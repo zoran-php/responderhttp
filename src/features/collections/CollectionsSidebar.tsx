@@ -5,7 +5,20 @@
 // here as local state; persistence goes through store/collections-store.ts,
 // the only thing that calls services/collections.ts for this feature.
 import { useEffect, useState, type MouseEvent } from "react";
-import { ChevronDown, ChevronRight, FileInput, FileText, FolderPlus, Plus } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  FileInput,
+  FileOutput,
+  FileText,
+  FolderInput,
+  FolderPlus,
+  Pencil,
+  Plus,
+  Trash2,
+  Zap,
+} from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CollectionTreeNode } from "@/features/collections/CollectionTreeNode";
@@ -15,6 +28,7 @@ import { ImportOpenApiDialog } from "@/features/collections/ImportOpenApiDialog"
 import { InlineTextInput } from "@/features/collections/InlineTextInput";
 import { MoveRequestDialog } from "@/features/collections/MoveRequestDialog";
 import type {
+  NewRequestProtocol,
   RenamingTarget,
   TreeContext,
   TreeKind,
@@ -23,13 +37,14 @@ import type {
 import { buildFolderTree } from "@/lib/collection-tree";
 import { useCollectionsStore } from "@/store/collections-store";
 import { useEnvironmentsStore } from "@/store/environments-store";
-import type { SavedRequest } from "@/types/collections";
+import type { SavedRequest, SavedWebSocket } from "@/types/collections";
 import type { DocsTarget } from "@/types/docs";
 import type { OpenApiImportResult } from "@/types/openapi-import";
 
 interface CollectionsSidebarProps {
   loadedRequestId: string | null;
   onOpenRequest: (request: SavedRequest) => void;
+  onOpenWebSocket: (webSocket: SavedWebSocket) => void;
   onOpenExample: (exampleId: string) => void;
   onOpenDocs: (target: DocsTarget) => void;
 }
@@ -55,6 +70,7 @@ interface CreatingFolder {
 interface CreatingRequest {
   collectionId: string;
   parentFolderId: string | null;
+  protocol: NewRequestProtocol;
 }
 
 interface ExportTarget {
@@ -72,6 +88,7 @@ interface MoveTarget {
 export function CollectionsSidebar({
   loadedRequestId,
   onOpenRequest,
+  onOpenWebSocket,
   onOpenExample,
   onOpenDocs,
 }: CollectionsSidebarProps) {
@@ -121,6 +138,14 @@ export function CollectionsSidebar({
     }
   }
 
+  async function handleOpenWebSocket(webSocket: SavedWebSocket) {
+    // Re-fetched by id for the same reason as handleOpenRequest.
+    const fresh = await store.loadWebSocket(webSocket.id);
+    if (fresh) {
+      onOpenWebSocket(fresh);
+    }
+  }
+
   async function handleCommitRename(
     kind: TreeKind,
     id: string,
@@ -157,8 +182,16 @@ export function CollectionsSidebar({
     collectionId: string,
     parentFolderId: string | null,
     name: string,
+    protocol: NewRequestProtocol,
   ) {
     setCreatingRequestIn(null);
+    if (protocol === "websocket") {
+      const created = await store.createWebSocket(collectionId, parentFolderId, name);
+      if (created) {
+        onOpenWebSocket(created);
+      }
+      return;
+    }
     // saveRequest's response is already the fresh row, so this opens it
     // directly rather than going through handleOpenRequest's re-fetch,
     // which exists for stale cached data — not a concern for a row we just
@@ -197,22 +230,44 @@ export function CollectionsSidebar({
     if (target.kind === "collection") {
       return [
         {
-          label: "New request",
+          label: "New HTTP request",
+          icon: Plus,
           // The inline input renders among the collection's children, so a
           // collapsed collection would swallow it.
           onSelect: () => {
             store.expandCollection(target.id);
-            setCreatingRequestIn({ collectionId: target.id, parentFolderId: null });
+            setCreatingRequestIn({
+              collectionId: target.id,
+              parentFolderId: null,
+              protocol: "http",
+            });
+          },
+        },
+        {
+          label: "New WebSocket request",
+          icon: Zap,
+          onSelect: () => {
+            store.expandCollection(target.id);
+            setCreatingRequestIn({
+              collectionId: target.id,
+              parentFolderId: null,
+              protocol: "websocket",
+            });
           },
         },
         {
           label: "New folder",
+          icon: FolderPlus,
           onSelect: () => {
             store.expandCollection(target.id);
             setCreatingFolder({ collectionId: target.id, parentFolderId: null });
           },
         },
-        { label: "Rename", onSelect: () => setRenaming({ kind: "collection", id: target.id }) },
+        {
+          label: "Rename",
+          icon: Pencil,
+          onSelect: () => setRenaming({ kind: "collection", id: target.id }),
+        },
         {
           label: "Docs",
           icon: FileText,
@@ -220,10 +275,12 @@ export function CollectionsSidebar({
         },
         {
           label: "Export as OpenAPI",
+          icon: FileOutput,
           onSelect: () => setExportTarget({ collectionId: target.id, collectionName: target.name }),
         },
         {
           label: "Delete",
+          icon: Trash2,
           destructive: true,
           onSelect: () =>
             setDeleteTarget({
@@ -238,22 +295,45 @@ export function CollectionsSidebar({
     if (target.kind === "folder") {
       return [
         {
-          label: "New request",
+          label: "New HTTP request",
+          icon: Plus,
           onSelect: () => {
             store.expandCollection(target.collectionId);
             store.expandFolder(target.id);
-            setCreatingRequestIn({ collectionId: target.collectionId, parentFolderId: target.id });
+            setCreatingRequestIn({
+              collectionId: target.collectionId,
+              parentFolderId: target.id,
+              protocol: "http",
+            });
+          },
+        },
+        {
+          label: "New WebSocket request",
+          icon: Zap,
+          onSelect: () => {
+            store.expandCollection(target.collectionId);
+            store.expandFolder(target.id);
+            setCreatingRequestIn({
+              collectionId: target.collectionId,
+              parentFolderId: target.id,
+              protocol: "websocket",
+            });
           },
         },
         {
           label: "New folder",
+          icon: FolderPlus,
           onSelect: () => {
             store.expandCollection(target.collectionId);
             store.expandFolder(target.id);
             setCreatingFolder({ collectionId: target.collectionId, parentFolderId: target.id });
           },
         },
-        { label: "Rename", onSelect: () => setRenaming({ kind: "folder", id: target.id }) },
+        {
+          label: "Rename",
+          icon: Pencil,
+          onSelect: () => setRenaming({ kind: "folder", id: target.id }),
+        },
         {
           label: "Docs",
           icon: FileText,
@@ -261,6 +341,7 @@ export function CollectionsSidebar({
         },
         {
           label: "Delete",
+          icon: Trash2,
           destructive: true,
           onSelect: () =>
             setDeleteTarget({
@@ -272,11 +353,56 @@ export function CollectionsSidebar({
         },
       ];
     }
-    if (target.kind === "example") {
+    if (target.kind === "websocket") {
+      // Rename, Docs, Move and Delete act on the row by id, whatever its
+      // kind. No Duplicate yet: it would need its own load-and-save path,
+      // and nothing asked for it.
       return [
-        { label: "Rename", onSelect: () => setRenaming({ kind: "example", id: target.id }) },
+        {
+          label: "Rename",
+          icon: Pencil,
+          onSelect: () => setRenaming({ kind: "websocket", id: target.id }),
+        },
+        {
+          label: "Docs",
+          icon: FileText,
+          onSelect: () => onOpenDocs({ kind: "request", id: target.id }),
+        },
+        {
+          label: "Move",
+          icon: FolderInput,
+          onSelect: () =>
+            setMoveTarget({
+              collectionId: target.collectionId,
+              requestId: target.id,
+              requestName: target.name,
+              currentFolderId: target.folderId,
+            }),
+        },
         {
           label: "Delete",
+          icon: Trash2,
+          destructive: true,
+          onSelect: () =>
+            setDeleteTarget({
+              kind: "websocket",
+              id: target.id,
+              collectionId: target.collectionId,
+              name: target.name,
+            }),
+        },
+      ];
+    }
+    if (target.kind === "example") {
+      return [
+        {
+          label: "Rename",
+          icon: Pencil,
+          onSelect: () => setRenaming({ kind: "example", id: target.id }),
+        },
+        {
+          label: "Delete",
+          icon: Trash2,
           destructive: true,
           onSelect: () =>
             setDeleteTarget({
@@ -289,7 +415,11 @@ export function CollectionsSidebar({
       ];
     }
     return [
-      { label: "Rename", onSelect: () => setRenaming({ kind: "request", id: target.id }) },
+      {
+        label: "Rename",
+        icon: Pencil,
+        onSelect: () => setRenaming({ kind: "request", id: target.id }),
+      },
       {
         label: "Docs",
         icon: FileText,
@@ -297,10 +427,12 @@ export function CollectionsSidebar({
       },
       {
         label: "Duplicate",
+        icon: Copy,
         onSelect: () => void handleDuplicateRequest(target.id, target.collectionId, target.name),
       },
       {
         label: "Move",
+        icon: FolderInput,
         onSelect: () =>
           setMoveTarget({
             collectionId: target.collectionId,
@@ -311,6 +443,7 @@ export function CollectionsSidebar({
       },
       {
         label: "Delete",
+        icon: Trash2,
         destructive: true,
         onSelect: () =>
           setDeleteTarget({
@@ -331,6 +464,7 @@ export function CollectionsSidebar({
       expandedFolderIds: store.expandedFolderIds,
       onToggleFolder: store.toggleFolder,
       onOpenRequest: (request) => void handleOpenRequest(request),
+      onOpenWebSocket: (webSocket) => void handleOpenWebSocket(webSocket),
       loadedRequestId,
       examplesByRequestId,
       expandedRequestIds: store.expandedRequestIds,
@@ -349,10 +483,18 @@ export function CollectionsSidebar({
       onCancelCreateFolder: () => setCreatingFolder(null),
       creatingRequestIn:
         creatingRequestIn && creatingRequestIn.collectionId === collectionId
-          ? { parentFolderId: creatingRequestIn.parentFolderId }
+          ? {
+              parentFolderId: creatingRequestIn.parentFolderId,
+              protocol: creatingRequestIn.protocol,
+            }
           : null,
       onCommitCreateRequest: (parentFolderId, name) =>
-        void handleCommitCreateRequest(collectionId, parentFolderId, name),
+        void handleCommitCreateRequest(
+          collectionId,
+          parentFolderId,
+          name,
+          creatingRequestIn?.protocol ?? "http",
+        ),
       onCancelCreateRequest: () => setCreatingRequestIn(null),
     };
   }
@@ -462,6 +604,7 @@ export function CollectionsSidebar({
                     folders={tree.rootFolders}
                     parentFolderId={null}
                     requests={tree.rootRequests}
+                    webSockets={tree.rootWebSockets}
                   />
                 ) : (
                   <p className="px-6 py-1 text-xs text-muted-foreground">Loading…</p>
@@ -491,7 +634,7 @@ export function CollectionsSidebar({
           message={deleteMessage(deleteTarget)}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => void handleConfirmDelete()}
-          title={`Delete ${deleteTarget.kind}`}
+          title={`Delete ${DELETE_TITLE_NOUN[deleteTarget.kind]}`}
         />
       )}
 
@@ -527,8 +670,18 @@ export function CollectionsSidebar({
 /** A request now carries its saved responses down with it, which the prompt
  * has to say — "cannot be undone" reads very differently once there is
  * something underneath. */
+const DELETE_TITLE_NOUN: Record<TreeKind, string> = {
+  collection: "collection",
+  folder: "folder",
+  request: "request",
+  example: "example",
+  websocket: "WebSocket request",
+};
+
 function deleteMessage(target: DeleteTarget): string {
-  if (target.kind === "example") {
+  // A WebSocket request has no saved responses under it, so the plain
+  // prompt is the truthful one.
+  if (target.kind === "example" || target.kind === "websocket") {
     return `Delete "${target.name}"? This cannot be undone.`;
   }
   if (target.kind === "request") {

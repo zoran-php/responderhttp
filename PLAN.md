@@ -90,7 +90,7 @@ Prove the React → `invoke()` → Tauri command → `HttpClient` trait → `Cur
 - Tests: 7 repository tests against in-memory SQLite running the real migrations (round trip through every JSON column, re-save updates, both cascade paths, move between folder and root, case-insensitive ordering, NotFound), plus 3 service tests and migration/id/timestamp unit tests.
 
 - Collections sidebar UI: tree view (collections → folders → requests), Save on the current request, inline create, and context-menu rename/delete/move (drag-and-drop was ruled out, 2026-09-13).
-- **Extended beyond the original scope** (2026-09-13, at request, no backend changes): "New request" from the collection and folder context menus, "Duplicate" on a request, and a Postman-style multi-tab request builder with per-tab dirty tracking and confirm-on-close. Tabs are in-memory only and reset on launch — persisting them was considered and deferred; Phase 6 is where it would go if ever wanted.
+- **Extended beyond the original scope** (2026-09-13, at request, no backend changes): "New request" from the collection and folder context menus, "Duplicate" on a request, and a multi-tab request builder with per-tab dirty tracking and confirm-on-close. Tabs are in-memory only and reset on launch — persisting them was considered and deferred; Phase 6 is where it would go if ever wanted.
 
 **Done when:** a request built in Phase 1/2 can be saved into a collection, closed, and reopened with all fields intact. — **met**, confirmed by manual click-through 2026-09-13.
 
@@ -102,7 +102,7 @@ Done at request, outside the phase structure, all frontend-only:
 
 - **"Nord Ice" theme** — the shadcn token set in `src/index.css` remapped to the supplied palette. `destructive` uses Nord's own aurora red (`#bf616a`) to fill the one slot the palette didn't name.
 - **App preloader** — inline `<style>` in `index.html` (it must paint before React or `index.css` load), removed by `main.tsx` after the first render.
-- **HTTP method colours** — `--method-*` tokens plus `lib/http-method-colors.ts`, applied in the collections tree, the method select, and the tab bar. GET/POST/PUT/DELETE are sampled from a Postman screenshot; PATCH/HEAD/OPTIONS are picked to match the same family.
+- **HTTP method colours** — `--method-*` tokens plus `lib/http-method-colors.ts`, applied in the collections tree, the method select, and the tab bar. GET/POST/PUT/DELETE are sampled from a screenshot; PATCH/HEAD/OPTIONS are picked to match the same family.
 - **In-flight animation** — `features/response-viewer/SendingIndicator.tsx` replaced the plain "Sending…" text. Added `--frost-teal` / `--frost-deep` tokens (nord7/nord10) and two keyframes in `tailwind.config.ts`.
 
 ---
@@ -432,7 +432,7 @@ can be replayed or promoted to a saved collection item.
 
 ## Phase 6 extension — Saved responses (examples) — **done, verified 2026-09-14**
 
-Postman's "Save as Example": a named response kept under the request that
+"Save as Example": a named response kept under the request that
 produced it, which makes a request node in the sidebar expandable. Asked for
 during Phase 6, hence the placement — but it is **collections work**, not
 history work, and nothing about it touches Phase 6's tables or commands.
@@ -533,7 +533,7 @@ expands to show it, it survives a restart, and deleting the request removes it.
 
 ## Phase 6 extension — Send and download — **done, verified 2026-09-14**
 
-A split Send button, Postman-style: Send on the left, a chevron opening
+A split Send button: Send on the left, a chevron opening
 "Send and download", which writes the response body to a file the user picks.
 
 ### New dependency — approved 2026-09-14
@@ -1084,7 +1084,7 @@ network at install time".
 
 ## Phase 7 extension — More transport settings — **done, verified 2026-09-14**
 
-Six settings from Postman's request Settings tab, chosen after auditing all
+Six settings from request Settings tab, chosen after auditing all
 thirteen against what libcurl and our TLS backend can actually do.
 
 ### What could not be built, and why it matters
@@ -1102,11 +1102,11 @@ thirteen against what libcurl and our TLS backend can actually do.
 
 ### Two were narrowed, and are labelled for what they do
 
-Postman's **"enable strict HTTP parser"** restricts invalid headers generally;
+**"enable strict HTTP parser"** restricts invalid headers generally;
 libcurl exposes no such switch. All we can control is whether HTTP/0.9
 responses are accepted, so the setting reads **"Accept HTTP/0.9 responses"**.
 
-Postman's **"TLS/SSL protocols disabled during handshake"** becomes a
+**"TLS/SSL protocols disabled during handshake"** becomes a
 **minimum** of TLS 1.2 or 1.3, because rustls supports only those two — there
 is no TLS 1.0 or 1.1 here to disable. `Auto` does not call the option at all,
 so the common path is untouched.
@@ -2850,10 +2850,10 @@ parse the URL's query into parameters**, rather than only adding a note.
 
 ---
 
-## Params tab synced with the URL bar (Postman-style) — **done, verified 2026-09-17**
+## Params tab synced with the URL bar — **done, verified 2026-09-17**
 
 Asked for: typing a key/value in Params shows in the URL bar, and the other
-way round, as in Postman.
+way round.
 
 ### Decided (2026-09-17)
 
@@ -2861,8 +2861,7 @@ way round, as in Postman.
   its query string, and a tab's `queryParams` is always sent and saved
   empty. Keeping two lists in step, and then appending one to the other at
   send time, would send every parameter twice.
-- **The table shows the query as typed, not decoded.** This is Postman's
-  behaviour.
+- **The table shows the query as typed, not decoded.**
   - `a%20b` stays `a%20b`, so there is no decode/encode round trip to get
     wrong around `+`, a stray `%`, or an escape meant literally.
   - Editing the table escapes only what would change the query's structure:
@@ -2891,7 +2890,7 @@ way round, as in Postman.
     key the Auth tab sends in the query.
   - **Known differences:**
     - An old row whose value was a `{{variable}}` is now substituted into
-      the URL raw, as in Postman. A variable value containing `&` would
+      the URL raw. A variable value containing `&` would
       therefore split into two parameters.
     - An old row holding a literal `%41` with encoding on is folded as
       `%2541`, so it stays literal. With encoding off it stays `%41`, as it
@@ -3152,7 +3151,7 @@ spec never does.
 
 ### Step 5 — folders and grouping (decision D1)
 
-**Option A — by tag** (Postman's default).
+**Option A — by tag**.
 
 - One folder per tag, in the order of the document's top-level `tags` list,
   then the order in which tags first appear.
@@ -3185,9 +3184,7 @@ operations.
 
 **Option D — a picker in the import dialog** offering A, B and C, with a
 preview of the resulting top-level folders. It defaults to A when the spec has
-tags and to B when it has none. This is what Postman offers ("Folder
-organization: Tags / Paths"), and the preview command already has the parsed
-document, so the extra cost is a dropdown.
+tags and to B when it has none.
 
 The tree is sorted in document order. The `folders` and `requests` tables have
 no position column, so the order comes from `created_at`. The importer
@@ -3714,7 +3711,15 @@ missing, `pnpm tauri build --no-bundle`, stage, pack.
   are untouched.
 
 **Listing drafts** are in `store/listing.md`; the privacy policy text is
-`store/privacy-policy.md`.
+`store/privacy-policy.md`. Both were refreshed on 2026-09-23 to cover what
+shipped after they were first written — Markdown documentation (Phase 12),
+WebSocket requests (Phase 13) and server-sent events (Phase 14). The policy
+gained those in its stored-data list, widened "network requests" to include
+WebSocket connections, and added WebSocket messages and stream events to the
+list of what never reaches the log. The listing gained the features, two more
+screenshots to take, and `websocket client` as a search term in place of
+`api testing`, which only repeated `api client`. Whenever a phase adds a
+visible feature, these two are part of it.
 
 **First run, 2026-09-19.** The package builds. `winapp` produced
 `ZoranDavidovi.ResponderHTTP_1.0.0.0_x64.msix`, 5.98 MB, from a 10.6 MB exe
@@ -4506,11 +4511,16 @@ unrelated devDependencies *backwards* within their caret ranges —
 dev-only and neither changes a byte of the shipped binary, but it is an
 unintended diff.
 
-The fix is one command on this machine, which re-resolves them under pnpm 12:
+Fixed on 2026-09-21 with `pnpm up autoprefixer prettier`, which re-resolved
+them under pnpm 12; the lockfile now pins `autoprefixer@10.6.1` and
+`prettier@3.9.8` again.
 
-```
-pnpm up autoprefixer prettier
-```
+**A reading error worth not repeating:** the run after that fix reported
+`pnpm install` → "Already up to date", and that was taken as evidence the fix
+had *not* been applied. It is the opposite — "Already up to date" is what
+`install` says once the lockfile and `package.json` agree, which is precisely
+the state `pnpm up` leaves behind. The install line says nothing about which
+versions are pinned; only the lockfile does.
 
 **The lesson for later phases: add dependencies on the machine whose pnpm
 owns the lockfile.** A cloud `pnpm add` is fine for checking that something
@@ -4598,6 +4608,98 @@ Both match byte for byte. (The archive listing shows the header as 31 454
 bytes, which is its *compressed* size; extracted it is the expected 25 818.)
 Worth remembering as the way to check any installer asset without installing
 anything.
+
+---
+
+## Phase 13 — WebSocket requests — **done, verified 2026-09-22 (`verify.bat` and `release.bat` green)**
+
+The full plan, decisions and per-step build notes are in `PLAN-WEBSOCKET.md`. This is the summary.
+
+**What was built.** WebSocket requests (`ws://`, `wss://`) sit beside HTTP requests in any collection or folder.
+- The tab has Connect/Disconnect, a Text/JSON/Hex composer, and Docs, Message, Params, Headers and Settings sub-tabs. The Cookies link opens the existing manager.
+- The status badge follows the connection state. The activity log runs newest first with millisecond timestamps and expandable rows (pretty-printed JSON, hex dumps, handshake headers), plus search, a direction filter and Clear Messages.
+- WebSocket requests save, reopen, rename, move, delete and carry docs exactly as HTTP requests do.
+- The OpenAPI export dialog says how many WebSocket requests it will leave out. OpenAPI cannot describe them.
+- There is no WebSocket import or export yet (D2); that comes with AsyncAPI.
+
+**Engine.**
+- libcurl's own WebSocket API, not a second library (D1), proven by a spike on Windows first (13a). It adds nothing to the binary.
+- The API has no Rust bindings, so `http/curl_ws_ffi.rs` declares them by hand. It is the codebase's first and only `unsafe`, which `CLAUDE.md` §4 and §11 rule 10 now fence in.
+
+**Sub-phases, all verified on `verify.bat`:**
+- 13a: the spike.
+- 13b: domain and transport, with 18 integration tests against a local server.
+- 13c: commands and IPC streaming.
+- 13d: persistence. Migration `0010` adds `kind` and `ws_json` to the shared `requests` table.
+- 13e: frontend state and pure libraries.
+- 13f: the UI.
+- 13g: the export dialog count.
+- 13h: hardening.
+
+**What was found along the way, worth remembering:**
+- **libcurl sends a ping's pong only lazily, and never answers a server's close.** Both are handled by the connection's owner thread (13a).
+- **The first smoke test lost messages.** Send, Send, Disconnect inside one 25 ms poll closed the connection before the queued messages went out, though both sends had reported success. The owner loop now drains the queue before acting on Disconnect, with a regression test (13c).
+- **Messages that arrive between Disconnect and the server's close are now logged** rather than dropped (decided 2026-09-22).
+- **A database from a newer version now gets a dialog at startup** (`desktop/startup_error.rs`), where it used to exit silently. This closes the Phase 7 item (13d, decided 2026-09-22).
+- **Collapsed log rows were rebuilding their preview from the whole message on every render.** With the log full of 1 MiB messages, one render spent 1.6 s doing it. Previews now read a bounded slice, and rows are memoised: 1.8 ms (13h).
+- **Decisions revised after the UI existed:** there is one Clear Messages that clears everything, with no "…" menu and no Clear Response. And a single count in the export dialog replaced one note per request.
+
+**Release gate, 2026-09-22.**
+- `verify.bat` green: 481 Rust unit tests, 14 curl, 69 repository, 19 websocket integration, and 377 vitest in 42 files.
+- `release.bat` green: NSIS and MSI both built.
+- **The static-link check still reports 29 imported DLLs, all Windows system DLLs.** WebSocket support added none, since it lives inside the statically linked libcurl.
+
+**Still open:** an in-app scroll and typing check under a fast message stream. The pure-code measurement in 13h already removed the cost it was guarding against.
+
+---
+
+## Phase 13 extension — WebSocket message formats — **done, verified 2026-09-22**
+
+The composer now offers XML, HTML and Binary, and Binary can be typed as Base64 or Hexadecimal. JSON, XML and HTML get a Beautify button. Text that does not parse is left as typed, with the reason shown.
+
+- Binary still crosses IPC as hex.
+- No migration: the draft lives in the `ws_json` blob, and a draft saved as the old "Hex" format opens as Binary in Hexadecimal.
+- An expanded binary row in the log opens in the composer's encoding and can be switched per row.
+
+Details are in `PLAN-WEBSOCKET.md`, 13i.
+
+---
+
+## Phase 14 — Server-sent events — **done, verified 2026-09-23 (`verify.bat` and `release.bat` green)**
+
+The full plan, decisions and per-step build notes are in `PLAN-SSE.md`. This is the summary.
+
+**What was built.** An HTTP response that says `Content-Type: text/event-stream` is now shown as it arrives instead of after it ends. Nothing has to be turned on and Send stays one button (D1): it is the response that differs, not the request.
+- The response pane switches to an Events view — one row per block, numbered, with its event name, `id` and a millisecond timestamp — plus a live Raw view and the headers. Comments (`: keep-alive`) are shown as comments rather than as empty events.
+- The list runs **newest first**, as the WebSocket log does, and follows the newest event unless the user has scrolled down to read the older ones. The status pill appears as soon as the headers land, with a Streaming badge while the stream is open, and the line carries a running event count and byte total.
+- The size badge shows headers plus body, and hovering it breaks that into Response (Headers, Body) and Request (Headers, Body). The ordinary response bar, which had no size display at all, now shows the same badge. The request half is libcurl's to report and only exists once the transfer ends, so it reads "—" while a stream is open.
+- The byte total is measured in Rust, on each block's raw bytes, and counts what the server sent rather than what the viewer still holds. Measuring it in the UI would have used `String.length`, which counts UTF-16 units and undercounts multi-byte characters.
+- The request still finishes normally, so history, saving an example and Copy as cURL are unchanged.
+
+**Engine.**
+- `domain/sse.rs` parses; it is pure, has no clock and no I/O, and keeps each block's raw lines so nothing the server sent is lost.
+- `HttpClient::send_streaming` has a default that calls `send`, so no existing client, mock or decorator had to change.
+- **The total timeout moved out of `CURLOPT_TIMEOUT` into libcurl's progress callback** and stops applying once a response proves to be a stream — otherwise a stream would be cut off at 30 seconds. A request that never answers still times out.
+- One `ipc::Channel` per request carries the events, batched to one store update per animation frame and capped at 1 000 events / 32 MiB. Both guards are the WebSocket log's, now shared in `lib/event-batcher.ts` and `lib/capped-list.ts` rather than copied.
+
+**Sub-phases:**
+- 14a: the parser, 17 tests.
+- 14b: transport, with 8 integration tests against a local server that writes a stream piece by piece.
+- 14c: the command, the DTOs and the streaming service.
+- 14d: the store and the Events view.
+- 14e: the long-stream measurement and these docs.
+
+**What was found along the way, worth remembering:**
+- **A sink that stops listening has to be checked before the parser runs, not after.** libcurl finishes the chunk it is on before the progress callback can abort, so the collector reported one block more than the test expected until the dropped flag was checked first (14b).
+- **`httpmock` cannot test this.** It answers in one go, which is precisely the behaviour under test, so the integration tests use a few lines of `std::net` instead — the same choice `tests/support/ws_server.rs` made.
+- **Nothing new was added to the binary.** SSE is plain HTTP; the parser is ours.
+
+**Release gate, 2026-09-23.**
+- `verify.bat` green: 504 Rust unit tests, 14 curl, 69 repository, 9 SSE, 19 WebSocket, and 440 vitest in 47 files, with `cargo fmt`, clippy, `tsc` and eslint clean.
+- `release.bat` green: NSIS and MSI both built.
+- **The static-link check still reports 29 imported DLLs, all Windows system DLLs.** SSE added none, as expected: it is plain HTTP and the parser is ours.
+
+**Deliberately not in this phase:** automatic reconnect with `Last-Event-ID`, saving a stream as an example, recording every event in history, a dedicated SSE request type in the sidebar, and streaming for `send_and_download`.
 
 ---
 

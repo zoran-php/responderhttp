@@ -4,6 +4,7 @@
 // SavedRequest reuses SendRequestInput from types/http.ts rather than
 // duplicating the request shape a second time.
 import type { KeyValue, SecretState, SendRequestInput } from "@/types/http";
+import type { WebSocketRequest, WsDraft } from "@/types/websocket";
 
 export interface Collection {
   id: string;
@@ -26,6 +27,22 @@ export interface SavedRequest {
   /** Whether request.auth's secret could be read. When it could not, the
    * field is empty and the Auth tab asks for it again. */
   secretState: SecretState;
+}
+
+/**
+ * A saved WebSocket request. Mirrors SavedWebSocketDto.
+ *
+ * It lives in the same collections and folders as SavedRequest, and shares
+ * its id space: rename, move, delete and docs reach it through the request
+ * commands by id.
+ */
+export interface SavedWebSocket {
+  id: string;
+  collectionId: string;
+  folderId: string | null;
+  name: string;
+  request: WebSocketRequest;
+  draft: WsDraft;
 }
 
 /**
@@ -55,12 +72,13 @@ export interface ExampleSummary {
   status: number;
 }
 
-/** One collection's folders, requests and example summaries — what
- * collection_contents returns. */
+/** One collection's folders, requests, example summaries and WebSocket
+ * requests — what collection_contents returns. */
 export interface CollectionContents {
   folders: Folder[];
   requests: SavedRequest[];
   examples: ExampleSummary[];
+  webSockets: SavedWebSocket[];
 }
 
 /**
@@ -73,4 +91,5 @@ export const EMPTY_COLLECTION_CONTENTS: CollectionContents = {
   folders: [],
   requests: [],
   examples: [],
+  webSockets: [],
 };

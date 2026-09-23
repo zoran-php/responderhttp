@@ -6,11 +6,19 @@ import { useState, type ReactNode } from "react";
 import { Download, FileWarning } from "lucide-react";
 
 import { LazyCodeEditor } from "@/components/LazyCodeEditor";
+import { EventStreamView } from "@/features/response-viewer/EventStreamView";
+import {
+  SaveExampleButton,
+  type SaveExampleAction,
+} from "@/features/response-viewer/SaveExampleButton";
 import { SendingIndicator } from "@/features/response-viewer/SendingIndicator";
+import { SizeBadge } from "@/features/response-viewer/SizeBadge";
 import { findHeader, languageForContentType } from "@/lib/content-type";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { prettyPrint } from "@/lib/pretty-print";
+import type { ResponseStream } from "@/lib/sse-log";
 import { statusPillClass } from "@/lib/status-colors";
+import { sizesOfResponse } from "@/lib/transfer-sizes";
 import type { ApiError, DownloadResult, HttpResponse } from "@/types/http";
 
 type View = "Pretty" | "Raw" | "Headers";
@@ -22,12 +30,16 @@ interface ResponseViewerProps {
   error: ApiError | null;
   isSending: boolean;
   /**
-   * Null when the response cannot be saved as an example, carrying the
-   * reason: an example hangs off a stored request, and a binary body has
-   * nothing to store. The reason is shown on the disabled button rather than
-   * the button being hidden, so the action does not silently disappear.
+   * What the request has reported so far. A `text/event-stream` response is
+   * shown as it arrives instead of as a finished body (PLAN-SSE.md).
    */
-  saveExample: { onSave: () => void } | { disabledReason: string };
+  stream: ResponseStream;
+  /**
+   * Carries the reason when the response cannot be saved as an example: an
+   * example hangs off a stored request, and a binary body has nothing to
+   * store.
+   */
+  saveExample: SaveExampleAction;
 }
 
 export function ResponseViewer({
@@ -35,10 +47,25 @@ export function ResponseViewer({
   download,
   error,
   isSending,
+  stream,
   saveExample,
 }: ResponseViewerProps) {
   const [view, setView] = useState<View>("Pretty");
 
+  // Before the sending check: a stream is worth watching precisely while the
+  // request is still running, and after it ends the events remain the
+  // readable form of a body that is one long concatenation.
+  if (stream.isEventStream && download === null) {
+    return (
+      <EventStreamView
+        error={error}
+        isSending={isSending}
+        response={response}
+        saveExample={saveExample}
+        stream={stream}
+      />
+    );
+  }
   if (isSending) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -72,30 +99,14 @@ export function ResponseViewer({
           {status}
         </span>
         <span className="text-muted-foreground">{formatDuration(timing.totalMs)}</span>
+        <SizeBadge sizes={sizesOfResponse(response.sizes)} />
         <span className="text-xs text-muted-foreground">
           DNS {formatDuration(timing.dnsMs)} · connect {formatDuration(timing.connectMs)} · TLS{" "}
           {formatDuration(timing.tlsMs)} · TTFB {formatDuration(timing.timeToFirstByteMs)}
         </span>
 
         <div className="ml-auto flex items-center gap-1">
-          {"onSave" in saveExample ? (
-            <button
-              className="mr-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground active:bg-accent/80"
-              onClick={saveExample.onSave}
-              type="button"
-            >
-              Save response
-            </button>
-          ) : (
-            <button
-              className="mr-1 rounded px-2 py-1 text-xs text-muted-foreground"
-              disabled
-              title={saveExample.disabledReason}
-              type="button"
-            >
-              Save response
-            </button>
-          )}
+          <SaveExampleButton action={saveExample} />
           {(["Pretty", "Raw", "Headers"] as const).map((name) => (
             <button
               className={`rounded px-2 py-1 text-xs ${
@@ -148,15 +159,11 @@ function DownloadSummary({ download }: { download: DownloadResult }) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex items-center gap-3 border-b border-border px-4 py-2 text-sm">
-        <span
-          className={`rounded px-2 py-0.5 font-medium ${statusPillClass(download.status)}`}
-        >
+        <span className={`rounded px-2 py-0.5 font-medium ${statusPillClass(download.status)}`}>
           {download.status}
         </span>
         <span className="text-muted-foreground">{formatDuration(download.timing.totalMs)}</span>
-        <span className="text-xs text-muted-foreground">
-          {formatBytes(download.byteLength)}
-        </span>
+        <span className="text-xs text-muted-foreground">{formatBytes(download.byteLength)}</span>
       </div>
 
       <div className="flex flex-1 items-center justify-center px-6">
@@ -168,9 +175,7 @@ function DownloadSummary({ download }: { download: DownloadResult }) {
           )}
           <p className="text-sm">{saved ? "Response saved" : "Download cancelled"}</p>
           <p className="max-w-full break-all font-mono text-xs text-muted-foreground">
-            {saved
-              ? download.savedTo
-              : "The request was sent; nothing was written to disk."}
+            {saved ? download.savedTo : "The request was sent; nothing was written to disk."}
           </p>
         </div>
       </div>

@@ -9,8 +9,8 @@ export interface ContextMenuItem {
   label: string;
   onSelect: () => void;
   destructive?: boolean;
-  /** Optional, because most entries here have never needed one. Where it is
-   * set, the label is indented to match so the column stays straight. */
+  /** Every menu sets one today. Still optional, and an entry without one is
+   * indented to match the rest so the column stays straight. */
   icon?: LucideIcon;
 }
 

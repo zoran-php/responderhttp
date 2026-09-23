@@ -9,17 +9,23 @@ import type {
   ExampleSummary,
   Folder,
   SavedRequest,
+  SavedWebSocket,
 } from "@/types/collections";
 
 export interface FolderNode {
   folder: Folder;
   children: FolderNode[];
   requests: SavedRequest[];
+  /** Beside `requests` rather than mixed into it: the node renders a method
+   * for one and a WebSocket icon for the other. */
+  webSockets: SavedWebSocket[];
 }
 
 export interface FolderTree {
   /** Requests saved directly in the collection, outside any folder. */
   rootRequests: SavedRequest[];
+  /** WebSocket requests saved directly in the collection. */
+  rootWebSockets: SavedWebSocket[];
   rootFolders: FolderNode[];
   /**
    * Examples grouped by the request they hang under, in the order storage
@@ -33,7 +39,7 @@ export interface FolderTree {
 export function buildFolderTree(contents: CollectionContents): FolderTree {
   const nodesById = new Map<string, FolderNode>();
   for (const folder of contents.folders) {
-    nodesById.set(folder.id, { folder, children: [], requests: [] });
+    nodesById.set(folder.id, { folder, children: [], requests: [], webSockets: [] });
   }
 
   const rootFolders: FolderNode[] = [];
@@ -59,10 +65,26 @@ export function buildFolderTree(contents: CollectionContents): FolderTree {
     }
   }
 
+  const rootWebSockets: SavedWebSocket[] = [];
+  for (const webSocket of contents.webSockets) {
+    const node = webSocket.folderId ? nodesById.get(webSocket.folderId) : undefined;
+    if (node) {
+      node.webSockets.push(webSocket);
+    } else {
+      rootWebSockets.push(webSocket);
+    }
+  }
+
   sortTree(rootFolders);
   rootRequests.sort(byName);
+  rootWebSockets.sort(byName);
 
-  return { rootRequests, rootFolders, examplesByRequestId: groupExamples(contents.examples) };
+  return {
+    rootRequests,
+    rootWebSockets,
+    rootFolders,
+    examplesByRequestId: groupExamples(contents.examples),
+  };
 }
 
 function groupExamples(examples: ExampleSummary[]): Map<string, ExampleSummary[]> {
@@ -98,6 +120,7 @@ function sortTree(nodes: FolderNode[]): void {
   nodes.sort((a, b) => byName(a.folder, b.folder));
   for (const node of nodes) {
     node.requests.sort(byName);
+    node.webSockets.sort(byName);
     sortTree(node.children);
   }
 }

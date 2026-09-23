@@ -11,5 +11,7 @@ pub mod folders;
 pub mod history;
 pub mod import;
 pub mod json;
+pub mod request_kind;
 pub mod saved_requests;
 pub mod secret_upgrade;
+pub mod web_sockets;

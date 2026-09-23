@@ -5,6 +5,7 @@
 // — a saved request keeps its placeholders, so the same request can be sent
 // against a different environment tomorrow.
 import type { Auth, KeyValue, RequestBody, SendRequestInput } from "@/types/http";
+import type { WebSocketRequest } from "@/types/websocket";
 
 /** A binding as substitution sees it. Environment variables carry `secret`;
  * a plain KeyValue is treated as not secret. */
@@ -90,6 +91,37 @@ export function substituteRequestInput(
     body: substituteBody(input.body, map),
     auth: substituteAuth(input.auth, map),
   };
+}
+
+/**
+ * The WebSocket counterpart of substituteRequestInput: the URL and every
+ * handshake header, by the same rules. Settings hold nothing typed as text
+ * except the proxy, which the HTTP path does not substitute either.
+ */
+export function substituteWebSocketRequest(
+  request: WebSocketRequest,
+  variables: readonly VariableBinding[],
+  options: SubstituteOptions = {},
+): WebSocketRequest {
+  const map = variableMap(variables, options);
+  if (map.size === 0) {
+    return request;
+  }
+  return {
+    ...request,
+    url: substitute(request.url, map),
+    headers: substitutePairs(request.headers, map),
+  };
+}
+
+/** A message from the composer, substituted when it is sent rather than
+ * when it is typed, like every other field. */
+export function substituteMessage(
+  text: string,
+  variables: readonly VariableBinding[],
+  options: SubstituteOptions = {},
+): string {
+  return substitute(text, variableMap(variables, options));
 }
 
 function substitutePairs(pairs: KeyValue[], map: Map<string, string>): KeyValue[] {

@@ -14,3 +14,4 @@ pub mod history;
 pub mod openapi;
 pub mod openapi_import;
 pub mod request;
+pub mod websocket;

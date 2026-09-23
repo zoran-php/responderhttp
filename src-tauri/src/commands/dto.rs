@@ -9,14 +9,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::commands::error::ApiError;
 use crate::domain::models::{
-    ApiKeyLocation, Auth, Collection, Cookie, Environment, EnvironmentVariable, Example,
+    ApiKeyLocation, Auth, ClosedBy, Collection, Cookie, Environment, EnvironmentVariable, Example,
     ExampleSummary, Folder, HistoryEntry, HttpMethod, HttpRequest, HttpResponse,
     HttpVersionPreference, KeyValue, MultipartPart, NewHistoryEntry, RequestBody, RequestSettings,
-    ResponseBody, SavedRequest, Timing, TlsMinimum,
+    ResponseBody, SavedRequest, SavedWebSocket, Timing, TlsMinimum, TransferSizes,
+    WebSocketRequest, WebSocketSettings, WsBinaryEncoding, WsDraft, WsEvent, WsMessageFormat,
+    WsPayload,
 };
+use crate::domain::ports::HttpStreamUpdate;
 use crate::domain::secrets::SecretState;
 use crate::domain::services::collections::CollectionContents;
 use crate::domain::services::docs::DocsTarget;
+use crate::domain::sse::{SseBlock, SseBlockKind};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -472,6 +476,27 @@ pub struct TimingDto {
     pub total_ms: u64,
 }
 
+/// Mirrors TransferSizes. Bytes, not milliseconds: the UI picks the unit.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferSizesDto {
+    pub request_headers: u64,
+    pub request_body: u64,
+    pub response_headers: u64,
+    pub response_body: u64,
+}
+
+impl From<TransferSizes> for TransferSizesDto {
+    fn from(sizes: TransferSizes) -> Self {
+        Self {
+            request_headers: sizes.request_headers,
+            request_body: sizes.request_body,
+            response_headers: sizes.response_headers,
+            response_body: sizes.response_body,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpResponseDto {
@@ -479,6 +504,7 @@ pub struct HttpResponseDto {
     pub headers: Vec<KeyValueDto>,
     pub body: ResponseBodyDto,
     pub timing: TimingDto,
+    pub sizes: TransferSizesDto,
 }
 
 impl From<HttpResponse> for HttpResponseDto {
@@ -492,6 +518,7 @@ impl From<HttpResponse> for HttpResponseDto {
                 .collect(),
             body: response.body.into(),
             timing: response.timing.into(),
+            sizes: response.sizes.into(),
         }
     }
 }
@@ -646,6 +673,473 @@ impl From<SavedRequest> for SavedRequestDto {
     }
 }
 
+/// Mirrors WsMessageFormat. Mirrored in src/types/websocket.ts.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum WsMessageFormatDto {
+    Text,
+    Json,
+    Xml,
+    Html,
+    Binary,
+}
+
+impl From<WsMessageFormatDto> for WsMessageFormat {
+    fn from(dto: WsMessageFormatDto) -> Self {
+        match dto {
+            WsMessageFormatDto::Text => Self::Text,
+            WsMessageFormatDto::Json => Self::Json,
+            WsMessageFormatDto::Xml => Self::Xml,
+            WsMessageFormatDto::Html => Self::Html,
+            WsMessageFormatDto::Binary => Self::Binary,
+        }
+    }
+}
+
+impl From<WsMessageFormat> for WsMessageFormatDto {
+    fn from(format: WsMessageFormat) -> Self {
+        match format {
+            WsMessageFormat::Text => Self::Text,
+            WsMessageFormat::Json => Self::Json,
+            WsMessageFormat::Xml => Self::Xml,
+            WsMessageFormat::Html => Self::Html,
+            WsMessageFormat::Binary => Self::Binary,
+        }
+    }
+}
+
+/// Mirrors WsBinaryEncoding. Mirrored in src/types/websocket.ts.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum WsBinaryEncodingDto {
+    #[default]
+    Base64,
+    Hex,
+}
+
+impl From<WsBinaryEncodingDto> for WsBinaryEncoding {
+    fn from(dto: WsBinaryEncodingDto) -> Self {
+        match dto {
+            WsBinaryEncodingDto::Base64 => Self::Base64,
+            WsBinaryEncodingDto::Hex => Self::Hex,
+        }
+    }
+}
+
+impl From<WsBinaryEncoding> for WsBinaryEncodingDto {
+    fn from(encoding: WsBinaryEncoding) -> Self {
+        match encoding {
+            WsBinaryEncoding::Base64 => Self::Base64,
+            WsBinaryEncoding::Hex => Self::Hex,
+        }
+    }
+}
+
+/// Durations cross as whole milliseconds and sizes as a plain number of
+/// bytes, as everywhere else in this file. A JS number holds any size this
+/// app would set exactly.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebSocketSettingsDto {
+    pub verify_tls: bool,
+    pub proxy: Option<String>,
+    pub send_cookies: bool,
+    pub connect_timeout_ms: u64,
+    pub max_message_bytes: u64,
+    pub auto_reconnect: bool,
+}
+
+impl From<WebSocketSettingsDto> for WebSocketSettings {
+    fn from(dto: WebSocketSettingsDto) -> Self {
+        Self {
+            verify_tls: dto.verify_tls,
+            proxy: dto.proxy,
+            send_cookies: dto.send_cookies,
+            connect_timeout: Duration::from_millis(dto.connect_timeout_ms),
+            max_message_bytes: usize::try_from(dto.max_message_bytes).unwrap_or(usize::MAX),
+            auto_reconnect: dto.auto_reconnect,
+        }
+    }
+}
+
+impl From<WebSocketSettings> for WebSocketSettingsDto {
+    fn from(settings: WebSocketSettings) -> Self {
+        Self {
+            verify_tls: settings.verify_tls,
+            proxy: settings.proxy,
+            send_cookies: settings.send_cookies,
+            connect_timeout_ms: millis(settings.connect_timeout),
+            max_message_bytes: u64::try_from(settings.max_message_bytes).unwrap_or(u64::MAX),
+            auto_reconnect: settings.auto_reconnect,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebSocketRequestDto {
+    pub url: String,
+    pub headers: Vec<KeyValueDto>,
+    pub settings: WebSocketSettingsDto,
+}
+
+impl From<WebSocketRequestDto> for WebSocketRequest {
+    fn from(dto: WebSocketRequestDto) -> Self {
+        Self {
+            url: dto.url,
+            headers: into_pairs(dto.headers),
+            settings: dto.settings.into(),
+        }
+    }
+}
+
+impl From<WebSocketRequest> for WebSocketRequestDto {
+    fn from(request: WebSocketRequest) -> Self {
+        Self {
+            url: request.url,
+            headers: from_pairs(request.headers),
+            settings: request.settings.into(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WsDraftDto {
+    pub format: WsMessageFormatDto,
+    #[serde(default)]
+    pub binary_encoding: WsBinaryEncodingDto,
+    pub text: String,
+}
+
+impl From<WsDraftDto> for WsDraft {
+    fn from(dto: WsDraftDto) -> Self {
+        Self {
+            format: dto.format.into(),
+            binary_encoding: dto.binary_encoding.into(),
+            text: dto.text,
+        }
+    }
+}
+
+impl From<WsDraft> for WsDraftDto {
+    fn from(draft: WsDraft) -> Self {
+        Self {
+            format: draft.format.into(),
+            binary_encoding: draft.binary_encoding.into(),
+            text: draft.text,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedWebSocketDto {
+    pub id: String,
+    pub collection_id: String,
+    pub folder_id: Option<String>,
+    pub name: String,
+    pub request: WebSocketRequestDto,
+    pub draft: WsDraftDto,
+}
+
+impl From<SavedWebSocket> for SavedWebSocketDto {
+    fn from(saved: SavedWebSocket) -> Self {
+        Self {
+            id: saved.id,
+            collection_id: saved.collection_id,
+            folder_id: saved.folder_id,
+            name: saved.name,
+            request: saved.request.into(),
+            draft: saved.draft.into(),
+        }
+    }
+}
+
+/// Grouped, as SaveExampleInput is, rather than six loose command parameters.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveWebSocketInput {
+    /// None saves a new WebSocket request; an existing id overwrites it.
+    pub id: Option<String>,
+    pub collection_id: String,
+    pub folder_id: Option<String>,
+    pub name: String,
+    pub request: WebSocketRequestDto,
+    pub draft: WsDraftDto,
+}
+
+/// Mirrors SseBlock: one block of a `text/event-stream` response
+/// (PLAN-SSE.md). Mirrored in src/types/http.ts.
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum SseBlockDto {
+    #[serde(rename_all = "camelCase")]
+    Event {
+        name: String,
+        data: String,
+        id: Option<String>,
+        /// Milliseconds. Shown, not acted on: this app does not reconnect.
+        retry: Option<u64>,
+        raw: String,
+    },
+    #[serde(rename_all = "camelCase")]
+    Comment { text: String, raw: String },
+}
+
+impl From<SseBlock> for SseBlockDto {
+    fn from(block: SseBlock) -> Self {
+        let raw = block.raw;
+        match block.kind {
+            SseBlockKind::Event {
+                name,
+                data,
+                id,
+                retry,
+            } => Self::Event {
+                name,
+                data,
+                id,
+                retry,
+                raw,
+            },
+            SseBlockKind::Comment { text } => Self::Comment { text, raw },
+        }
+    }
+}
+
+/// Mirrors HttpStreamUpdate: what a request reports before it finishes.
+/// Tagged on `type`, as WsEventDto is, because the block inside uses `kind`.
+#[derive(Debug, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum HttpStreamEventDto {
+    #[serde(rename_all = "camelCase")]
+    Headers {
+        status: u16,
+        headers: Vec<KeyValueDto>,
+        /// The header block's size, so the running total has both halves.
+        bytes: u64,
+    },
+    #[serde(rename_all = "camelCase")]
+    Block {
+        at_ms: u64,
+        /// The block's own bytes on the wire. Counted here because `raw` is
+        /// UTF-8 and JavaScript's `length` counts UTF-16 units, which would
+        /// undercount every multi-byte character the stream carries.
+        bytes: usize,
+        block: SseBlockDto,
+    },
+}
+
+impl From<HttpStreamUpdate> for HttpStreamEventDto {
+    fn from(update: HttpStreamUpdate) -> Self {
+        match update {
+            HttpStreamUpdate::Headers {
+                status,
+                headers,
+                bytes,
+            } => Self::Headers {
+                status,
+                headers: from_pairs(headers),
+                bytes,
+            },
+            HttpStreamUpdate::Block { at_ms, block } => Self::Block {
+                at_ms,
+                bytes: block.raw.len(),
+                block: block.into(),
+            },
+        }
+    }
+}
+
+/// Mirrors WsPayload, both ways: what the composer sends and what the log
+/// shows. Binary crosses as hex because the UI shows it as hex anyway, and
+/// a JSON array of numbers would be almost twice the size.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum WsPayloadDto {
+    Text { text: String },
+    Binary { hex: String },
+}
+
+impl TryFrom<WsPayloadDto> for WsPayload {
+    type Error = ApiError;
+
+    fn try_from(dto: WsPayloadDto) -> Result<Self, Self::Error> {
+        match dto {
+            WsPayloadDto::Text { text } => Ok(Self::Text(text)),
+            WsPayloadDto::Binary { hex } => decode_hex(&hex)
+                .map(Self::Binary)
+                .map_err(|message| ApiError::InvalidRequest { message }),
+        }
+    }
+}
+
+impl From<WsPayload> for WsPayloadDto {
+    fn from(payload: WsPayload) -> Self {
+        match payload {
+            WsPayload::Text(text) => Self::Text { text },
+            WsPayload::Binary(bytes) => Self::Binary {
+                hex: encode_hex(&bytes),
+            },
+        }
+    }
+}
+
+/// Lowercase, no separators: the one spelling both sides agree on.
+fn encode_hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut hex = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        hex.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        hex.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
+    hex
+}
+
+/// Strict: pairs of hex digits and nothing else. The composer's leniency
+/// (spaces, a `0x` prefix) is the frontend's to strip before it sends, so
+/// that rule lives in one place.
+fn decode_hex(hex: &str) -> Result<Vec<u8>, String> {
+    if !hex.len().is_multiple_of(2) {
+        return Err("hex payload has an odd number of digits".into());
+    }
+    hex.as_bytes()
+        .chunks_exact(2)
+        .map(|pair| match (hex_digit(pair[0]), hex_digit(pair[1])) {
+            (Some(high), Some(low)) => Ok(high << 4 | low),
+            _ => Err("hex payload contains a character that is not a hex digit".into()),
+        })
+        .collect()
+}
+
+fn hex_digit(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+/// Mirrors ClosedBy.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum WsClosedByDto {
+    User,
+    Server,
+    Error,
+}
+
+impl From<ClosedBy> for WsClosedByDto {
+    fn from(by: ClosedBy) -> Self {
+        match by {
+            ClosedBy::User => Self::User,
+            ClosedBy::Server => Self::Server,
+            ClosedBy::Error => Self::Error,
+        }
+    }
+}
+
+/// Mirrors WsEvent: one message on a connection's IPC channel. Tagged on
+/// `type` rather than `kind`, because the payload inside already uses
+/// `kind`. `byteLength` is the size on the wire, which for text is not the
+/// JS string length.
+#[derive(Debug, Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum WsEventDto {
+    #[serde(rename_all = "camelCase")]
+    Connected {
+        at_ms: u64,
+        url: String,
+        status: u16,
+        headers: Vec<KeyValueDto>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Sent {
+        at_ms: u64,
+        byte_length: u64,
+        payload: WsPayloadDto,
+    },
+    #[serde(rename_all = "camelCase")]
+    Received {
+        at_ms: u64,
+        byte_length: u64,
+        payload: WsPayloadDto,
+    },
+    #[serde(rename_all = "camelCase")]
+    Closed {
+        at_ms: u64,
+        code: Option<u16>,
+        reason: String,
+        by: WsClosedByDto,
+    },
+    #[serde(rename_all = "camelCase")]
+    Error { at_ms: u64, message: String },
+    #[serde(rename_all = "camelCase")]
+    Reconnecting {
+        at_ms: u64,
+        attempt: u32,
+        max_attempts: u32,
+        delay_ms: u64,
+    },
+}
+
+fn byte_length(payload: &WsPayload) -> u64 {
+    u64::try_from(payload.byte_length()).unwrap_or(u64::MAX)
+}
+
+impl From<WsEvent> for WsEventDto {
+    fn from(event: WsEvent) -> Self {
+        match event {
+            WsEvent::Connected {
+                at_ms,
+                url,
+                status,
+                headers,
+            } => Self::Connected {
+                at_ms,
+                url,
+                status,
+                headers: from_pairs(headers),
+            },
+            WsEvent::Sent { at_ms, payload } => Self::Sent {
+                at_ms,
+                byte_length: byte_length(&payload),
+                payload: payload.into(),
+            },
+            WsEvent::Received { at_ms, payload } => Self::Received {
+                at_ms,
+                byte_length: byte_length(&payload),
+                payload: payload.into(),
+            },
+            WsEvent::Closed {
+                at_ms,
+                code,
+                reason,
+                by,
+            } => Self::Closed {
+                at_ms,
+                code,
+                reason,
+                by: by.into(),
+            },
+            WsEvent::Error { at_ms, message } => Self::Error { at_ms, message },
+            WsEvent::Reconnecting {
+                at_ms,
+                attempt,
+                max_attempts,
+                delay,
+            } => Self::Reconnecting {
+                at_ms,
+                attempt,
+                max_attempts,
+                delay_ms: millis(delay),
+            },
+        }
+    }
+}
+
 /// One collection plus its contents — what the sidebar renders in one go.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -654,6 +1148,7 @@ pub struct CollectionContentsDto {
     pub requests: Vec<SavedRequestDto>,
     /// Summaries only — see CollectionContents.
     pub examples: Vec<ExampleSummaryDto>,
+    pub web_sockets: Vec<SavedWebSocketDto>,
 }
 
 impl From<CollectionContents> for CollectionContentsDto {
@@ -669,6 +1164,11 @@ impl From<CollectionContents> for CollectionContentsDto {
                 .examples
                 .into_iter()
                 .map(ExampleSummaryDto::from)
+                .collect(),
+            web_sockets: contents
+                .web_sockets
+                .into_iter()
+                .map(SavedWebSocketDto::from)
                 .collect(),
         }
     }
@@ -835,6 +1335,282 @@ impl From<DocsTargetKind> for DocsTarget {
             DocsTargetKind::Collection => Self::Collection,
             DocsTargetKind::Folder => Self::Folder,
             DocsTargetKind::Request => Self::Request,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// src/types/websocket.ts mirrors these names exactly. A rename here
+    /// that is not made there fails silently at runtime, so the keys the
+    /// frontend reads are pinned.
+    #[test]
+    fn a_saved_web_socket_crosses_the_boundary_in_camel_case() {
+        let dto = SavedWebSocketDto::from(SavedWebSocket {
+            id: "req_1".into(),
+            collection_id: "col_1".into(),
+            folder_id: None,
+            name: "Echo".into(),
+            request: WebSocketRequest {
+                url: "wss://echo.websocket.org".into(),
+                headers: vec![KeyValue::new("X-Trace", "1")],
+                settings: WebSocketSettings::default(),
+            },
+            draft: WsDraft {
+                format: WsMessageFormat::Binary,
+                binary_encoding: WsBinaryEncoding::Hex,
+                text: "de ad".into(),
+            },
+        });
+
+        let json = serde_json::to_value(&dto).expect("should serialise");
+
+        assert_eq!(json["collectionId"], "col_1");
+        assert!(json["folderId"].is_null());
+        assert_eq!(json["request"]["url"], "wss://echo.websocket.org");
+        assert_eq!(json["request"]["headers"][0]["name"], "X-Trace");
+        let settings = &json["request"]["settings"];
+        assert_eq!(settings["verifyTls"], true);
+        assert_eq!(settings["sendCookies"], true);
+        assert_eq!(settings["connectTimeoutMs"], 30_000);
+        assert_eq!(settings["maxMessageBytes"], 1_048_576);
+        assert_eq!(settings["autoReconnect"], false);
+        assert_eq!(json["draft"]["format"], "binary");
+        assert_eq!(json["draft"]["binaryEncoding"], "hex");
+    }
+
+    #[test]
+    fn a_save_from_the_frontend_deserialises_into_the_domain_shape() {
+        let input: SaveWebSocketInput = serde_json::from_str(
+            r#"{
+                "id": null,
+                "collectionId": "col_1",
+                "folderId": "fld_1",
+                "name": "Echo",
+                "request": {
+                    "url": "wss://echo.websocket.org",
+                    "headers": [],
+                    "settings": {
+                        "verifyTls": true,
+                        "proxy": null,
+                        "sendCookies": false,
+                        "connectTimeoutMs": 5000,
+                        "maxMessageBytes": 4096,
+                        "autoReconnect": true
+                    }
+                },
+                "draft": { "format": "binary", "binaryEncoding": "base64", "text": "3q0=" }
+            }"#,
+        )
+        .expect("the frontend's payload should deserialise");
+
+        let request = WebSocketRequest::from(input.request);
+        let draft = WsDraft::from(input.draft);
+
+        assert_eq!(input.folder_id.as_deref(), Some("fld_1"));
+        assert!(!request.settings.send_cookies);
+        assert_eq!(
+            request.settings.connect_timeout,
+            Duration::from_millis(5000)
+        );
+        assert_eq!(request.settings.max_message_bytes, 4096);
+        assert!(request.settings.auto_reconnect);
+        assert_eq!(draft.format, WsMessageFormat::Binary);
+        assert_eq!(draft.binary_encoding, WsBinaryEncoding::Base64);
+    }
+
+    /// src/types/http.ts switches on these keys while a stream is running.
+    #[test]
+    fn a_streaming_update_crosses_the_boundary_in_camel_case() {
+        let json = |update: HttpStreamUpdate| {
+            serde_json::to_value(HttpStreamEventDto::from(update)).expect("should serialise")
+        };
+
+        let headers = json(HttpStreamUpdate::Headers {
+            status: 200,
+            headers: vec![KeyValue::new("content-type", "text/event-stream")],
+            bytes: 120,
+        });
+        assert_eq!(headers["type"], "headers");
+        assert_eq!(headers["status"], 200);
+        assert_eq!(headers["bytes"], 120);
+        assert_eq!(headers["headers"][0]["value"], "text/event-stream");
+
+        let event = json(HttpStreamUpdate::Block {
+            at_ms: 7,
+            block: SseBlock {
+                kind: SseBlockKind::Event {
+                    name: "end".into(),
+                    data: "Stream ended".into(),
+                    id: Some("42".into()),
+                    retry: Some(3000),
+                },
+                raw: "event: end\ndata: Stream ended\n".into(),
+            },
+        });
+        assert_eq!(event["type"], "block");
+        assert_eq!(event["atMs"], 7);
+        assert_eq!(event["bytes"], 30);
+        assert_eq!(event["block"]["kind"], "event");
+        assert_eq!(event["block"]["name"], "end");
+        assert_eq!(event["block"]["data"], "Stream ended");
+        assert_eq!(event["block"]["id"], "42");
+        assert_eq!(event["block"]["retry"], 3000);
+        assert_eq!(event["block"]["raw"], "event: end\ndata: Stream ended\n");
+
+        let comment = json(HttpStreamUpdate::Block {
+            at_ms: 8,
+            block: SseBlock {
+                kind: SseBlockKind::Comment {
+                    text: "keep-alive".into(),
+                },
+                raw: ": keep-alive\n".into(),
+            },
+        });
+        assert_eq!(comment["block"]["kind"], "comment");
+        assert_eq!(comment["block"]["text"], "keep-alive");
+        assert!(comment["block"]["name"].is_null());
+    }
+
+    /// The spellings src/types/websocket.ts sends, and the fallback for a
+    /// draft that predates the binary encoding.
+    #[test]
+    fn every_message_format_and_encoding_has_its_frontend_spelling() {
+        for (wire, format) in [
+            ("text", WsMessageFormat::Text),
+            ("json", WsMessageFormat::Json),
+            ("xml", WsMessageFormat::Xml),
+            ("html", WsMessageFormat::Html),
+            ("binary", WsMessageFormat::Binary),
+        ] {
+            let dto: WsMessageFormatDto =
+                serde_json::from_value(serde_json::json!(wire)).expect("should parse");
+            assert_eq!(WsMessageFormat::from(dto), format);
+        }
+        let draft: WsDraftDto = serde_json::from_str(r#"{ "format": "xml", "text": "<a/>" }"#)
+            .expect("a draft without binaryEncoding should parse");
+        assert_eq!(
+            WsDraft::from(draft).binary_encoding,
+            WsBinaryEncoding::Base64
+        );
+    }
+
+    /// src/types/websocket.ts switches on `type` and reads these keys. Every
+    /// variant is pinned, because a rename that misses the frontend drops
+    /// events silently instead of failing.
+    #[test]
+    fn every_websocket_event_crosses_the_boundary_in_camel_case() {
+        let json = |event: WsEvent| {
+            serde_json::to_value(WsEventDto::from(event)).expect("should serialise")
+        };
+
+        let connected = json(WsEvent::Connected {
+            at_ms: 1,
+            url: "wss://a.test/".into(),
+            status: 101,
+            headers: vec![KeyValue::new("Upgrade", "websocket")],
+        });
+        assert_eq!(connected["type"], "connected");
+        assert_eq!(connected["atMs"], 1);
+        assert_eq!(connected["status"], 101);
+        assert_eq!(connected["headers"][0]["name"], "Upgrade");
+
+        let sent = json(WsEvent::Sent {
+            at_ms: 2,
+            payload: WsPayload::Text("é".into()),
+        });
+        assert_eq!(sent["type"], "sent");
+        assert_eq!(sent["byteLength"], 2);
+        assert_eq!(sent["payload"]["kind"], "text");
+        assert_eq!(sent["payload"]["text"], "é");
+
+        let received = json(WsEvent::Received {
+            at_ms: 3,
+            payload: WsPayload::Binary(vec![0xde, 0xad, 0x0f]),
+        });
+        assert_eq!(received["type"], "received");
+        assert_eq!(received["byteLength"], 3);
+        assert_eq!(received["payload"]["kind"], "binary");
+        assert_eq!(received["payload"]["hex"], "dead0f");
+
+        let closed = json(WsEvent::Closed {
+            at_ms: 4,
+            code: Some(1000),
+            reason: "bye".into(),
+            by: ClosedBy::Server,
+        });
+        assert_eq!(closed["type"], "closed");
+        assert_eq!(closed["code"], 1000);
+        assert_eq!(closed["reason"], "bye");
+        assert_eq!(closed["by"], "server");
+        let no_code = json(WsEvent::Closed {
+            at_ms: 4,
+            code: None,
+            reason: String::new(),
+            by: ClosedBy::Error,
+        });
+        assert!(no_code["code"].is_null());
+        assert_eq!(no_code["by"], "error");
+
+        let error = json(WsEvent::Error {
+            at_ms: 5,
+            message: "boom".into(),
+        });
+        assert_eq!(error["type"], "error");
+        assert_eq!(error["message"], "boom");
+
+        let reconnecting = json(WsEvent::Reconnecting {
+            at_ms: 6,
+            attempt: 2,
+            max_attempts: 10,
+            delay: Duration::from_secs(2),
+        });
+        assert_eq!(reconnecting["type"], "reconnecting");
+        assert_eq!(reconnecting["maxAttempts"], 10);
+        assert_eq!(reconnecting["delayMs"], 2000);
+    }
+
+    #[test]
+    fn an_outgoing_message_from_the_composer_deserialises() {
+        let text: WsPayloadDto =
+            serde_json::from_str(r#"{ "kind": "text", "text": "hi" }"#).expect("text");
+        let binary: WsPayloadDto =
+            serde_json::from_str(r#"{ "kind": "binary", "hex": "DEad" }"#).expect("binary");
+
+        assert_eq!(
+            WsPayload::try_from(text).ok(),
+            Some(WsPayload::Text("hi".into()))
+        );
+        assert_eq!(
+            WsPayload::try_from(binary).ok(),
+            Some(WsPayload::Binary(vec![0xde, 0xad]))
+        );
+    }
+
+    #[test]
+    fn hex_round_trips_every_byte() {
+        let bytes: Vec<u8> = (0..=255).collect();
+
+        let hex = encode_hex(&bytes);
+
+        assert_eq!(&hex[..6], "000102");
+        assert_eq!(&hex[hex.len() - 4..], "feff");
+        assert_eq!(decode_hex(&hex), Ok(bytes));
+        assert_eq!(decode_hex(""), Ok(Vec::new()));
+    }
+
+    /// Anything but bare digit pairs is the frontend's to clean up, so the
+    /// Rust side refuses it rather than guessing.
+    #[test]
+    fn malformed_hex_is_an_invalid_request() {
+        for bad in ["abc", "zz", "de ad", "0xde", "é0"] {
+            let result = WsPayload::try_from(WsPayloadDto::Binary { hex: bad.into() });
+            assert!(
+                matches!(result, Err(ApiError::InvalidRequest { .. })),
+                "{bad:?} should be refused"
+            );
         }
     }
 }

@@ -12,7 +12,8 @@ use std::path::PathBuf;
 
 use crate::domain::models::{
     ApiKeyLocation, Auth, HttpVersionPreference, KeyValue, MultipartPart, RequestBody,
-    RequestSettings, TlsMinimum,
+    RequestSettings, TlsMinimum, WebSocketSettings, WsBinaryEncoding, WsDraft, WsMessageFormat,
+    DEFAULT_WS_CONNECT_TIMEOUT, DEFAULT_WS_MAX_MESSAGE_BYTES,
 };
 use crate::domain::ports::{OpenedSecret, SecretCipher};
 use crate::domain::secrets::{
@@ -520,6 +521,154 @@ pub fn decode_settings(raw: &str) -> Result<RequestSettings, AppError> {
     })
 }
 
+/// What only a WebSocket request has, in `requests.ws_json` (migration 0010).
+/// The URL and the handshake headers are in the columns HTTP already uses.
+///
+/// Every field is defaulted, so a blob written before a field existed still
+/// loads: the column is JSON, so the defaults are the migration. The same
+/// rule as `StoredSettings`, and the same trap — a bare `#[serde(default)]` on
+/// a bool is false, which for `verify_tls` would silently turn certificate
+/// checking off. Each bool whose default is true says so explicitly.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StoredWebSocket {
+    #[serde(default)]
+    pub draft_format: StoredWsMessageFormat,
+    /// Absent before binary messages had a Base64 option. A draft stored as
+    /// `Hex` then reads as binary typed in hex, whatever this says.
+    #[serde(default)]
+    pub draft_binary_encoding: StoredWsBinaryEncoding,
+    #[serde(default)]
+    pub draft_text: String,
+    #[serde(default)]
+    pub settings: StoredWebSocketSettings,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub enum StoredWsMessageFormat {
+    #[default]
+    Text,
+    Json,
+    /// Written before XML, HTML and Base64 existed: binary typed in hex.
+    /// Still read, never written.
+    Hex,
+    Xml,
+    Html,
+    Binary,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub enum StoredWsBinaryEncoding {
+    #[default]
+    Base64,
+    Hex,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StoredWebSocketSettings {
+    #[serde(default = "enabled")]
+    pub verify_tls: bool,
+    #[serde(default)]
+    pub proxy: Option<String>,
+    #[serde(default = "enabled")]
+    pub send_cookies: bool,
+    #[serde(default = "default_ws_connect_timeout_ms")]
+    pub connect_timeout_ms: u64,
+    #[serde(default = "default_ws_max_message_bytes")]
+    pub max_message_bytes: u64,
+    #[serde(default)]
+    pub auto_reconnect: bool,
+}
+
+/// A whole missing `settings` object gets the same values a new request
+/// does, from the one place those are decided (`WebSocketSettings::default`).
+impl Default for StoredWebSocketSettings {
+    fn default() -> Self {
+        stored_ws_settings(&WebSocketSettings::default())
+    }
+}
+
+fn default_ws_connect_timeout_ms() -> u64 {
+    millis_u64(DEFAULT_WS_CONNECT_TIMEOUT)
+}
+
+fn default_ws_max_message_bytes() -> u64 {
+    u64::try_from(DEFAULT_WS_MAX_MESSAGE_BYTES).unwrap_or(u64::MAX)
+}
+
+fn millis_u64(duration: std::time::Duration) -> u64 {
+    u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
+}
+
+fn stored_ws_settings(settings: &WebSocketSettings) -> StoredWebSocketSettings {
+    StoredWebSocketSettings {
+        verify_tls: settings.verify_tls,
+        proxy: settings.proxy.clone(),
+        send_cookies: settings.send_cookies,
+        connect_timeout_ms: millis_u64(settings.connect_timeout),
+        max_message_bytes: u64::try_from(settings.max_message_bytes).unwrap_or(u64::MAX),
+        auto_reconnect: settings.auto_reconnect,
+    }
+}
+
+pub fn encode_web_socket(
+    settings: &WebSocketSettings,
+    draft: &WsDraft,
+) -> Result<String, AppError> {
+    to_json(&StoredWebSocket {
+        draft_format: match draft.format {
+            WsMessageFormat::Text => StoredWsMessageFormat::Text,
+            WsMessageFormat::Json => StoredWsMessageFormat::Json,
+            WsMessageFormat::Xml => StoredWsMessageFormat::Xml,
+            WsMessageFormat::Html => StoredWsMessageFormat::Html,
+            WsMessageFormat::Binary => StoredWsMessageFormat::Binary,
+        },
+        draft_binary_encoding: match draft.binary_encoding {
+            WsBinaryEncoding::Base64 => StoredWsBinaryEncoding::Base64,
+            WsBinaryEncoding::Hex => StoredWsBinaryEncoding::Hex,
+        },
+        draft_text: draft.text.clone(),
+        settings: stored_ws_settings(settings),
+    })
+}
+
+/// An empty column is what an HTTP row holds; read as all defaults rather
+/// than refused, so a row whose kind and blob disagree still opens.
+pub fn decode_web_socket(raw: &str) -> Result<(WebSocketSettings, WsDraft), AppError> {
+    let stored: StoredWebSocket = if raw.trim().is_empty() {
+        from_json("{}")?
+    } else {
+        from_json(raw)?
+    };
+    let settings = stored.settings;
+    let stored_encoding = match stored.draft_binary_encoding {
+        StoredWsBinaryEncoding::Base64 => WsBinaryEncoding::Base64,
+        StoredWsBinaryEncoding::Hex => WsBinaryEncoding::Hex,
+    };
+    let (format, binary_encoding) = match stored.draft_format {
+        StoredWsMessageFormat::Text => (WsMessageFormat::Text, stored_encoding),
+        StoredWsMessageFormat::Json => (WsMessageFormat::Json, stored_encoding),
+        StoredWsMessageFormat::Xml => (WsMessageFormat::Xml, stored_encoding),
+        StoredWsMessageFormat::Html => (WsMessageFormat::Html, stored_encoding),
+        StoredWsMessageFormat::Binary => (WsMessageFormat::Binary, stored_encoding),
+        StoredWsMessageFormat::Hex => (WsMessageFormat::Binary, WsBinaryEncoding::Hex),
+    };
+    Ok((
+        WebSocketSettings {
+            verify_tls: settings.verify_tls,
+            proxy: settings.proxy,
+            send_cookies: settings.send_cookies,
+            connect_timeout: std::time::Duration::from_millis(settings.connect_timeout_ms),
+            max_message_bytes: usize::try_from(settings.max_message_bytes).unwrap_or(usize::MAX),
+            auto_reconnect: settings.auto_reconnect,
+        },
+        WsDraft {
+            format,
+            binary_encoding,
+            text: stored.draft_text,
+        },
+    ))
+}
+
 fn to_stored(pairs: &[KeyValue]) -> Vec<StoredKeyValue> {
     pairs
         .iter()
@@ -614,6 +763,103 @@ mod tests {
         let decoded = decode_settings(&encoded).expect("should decode");
 
         assert_eq!(decoded, original);
+    }
+
+    /// A WebSocket blob with every field away from its default survives the
+    /// trip, draft text in a script other than Latin included.
+    #[test]
+    fn a_web_socket_blob_round_trips_with_every_field_set() {
+        let settings = WebSocketSettings {
+            verify_tls: false,
+            proxy: Some("http://127.0.0.1:8080".into()),
+            send_cookies: false,
+            connect_timeout: std::time::Duration::from_millis(2500),
+            max_message_bytes: 4096,
+            auto_reconnect: true,
+        };
+        let draft = WsDraft {
+            format: WsMessageFormat::Binary,
+            binary_encoding: WsBinaryEncoding::Hex,
+            text: "de ad be ef — Ђорђе".into(),
+        };
+
+        let encoded = encode_web_socket(&settings, &draft).expect("should encode");
+        let (decoded_settings, decoded_draft) = decode_web_socket(&encoded).expect("should decode");
+
+        assert_eq!(decoded_settings, settings);
+        assert_eq!(decoded_draft, draft);
+    }
+
+    /// The trap StoredSettings already fell into once: a bool that is
+    /// missing from an older blob must come back as its real default. For
+    /// `verify_tls` the wrong answer is certificate checking switched off.
+    #[test]
+    fn a_web_socket_blob_missing_its_settings_keys_gets_the_defaults_a_new_request_gets() {
+        let (settings, draft) =
+            decode_web_socket(r#"{"draft_text":"hi","settings":{}}"#).expect("should decode");
+
+        assert_eq!(settings, WebSocketSettings::default());
+        assert!(settings.verify_tls);
+        assert!(settings.send_cookies);
+        assert_eq!(draft.format, WsMessageFormat::Text);
+        assert_eq!(draft.binary_encoding, WsBinaryEncoding::Base64);
+        assert_eq!(draft.text, "hi");
+    }
+
+    /// A draft saved when the only binary option was "Hex" opens as binary
+    /// typed in hex, not as something else or not at all.
+    #[test]
+    fn a_draft_saved_as_hex_opens_as_binary_in_hex() {
+        let (_, draft) = decode_web_socket(r#"{"draft_format":"Hex","draft_text":"de ad"}"#)
+            .expect("a hex draft should decode");
+
+        assert_eq!(draft.format, WsMessageFormat::Binary);
+        assert_eq!(draft.binary_encoding, WsBinaryEncoding::Hex);
+        assert_eq!(draft.text, "de ad");
+    }
+
+    #[test]
+    fn every_format_and_encoding_round_trips() {
+        let formats = [
+            WsMessageFormat::Text,
+            WsMessageFormat::Json,
+            WsMessageFormat::Xml,
+            WsMessageFormat::Html,
+            WsMessageFormat::Binary,
+        ];
+        for format in formats {
+            for binary_encoding in [WsBinaryEncoding::Base64, WsBinaryEncoding::Hex] {
+                let draft = WsDraft {
+                    format,
+                    binary_encoding,
+                    text: "x".into(),
+                };
+                let encoded = encode_web_socket(&WebSocketSettings::default(), &draft)
+                    .expect("should encode");
+
+                // The legacy spelling is read, never written.
+                assert!(!encoded.contains(r#""draft_format":"Hex""#));
+                assert_eq!(decode_web_socket(&encoded).expect("should decode").1, draft);
+            }
+        }
+    }
+
+    #[test]
+    fn a_web_socket_blob_with_no_settings_object_at_all_still_loads() {
+        let (settings, draft) =
+            decode_web_socket(r#"{"draft_format":"Json"}"#).expect("an older blob should decode");
+
+        assert_eq!(settings, WebSocketSettings::default());
+        assert_eq!(draft.format, WsMessageFormat::Json);
+        assert_eq!(draft.text, "");
+    }
+
+    #[test]
+    fn an_empty_web_socket_column_reads_as_all_defaults() {
+        let (settings, draft) = decode_web_socket("").expect("empty should decode");
+
+        assert_eq!(settings, WebSocketSettings::default());
+        assert_eq!(draft, WsDraft::default());
     }
 
     use crate::secrets::data_key::DataKey;

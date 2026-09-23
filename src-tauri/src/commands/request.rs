@@ -1,8 +1,11 @@
 // http_client/src-tauri/src/commands/request.rs
+use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::commands::dto::{DownloadResultDto, HttpResponseDto, KeyValueDto, SendRequestInput};
+use crate::commands::dto::{
+    DownloadResultDto, HttpResponseDto, HttpStreamEventDto, KeyValueDto, SendRequestInput,
+};
 use crate::commands::error::ApiError;
 use crate::domain::error::AppError;
 use crate::domain::models::HttpRequest;
@@ -13,19 +16,30 @@ use crate::AppState;
 ///
 /// The service call is blocking (libcurl is), so it runs on a blocking task
 /// rather than on the thread driving the webview.
+///
+/// `on_event` carries what arrives before the response is complete: the
+/// status and headers, and, for a `text/event-stream` response, every block
+/// as it is parsed (PLAN-SSE.md). The promise still resolves with the whole
+/// response, so history, saved responses and the rest are unchanged. A
+/// failed `send` on the channel means the webview is gone, which ends the
+/// transfer rather than letting it run unseen.
 #[tauri::command]
 pub async fn send_request(
     state: State<'_, AppState>,
     request_id: String,
     request: SendRequestInput,
+    on_event: Channel<HttpStreamEventDto>,
 ) -> Result<HttpResponseDto, ApiError> {
     let service = state.send_request.clone();
     let domain_request = HttpRequest::try_from(request)?;
 
-    let response =
-        tauri::async_runtime::spawn_blocking(move || service.execute(request_id, domain_request))
-            .await
-            .map_err(|_| ApiError::internal("request task failed to complete"))??;
+    let response = tauri::async_runtime::spawn_blocking(move || {
+        service.execute_streaming(request_id, domain_request, &mut |update| {
+            on_event.send(HttpStreamEventDto::from(update)).is_ok()
+        })
+    })
+    .await
+    .map_err(|_| ApiError::internal("request task failed to complete"))??;
 
     Ok(response.into())
 }

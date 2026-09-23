@@ -10,3 +10,4 @@ pub mod openapi_import;
 pub mod send_request;
 pub mod tray_notice;
 pub mod validation;
+pub mod websocket;

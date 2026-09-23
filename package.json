@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
-    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-log": "^2.9.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",

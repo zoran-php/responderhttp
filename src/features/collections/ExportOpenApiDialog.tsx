@@ -3,11 +3,16 @@
 // "Export as OpenAPI" for one collection.
 //
 // Local state only: an export writes a file and changes nothing the rest of
-// the app displays, so there is no store for it (CLAUDE.md section 6).
-import { useState } from "react";
+// the app displays, so there is no store for it (CLAUDE.md section 6). The
+// collection's contents are read from the collections store, only to count
+// the WebSocket requests the export leaves out.
+import { useEffect, useState } from "react";
+import { Info } from "lucide-react";
 
 import { Modal } from "@/components/Modal";
+import { webSocketOmissionNotice } from "@/lib/openapi-export";
 import { exportCollectionOpenApi } from "@/services/openapi";
+import { useCollectionsStore } from "@/store/collections-store";
 import type { ApiError } from "@/types/http";
 import {
   DEFAULT_EXPORT_FORMAT,
@@ -41,6 +46,17 @@ export function ExportOpenApiDialog({
   const [error, setError] = useState<ApiError | null>(null);
   const [notes, setNotes] = useState<string[] | null>(null);
   const [savedTo, setSavedTo] = useState<string | null>(null);
+
+  // Fetched on open: a collection that was never expanded in the sidebar has
+  // no contents loaded yet, and the count must not read as zero because of it.
+  const refreshContents = useCollectionsStore((state) => state.refreshContents);
+  const webSocketCount = useCollectionsStore(
+    (state) => state.contentsById[collectionId]?.webSockets.length ?? 0,
+  );
+  useEffect(() => {
+    void refreshContents(collectionId);
+  }, [collectionId, refreshContents]);
+  const omissionNotice = webSocketOmissionNotice(webSocketCount);
 
   async function handleExport() {
     setBusy(true);
@@ -106,6 +122,13 @@ export function ExportOpenApiDialog({
               <code className="rounded bg-muted px-1">{"{{variables}}"}</code> become templated
               paths; everything else is exported literally.
             </p>
+
+            {omissionNotice !== null && (
+              <p className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs">
+                <Info aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                <span role="note">{omissionNotice}</span>
+              </p>
+            )}
 
             <label className="block">
               <span className="mb-1 block text-muted-foreground">OpenAPI version</span>
