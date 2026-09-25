@@ -19,8 +19,8 @@ pub fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 }
 
 /// Closing the main window hides it to the tray instead of exiting.
-/// The tray "Quit" item is the only way out, via `AppHandle::exit`, which
-/// does not go through `CloseRequested`.
+/// The way out is Quit — in the tray menu or under File in the menu bar —
+/// via `AppHandle::exit`, which does not go through `CloseRequested`.
 ///
 /// The first closes also raise a toast saying so, because a window that
 /// vanishes on X looks like a quit (desktop/toast.rs). Whether to show it is

@@ -87,6 +87,8 @@ Strict three-layer separation. **Business logic never lives in a React component
 │   │   ├── lib.rs                # bootstrap, plugin registration, DI wiring
 │   │   ├── commands/             # #[tauri::command] adapters, grouped by feature
 │   │   ├── desktop/              # shell only: tray, window lifecycle, single instance — no domain logic
+│   │   │   ├── menu.rs           # menu bar: File > Quit, Help > Privacy Policy / Terms / About
+│   │   │   ├── notices.rs        # About / Privacy / Terms dialog text — no links, fits a message box
 │   │   │   ├── tray.rs           # tray icon + Show/Quit menu
 │   │   │   ├── window.rs         # show/focus main window, close-to-tray
 │   │   │   └── startup_error.rs  # dialog when the database cannot be opened

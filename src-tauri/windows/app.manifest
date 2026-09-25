@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Application manifest embedded into ResponderHTTP.exe by build.rs.
+
+  It replaces tauri-build's default, which declares only the Common Controls
+  v6 dependency. That dependency is kept: rfd's native dialogs
+  (common-controls-v6 feature) need it.
+
+  The DPI block is why this file exists. tao already makes the process
+  per-monitor-v2 aware at runtime, so the app has always rendered sharply,
+  but the Windows App Certification Kit reads the manifest, not the runtime,
+  and warned "not DPI Aware" (PLAN.md Phase 10, WACK run 2026-09-24).
+  Declaring it here also sets awareness before any window exists, which is
+  what Microsoft recommends. tao's own call then fails harmlessly with
+  ERROR_ACCESS_DENIED, and it ignores that error.
+
+  dpiAware is the pre-Windows 10 1607 fallback; dpiAwareness wins wherever it
+  is understood.
+
+  The compatibility block declares Windows 10/11 support. Without it Windows
+  runs the exe with its Windows 8 compatibility shims, and GetVersionEx
+  reports 6.2. Nothing in the app depends on that today; it is declared so
+  that nothing added later can be misled by it.
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+    </windowsSettings>
+  </application>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 and Windows 11 share this GUID. -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+    </application>
+  </compatibility>
+</assembly>

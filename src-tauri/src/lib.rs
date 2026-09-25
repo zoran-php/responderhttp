@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 use tauri::Manager;
 
-use crate::desktop::{startup_error, toast, tray, webview, window};
+use crate::desktop::{menu, startup_error, toast, tray, webview, window};
 use crate::domain::ports::{CookieRepository, HttpClient};
 use crate::domain::services::collections::Collections;
 use crate::domain::services::cookies::Cookies;
@@ -298,6 +298,11 @@ pub fn run() -> Result<(), StartupError> {
             tray::build_tray(app)?;
             Ok(())
         })
+        // Set on the builder rather than in setup: Tauri creates the window
+        // from tauri.conf.json before the setup hook runs (see webview.rs),
+        // and a menu given here is in place by then (desktop/menu.rs).
+        .menu(menu::build_menu)
+        .on_menu_event(menu::handle_menu_event)
         .on_window_event(window::hide_main_window_on_close)
         .invoke_handler(tauri::generate_handler![
             commands::request::send_request,

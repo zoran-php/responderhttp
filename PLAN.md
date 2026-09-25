@@ -4714,6 +4714,41 @@ The full plan, decisions and per-step build notes are in `PLAN-SSE.md`. This is 
 
 ---
 
+## Phase 15 — Native menu bar — **built 2026-09-24, not yet verified on Windows**
+
+File > Quit, and Help > Privacy Policy, Terms and Conditions, About. Rust only (`desktop/menu.rs`, `desktop/notices.rs`); no command, no frontend change, no new dependency.
+
+- Dialogs are native message boxes through `tauri-plugin-dialog`, already linked. Non-blocking `show`, because menu events arrive on the main thread; parented to the main window.
+- The texts are condensed from `store/privacy-policy.md` and `docs/terms.html`, which stay the full versions — change them together. They carry **no links** of any kind (the contact address is plain text) and stay under 2 000 characters, because a message box does not scroll. Both are pinned by tests.
+- Menu ids are prefixed `app-menu:`: Tauri delivers every menu event to every handler, the tray's included, and the tray already owns `quit`.
+- File > Quit calls `AppHandle::exit`, like the tray's Quit; closing the window still hides to the tray.
+- The menu is set on the builder, not in `setup`, so the window created from `tauri.conf.json` has it from the start.
+
+### To check by hand on Windows
+
+- The menu bar appears on first launch, and after hiding to the tray and showing again.
+- Each Help item opens its box, the box is modal to the window, and the Terms box fits a 1366×768 screen.
+- File > Quit ends the process (Task Manager), with no close-to-tray toast.
+
+## Windows App Certification Kit — run 2026-09-24
+
+WACK 10.0.28000 on the 1.0.0.0 MSIX, Windows 11 Pro 26200: overall **WARNING**, every required test passed. Two findings.
+
+**DPIAwarenessValidation (required, warning) — fixed 2026-09-24, re-run pending.** The embedded manifest was tauri-build's default, which declares only Common Controls v6. The app *is* per-monitor-v2 aware — tao calls `SetProcessDpiAwarenessContext` at startup — but WACK reads the manifest, not the runtime. `src-tauri/windows/app.manifest` now carries the Common Controls dependency plus `dpiAware true/pm` and `dpiAwareness PerMonitorV2, PerMonitor`, embedded by `build.rs` through `WindowsAttributes::app_manifest`. tao's runtime call then fails with `ERROR_ACCESS_DENIED`, which it ignores.
+
+The same manifest declares Windows 10/11 in a `compatibility` block (`supportedOS {8e0f7a12-…}`), added 2026-09-24. Without it Windows applies its Windows 8 compatibility shims and `GetVersionEx` reports 6.2. Nothing depends on that today; it is there so nothing added later is misled.
+
+**Re-run 2026-09-24, 22:16 — DPI warning unchanged, accepted.** The installed exe was confirmed to be the new build (SHA-256 `FC911C26…2BD2FEC6`, identical to `msix-stage/ResponderHTTP.exe`), and its embedded manifest carries `dpiAwareness PerMonitorV2`. WACK still reports "Failed to process the binary … is not DPI Aware": the test could not read the exe at all, so the verdict is not about its contents. Microsoft Q&A has the same message from apps that do declare PerMonitorV2, with no fix offered beyond a certification support ticket. The app is PerMonitorV2-aware in two ways — the manifest and tao's runtime `SetProcessDpiAwarenessContext` — and the result is a warning, not a failure, so the package is submitted as is. If Store certification raises it, answer with those two facts.
+
+**Blocked executables (optional, fail) — accepted, no change.** It is a string scan of the binary, and nothing in it is a process this app launches. Our code has no `std::process::Command` (CLAUDE.md §11 rule 1 holds):
+
+- `CreateProcessW` and `cmd.exe /e:ON /v:OFF /d /c` are Rust std's `Command` implementation, linked in by dependencies.
+- `ShellExecuteW` is imported by the windowing stack (tao/tauri), not called by us.
+- `\WindowsPowerShell\v1.0\powershell.exe` is the text of `Toast::POWERSHELL_APP_ID`, the AUMID that `desktop/toast.rs` falls back to in the unpackaged build. It is an identifier string; nothing is executed.
+- `basH`, `CDb`, `Reg`, `dnx`, `cmd` are case-insensitive substring hits in unrelated data.
+
+The test is optional, and a `runFullTrust` desktop app is allowed to use these APIs, so it does not block submission.
+
 ## Open decisions to confirm before the relevant phase starts
 
 - ~~Phase 5: variable resolution order if more than one tier (environment vs. global) is wanted.~~ Settled 2026-09-14: environments only, no global tier.
