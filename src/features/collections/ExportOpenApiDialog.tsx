@@ -5,12 +5,12 @@
 // Local state only: an export writes a file and changes nothing the rest of
 // the app displays, so there is no store for it (CLAUDE.md section 6). The
 // collection's contents are read from the collections store, only to count
-// the WebSocket requests the export leaves out.
+// the WebSocket and gRPC requests the export leaves out.
 import { useEffect, useState } from "react";
 import { Info } from "lucide-react";
 
 import { Modal } from "@/components/Modal";
-import { webSocketOmissionNotice } from "@/lib/openapi-export";
+import { nonHttpOmissionNotice } from "@/lib/openapi-export";
 import { exportCollectionOpenApi } from "@/services/openapi";
 import { useCollectionsStore } from "@/store/collections-store";
 import type { ApiError } from "@/types/http";
@@ -53,10 +53,13 @@ export function ExportOpenApiDialog({
   const webSocketCount = useCollectionsStore(
     (state) => state.contentsById[collectionId]?.webSockets.length ?? 0,
   );
+  const grpcCount = useCollectionsStore(
+    (state) => state.contentsById[collectionId]?.grpcRequests.length ?? 0,
+  );
   useEffect(() => {
     void refreshContents(collectionId);
   }, [collectionId, refreshContents]);
-  const omissionNotice = webSocketOmissionNotice(webSocketCount);
+  const omissionNotice = nonHttpOmissionNotice(webSocketCount, grpcCount);
 
   async function handleExport() {
     setBusy(true);

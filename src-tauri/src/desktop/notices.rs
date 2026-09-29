@@ -32,7 +32,7 @@ pub fn about_message(version: &str) -> String {
     format!(
         "{APP_NAME}\n\
          Version {version}\n\n\
-         A desktop API client for HTTP, WebSocket and server-sent events. \
+         A desktop API client for HTTP, WebSocket, gRPC and server-sent events. \
          Requests run through libcurl built into the app, so nothing else \
          needs to be installed.\n\n\
          Author: {AUTHOR}\n\n\
@@ -42,25 +42,25 @@ pub fn about_message(version: &str) -> String {
     )
 }
 
-pub const PRIVACY_TEXT: &str = "Last updated: 23 September 2026
+pub const PRIVACY_TEXT: &str = "Last updated: 28 September 2026
 
 The developer collects nothing. ResponderHTTP has no analytics, no telemetry, no crash reporting and no accounts. It does not phone home and contains no update checker.
 
-Your data stays on your computer. Saved requests and collections, their documentation, environments, history, cookies and settings are kept in a local SQLite database in your Windows user profile. Uninstalling the app removes it.
+Your data stays on your computer. Saved requests and collections, their documentation, gRPC schemas, environments, history, cookies and settings are kept in a local SQLite database in your Windows user profile. Uninstalling the app removes it.
 
 Credentials are encrypted. Passwords, bearer tokens, API keys and secret variables are never stored in plain text. They are encrypted with a key held in Windows Credential Manager, which only your Windows account can read.
 
-Requests go only where you send them. HTTP requests and WebSocket connections go directly from your computer to the address you enter, never through a service operated by the developer.
+Requests go only where you send them. HTTP requests, WebSocket connections and gRPC calls, server reflection included, go directly from your computer to the address you enter, never through a service operated by the developer.
 
-Logs stay local. The diagnostic log leaves out request bodies, authentication headers, tokens, cookies, WebSocket messages and streamed events, and it is never uploaded.
+Logs stay local. The diagnostic log leaves out request bodies, authentication headers, tokens, cookies, WebSocket and gRPC messages, gRPC metadata and streamed events, and it is never uploaded.
 
-Files. Importing an OpenAPI document or saving a response reads and writes only the file you chose.
+Files. Importing an OpenAPI document or saving a response reads and writes only the file you chose. Importing .proto files reads those files and the files they import, from their own folders and the import folders you chose.
 
 The app is a developer tool and is not directed at children.
 
 Questions about this policy: zorandavidovic@outlook.com";
 
-pub const TERMS_TEXT: &str = "Effective date: 23 September 2026
+pub const TERMS_TEXT: &str = "Effective date: 28 September 2026
 
 ResponderHTTP is published by Zoran Davidović. Use it freely, for anything, at no cost, but do not distribute a modified copy.
 
@@ -72,7 +72,7 @@ No warranty. The app is provided as is, without warranty of any kind. You are re
 
 Limitation of liability. To the fullest extent permitted by law, the author is not liable for any damages arising from the app or its use, including loss of data or profit. Rights the law does not allow to be waived are not affected.
 
-Third-party components. libcurl, SQLite, Tauri, React, the Monaco editor and the other components remain under their own licences. The Microsoft Edge WebView2 Runtime is covered by Microsoft's terms.
+Third-party components. libcurl, SQLite, Tauri, React, the Monaco editor, protox, prost-reflect and the other components remain under their own licences. The Microsoft Edge WebView2 Runtime is covered by Microsoft's terms.
 
 The full licence is the LICENSE file in the source code. Where it and this summary differ, the licence governs.
 
@@ -87,7 +87,7 @@ mod tests {
 
     fn every_text() -> [String; 3] {
         [
-            about_message("1.0.0"),
+            about_message("1.1.0"),
             PRIVACY_TEXT.to_string(),
             TERMS_TEXT.to_string(),
         ]

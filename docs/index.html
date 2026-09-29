@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ResponderHTTP — Desktop API Client for Windows</title>
-    <meta name="description" content="ResponderHTTP is a desktop API client for Windows: HTTP, WebSocket and server-sent events in one executable, with libcurl built in and everything stored locally.">
+    <meta name="description" content="ResponderHTTP is a desktop API client for Windows: HTTP, WebSocket, gRPC and server-sent events in one executable, with libcurl built in and everything stored locally.">
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -143,13 +143,13 @@
             <div class="max-w-3xl">
                 <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-themeCard border border-themeBorder text-xs text-textMuted font-mono mb-4">
                     <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                    <span>Version 1.0.0 &bull; Windows 10 &amp; 11, 64-bit</span>
+                    <span>Version 1.1.0 &bull; Windows 10 &amp; 11, 64-bit</span>
                 </div>
                 <h1 class="text-3xl sm:text-5xl font-extrabold text-textPrimary tracking-tight print-text-dark">
                     A desktop API client that ships as one file
                 </h1>
                 <p class="mt-4 text-base sm:text-lg text-textSecondary leading-relaxed print-text-muted">
-                    Send HTTP requests, open WebSocket connections, watch a server-sent event stream arrive live — and keep every collection, environment and cookie on your own machine. curl is not a dependency: libcurl is compiled into the binary.
+                    Send HTTP requests, open WebSocket connections, call gRPC services, watch a server-sent event stream arrive live — and keep every collection, environment and cookie on your own machine. curl is not a dependency: libcurl is compiled into the binary.
                 </p>
             </div>
         </div>
@@ -190,8 +190,8 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                 </div>
                 <div>
-                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">HTTP, WS and SSE</h2>
-                    <p class="text-xs text-textSecondary mt-1 leading-snug">Requests, live WebSocket sessions and streamed events in one place.</p>
+                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">HTTP, WS, gRPC and SSE</h2>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">Requests, live WebSocket sessions, gRPC calls and streamed events in one place.</p>
                 </div>
             </div>
         </div>
@@ -226,26 +226,29 @@
                         <a href="#websocket" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
                             <span class="font-mono text-xs text-brandAccent mr-2.5">07</span> WebSocket
                         </a>
+                        <a href="#grpc" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">08</span> gRPC
+                        </a>
                         <a href="#organising" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">08</span> Collections and environments
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">09</span> Collections and environments
                         </a>
                         <a href="#openapi" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">09</span> OpenAPI
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">10</span> OpenAPI
                         </a>
                         <a href="#settings" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">10</span> Per-request settings
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">11</span> Per-request settings
                         </a>
                         <a href="#shortcuts" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">11</span> Shortcuts and the tray
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">12</span> Shortcuts and the tray
                         </a>
                         <a href="#data" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">12</span> Where your data lives
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">13</span> Where your data lives
                         </a>
                         <a href="#troubleshooting" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">13</span> Troubleshooting
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">14</span> Troubleshooting
                         </a>
                         <a href="#links" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">14</span> Links and contact
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">15</span> Links and contact
                         </a>
                     </nav>
                 </div>
@@ -263,7 +266,7 @@
                         </h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">ResponderHTTP is an API client for Windows. Type a URL, choose a method, add headers, parameters, a body and authentication, and send. You get the status code, the response headers, the body with syntax highlighting, and a timing breakdown showing where the time actually went — DNS, connect, TLS, first byte, total.</p>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">It ships as a <strong class="text-textPrimary font-semibold print-text-dark">single executable</strong>. The HTTP and WebSocket engine is libcurl, compiled into the app, so there is no curl to install, no runtime to add and no system SSL library to keep up to date.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">It ships as a <strong class="text-textPrimary font-semibold print-text-dark">single executable</strong>. The HTTP, WebSocket and gRPC engine is libcurl, compiled into the app, so there is no curl to install, no runtime to add and no system SSL library to keep up to date.</p>
                     <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
@@ -282,6 +285,12 @@
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
                             <span class="print-text-dark">WebSocket — ws:// and wss:// requests saved alongside HTTP ones, with a composer and a searchable message log</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">gRPC — unary and streaming calls, with the schema from server reflection or imported .proto files, Send and End Streaming, and each call's status, metadata and trailers</span>
                         </li>
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
@@ -492,10 +501,60 @@
                     </ul>
                 </section>
 
-                <section id="organising" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                <section id="grpc" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
                             08
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            gRPC
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">gRPC requests live in the same collections as HTTP and WebSocket ones. Enter the server as <span class="font-mono text-xs">host:port</span> and set the lock: on for TLS, off for plain-text HTTP/2 (h2c). Pasting a <span class="font-mono text-xs">grpcs://</span> or <span class="font-mono text-xs">grpc://</span> address sets the lock for you. Then pick a method from the list, grouped by service, and Invoke.</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The schema</strong> — ask the server for it by reflection, or import .proto files together with the folders their imports live in. An imported schema is saved to a schema library, so a saved request keeps working after the files move</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">All four kinds of call</strong> — unary, server streaming, client streaming and bidirectional. Messages are written as JSON; <strong class="text-textPrimary font-semibold print-text-dark">Use Example Message</strong> fills in every field of the chosen method, and 64-bit numbers come back exactly as the server sent them</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Streaming</strong> — Invoke opens the call, Send adds one message at a time, End Streaming closes your side, and Cancel stops the call. Every message lands in a log with the same filter and search as WebSocket</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The response</strong> — the message, the response metadata and trailers, and the status as its code and name (<span class="font-mono text-xs">0 OK</span>, <span class="font-mono text-xs">5 NOT_FOUND</span>), with the time and size. A status other than OK is a result, shown like any other response</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Metadata and authorization</strong> work as headers do for HTTP, with <span class="font-mono text-xs">{{variables}}</span> and secret variables. <strong class="text-textPrimary font-semibold print-text-dark">Copy as grpcurl</strong> gives you the same call as a command</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Per-request settings</strong> — connect timeout, deadline, the largest response message to accept, and a proxy</span>
+                        </li>
+                    </ul>
+                </section>
+
+                <section id="organising" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            09
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             Collections and environments
@@ -539,20 +598,20 @@
                 <section id="openapi" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                            09
+                            10
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             OpenAPI
                         </h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Import a 3.0, 3.1 or 3.2 document, in JSON or YAML, as a new collection. Nothing is written until you confirm: the dialog shows how many requests and saved responses it found, lets you choose how they are grouped into folders, and offers to create an environment from the document’s servers. Descriptions come in as documentation.</p>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark ">Export a collection back out, choosing the version and JSON or YAML; request and response shapes are inferred from the examples you saved. WebSocket requests cannot be exported — the OpenAPI specification has no way to describe them, and the dialog says how many it is leaving out.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark ">Export a collection back out, choosing the version and JSON or YAML; request and response shapes are inferred from the examples you saved. WebSocket and gRPC requests cannot be exported — the OpenAPI specification has no way to describe them, and the dialog says how many it is leaving out.</p>
                 </section>
 
                 <section id="settings" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                            10
+                            11
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             Per-request settings
@@ -637,7 +696,7 @@
                 <section id="shortcuts" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                            11
+                            12
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             Shortcuts and the tray
@@ -669,7 +728,7 @@
                 <section id="data" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                            12
+                            13
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             Where your data lives
@@ -677,7 +736,7 @@
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-2">One SQLite database plus a log folder, under your user profile:</p>
                     <pre class="mt-4 overflow-x-auto rounded-xl border border-themeBorder bg-themeBg/80 p-4 font-mono text-xs text-textSecondary leading-relaxed print-text-dark">%APPDATA%\io.github.zoran-php.responderhttp\
-    responderhttp.sqlite3      collections, environments, history, cookies, settings
+    responderhttp.sqlite3      collections, environments, gRPC schemas, history, cookies, settings
     logs\                      rotating log files</pre>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mt-4 mb-4">Installed from the Microsoft Store the same files live under <span class="font-mono text-xs">%LOCALAPPDATA%\Packages\&lt;package&gt;\LocalCache\</span>, which Windows removes when the app is uninstalled.</p>
                     <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
@@ -697,7 +756,7 @@
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The log</strong> records what happened, never what was in it: bodies, auth headers, tokens, cookies, WebSocket messages and stream events are all kept out</span>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The log</strong> records what happened, never what was in it: bodies, auth headers, tokens, cookies, WebSocket and gRPC messages, gRPC metadata and stream events are all kept out</span>
                         </li>
                     </ul>
                 </section>
@@ -705,7 +764,7 @@
                 <section id="troubleshooting" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                            13
+                            14
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             Troubleshooting
@@ -723,6 +782,12 @@
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
                             <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">A request fails with a TLS error.</strong> Check the clock, the certificate chain and any corporate proxy first. Turning off Verify TLS for that one request will tell you whether that is the cause — and it should go back on</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">A gRPC call fails with “The TLS handshake failed” or “did not answer plain-text HTTP/2”.</strong> The lock does not match the server: turn it off for a plain-text (h2c) port, on for a TLS one</span>
                         </li>
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
@@ -754,7 +819,7 @@
                 <section id="links" class="scroll-mt-24 print-card bg-gradient-to-br from-themeCard to-themeBgAlt border border-brandAccentBorder rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
                     <div class="absolute -right-10 -bottom-10 w-40 h-40 rounded-full bg-brandAccent/5 blur-2xl pointer-events-none"></div>
                     <div class="flex items-center space-x-3 mb-4">
-                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">14</span>
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">15</span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">Links and contact</h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed mb-6 print-text-dark">

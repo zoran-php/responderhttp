@@ -15,7 +15,8 @@ ResponderHTTP
 
 ```
 A desktop API client that ships as one file. Send HTTP requests, open
-WebSocket connections, watch a server-sent event stream arrive live, and keep
+WebSocket connections, call gRPC services, watch a server-sent event stream
+arrive live, and keep
 your collections, environments and history on your own machine. curl is built
 in — nothing to install alongside it.
 ```
@@ -31,10 +32,13 @@ byte, total.
 
 WebSocket requests sit beside HTTP ones in the same collections: connect,
 send text, JSON, XML, HTML or binary, and read the conversation in a
-timestamped log. And when a response arrives as an event stream, it is shown
-event by event while it is still arriving rather than after it ends.
+timestamped log. gRPC requests sit there too: load a service's schema by server
+reflection or from its .proto files, pick a method, and invoke it — unary or
+streaming in either direction. And when a response arrives as an event stream,
+it is shown event by event while it is still arriving rather than after it
+ends.
 
-It ships as a single executable. The HTTP and WebSocket engine is libcurl,
+It ships as a single executable. The HTTP, WebSocket and gRPC engine is libcurl,
 compiled into the app, so there is no curl to install, no runtime to add and
 no system SSL library to keep up to date. Everything the app stores —
 collections, environments, history, cookies — lives in a local database on
@@ -53,6 +57,11 @@ WHAT IT DOES
 • WebSocket — ws:// and wss:// requests saved alongside HTTP ones, a composer
   for text, JSON, XML, HTML and binary (Base64 or hex) messages, and a
   searchable message log with millisecond timestamps.
+• gRPC — unary, server-streaming, client-streaming and bidirectional calls,
+  with the schema from server reflection or imported .proto files kept in a
+  schema library. JSON messages with an example generator, metadata, auth,
+  deadlines, Send and End Streaming, and the status, metadata and trailers
+  of every call.
 • Collections — organise saved requests into folders, keep example responses
   next to the request that produced them.
 • Environments — {{variables}} substituted into any part of a request, with
@@ -67,8 +76,9 @@ WHAT IT DOES
 
 PRIVACY
 
-No accounts, no telemetry, no analytics, no crash reporting. Requests and
-WebSocket connections go straight from your computer to the server you named. Passwords, tokens and
+No accounts, no telemetry, no analytics, no crash reporting. Requests,
+WebSocket connections and gRPC calls go straight from your computer to the
+server you named. Passwords, tokens and
 API keys are encrypted with a key held in Windows Credential Manager and are
 never written in plain text.
 ```
@@ -86,6 +96,8 @@ Timing breakdown for every request: DNS, connect, TLS, time to first byte, total
 Server-sent events shown live, event by event, as the stream arrives
 WebSocket requests with a Text, JSON, XML, HTML and binary composer
 A searchable WebSocket message log with millisecond timestamps
+gRPC calls — unary and streaming — with the schema from server reflection or .proto files
+gRPC status, metadata and trailers, and a searchable message stream for streaming calls
 Collections and folders, with example responses saved beside the request
 Environments and {{variables}}, resolved when you send
 Secrets encrypted with a key held in Windows Credential Manager
@@ -150,7 +162,7 @@ http client
 rest client
 curl
 openapi
-postman alternative
+grpc client
 websocket client
 ```
 
@@ -242,7 +254,8 @@ launched. It is the only restricted capability this package declares.
 
 Full trust is what the app's ordinary work needs:
 
-- It sends HTTP requests and opens WebSocket connections using libcurl, which
+- It sends HTTP requests and gRPC calls and opens WebSocket connections using
+  libcurl, which
   is compiled into the executable — a native networking stack rather than the
   WinRT HTTP APIs.
 - It keeps saved requests, collections, environments, history and cookies in a
@@ -251,8 +264,8 @@ Full trust is what the app's ordinary work needs:
   passwords, bearer tokens and API keys the user saves are encrypted rather
   than stored in plain text.
 - It opens and saves files the user chooses in the system dialog: file parts
-  for multipart uploads, OpenAPI documents to import, and response bodies
-  saved to disk.
+  for multipart uploads, OpenAPI documents and .proto files to import, and
+  response bodies saved to disk.
 - It hosts its interface in the Microsoft Edge WebView2 Runtime and places an
   icon in the notification area.
 

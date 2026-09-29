@@ -3,7 +3,7 @@
 // App.tsx owns the confirm-before-closing-a-dirty-tab prompt, since that
 // needs the shared ConfirmDialog and knows what "dirty" means for a tab.
 import { useState, type ReactNode } from "react";
-import { FileText, Layers, MessageSquare, Plus, X, Zap } from "lucide-react";
+import { FileText, Layers, MessageSquare, Network, Plus, X, Zap } from "lucide-react";
 
 import { ContextMenu } from "@/features/collections/ContextMenu";
 import { methodTextColor } from "@/lib/http-method-colors";
@@ -20,10 +20,11 @@ export type TabBarTab =
   | { kind: "environment"; id: string; label: string }
   | { kind: "example"; id: string; label: string }
   | { kind: "docs"; id: string; label: string; isDirty: boolean }
-  | { kind: "websocket"; id: string; label: string; isDirty: boolean; live: boolean };
+  | { kind: "websocket"; id: string; label: string; isDirty: boolean; live: boolean }
+  | { kind: "grpc"; id: string; label: string; isDirty: boolean; live: boolean };
 
 /** What the "+" button can open. */
-export type NewTabKind = "http" | "websocket";
+export type NewTabKind = "http" | "websocket" | "grpc";
 
 /** Only some kinds can be unsaved, so this asks rather than
  * assuming the field is there. */
@@ -111,6 +112,13 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, trailing }
                       tab.live ? "text-ws-ok" : "text-muted-foreground"
                     }`}
                   />
+                ) : tab.kind === "grpc" ? (
+                  <Network
+                    aria-hidden
+                    className={`mr-1.5 h-3.5 w-3.5 shrink-0 ${
+                      tab.live ? "text-ws-ok" : "text-muted-foreground"
+                    }`}
+                  />
                 ) : tab.kind === "docs" ? (
                   <FileText
                     aria-hidden
@@ -157,6 +165,7 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, trailing }
           items={[
             { label: "HTTP request", icon: FileText, onSelect: () => onNew("http") },
             { label: "WebSocket request", icon: Zap, onSelect: () => onNew("websocket") },
+            { label: "gRPC request", icon: Network, onSelect: () => onNew("grpc") },
           ]}
           onClose={() => setNewMenuAt(null)}
           x={newMenuAt.x}

@@ -35,10 +35,12 @@ export function docsTargetName(
   }
 
   for (const contents of Object.values(contentsById)) {
-    // A WebSocket request is a "request" target too: it shares the requests
-    // table, and its docs are reached by the same id.
+    // WebSocket and gRPC requests are "request" targets too: they share the
+    // requests table, and their docs are reached by the same id.
     const items: readonly { id: string; name: string }[] =
-      target.kind === "folder" ? contents.folders : [...contents.requests, ...contents.webSockets];
+      target.kind === "folder"
+        ? contents.folders
+        : [...contents.requests, ...contents.webSockets, ...contents.grpcRequests];
     const found = items.find((item) => item.id === target.id);
     if (found !== undefined) {
       return found.name;

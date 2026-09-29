@@ -6,6 +6,11 @@
 // When the text does not parse, the answer is the reason and never a
 // rewritten message: a formatter that "repairs" a broken document would send
 // something the user did not write.
+//
+// JSON goes through lib/json-reformat.ts rather than JSON.parse, which
+// would round an integer above 2^53 and send a different number than the
+// one typed.
+import { reformatJson } from "@/lib/json-reformat";
 import type { WsMessageFormat } from "@/types/websocket";
 
 export type BeautifyResult = { ok: true; text: string } | { ok: false; reason: string };
@@ -43,16 +48,7 @@ export function beautify(format: BeautifiableFormat, text: string): BeautifyResu
   if (text.trim() === "") {
     return { ok: true, text };
   }
-  return format === "json" ? beautifyJson(text) : beautifyMarkup(text, format);
-}
-
-function beautifyJson(text: string): BeautifyResult {
-  try {
-    return { ok: true, text: JSON.stringify(JSON.parse(text), null, 2) };
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    return { ok: false, reason: `Not valid JSON: ${detail}` };
-  }
+  return format === "json" ? reformatJson(text, INDENT) : beautifyMarkup(text, format);
 }
 
 type Token =

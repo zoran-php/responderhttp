@@ -10,10 +10,12 @@ use serde::{Deserialize, Serialize};
 use crate::domain::error::AppError;
 use std::path::PathBuf;
 
+use crate::domain::grpc_wire::MAX_RECEIVE_BYTES_CAP;
 use crate::domain::models::{
-    ApiKeyLocation, Auth, HttpVersionPreference, KeyValue, MultipartPart, RequestBody,
-    RequestSettings, TlsMinimum, WebSocketSettings, WsBinaryEncoding, WsDraft, WsMessageFormat,
-    DEFAULT_WS_CONNECT_TIMEOUT, DEFAULT_WS_MAX_MESSAGE_BYTES,
+    ApiKeyLocation, Auth, GrpcRequestDraft, GrpcSchemaRef, GrpcSettings, HttpVersionPreference,
+    KeyValue, MultipartPart, RequestBody, RequestSettings, TlsMinimum, WebSocketSettings,
+    WsBinaryEncoding, WsDraft, WsMessageFormat, DEFAULT_WS_CONNECT_TIMEOUT,
+    DEFAULT_WS_MAX_MESSAGE_BYTES,
 };
 use crate::domain::ports::{OpenedSecret, SecretCipher};
 use crate::domain::secrets::{
@@ -669,6 +671,131 @@ pub fn decode_web_socket(raw: &str) -> Result<(WebSocketSettings, WsDraft), AppE
     ))
 }
 
+/// What only a gRPC request has, in `requests.grpc_json` (migration 0011).
+/// The URL, metadata and auth are in the columns HTTP already uses, so auth
+/// secrets are sealed by the same path.
+///
+/// Every field is defaulted, the same rule as `StoredWebSocket`, and the same
+/// trap: `verify_tls` and `tls` say explicitly that their default is true.
+/// `schema_id` is read by `json_extract` in proto_schemas.rs, so its name is
+/// part of the storage contract.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StoredGrpc {
+    #[serde(default = "enabled")]
+    pub tls: bool,
+    #[serde(default)]
+    pub method_path: String,
+    /// Set for a request whose schema comes from reflection.
+    #[serde(default)]
+    pub reflection: bool,
+    /// Set for a request whose schema is in the library.
+    #[serde(default)]
+    pub schema_id: Option<String>,
+    #[serde(default)]
+    pub message: String,
+    #[serde(default)]
+    pub settings: StoredGrpcSettings,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StoredGrpcSettings {
+    #[serde(default = "enabled")]
+    pub verify_tls: bool,
+    #[serde(default)]
+    pub proxy: Option<String>,
+    #[serde(default = "default_grpc_connect_timeout_ms")]
+    pub connect_timeout_ms: u64,
+    #[serde(default)]
+    pub deadline_ms: Option<u64>,
+    #[serde(default = "default_grpc_max_receive_bytes")]
+    pub max_receive_bytes: u64,
+    #[serde(default)]
+    pub include_defaults: bool,
+}
+
+impl Default for StoredGrpcSettings {
+    fn default() -> Self {
+        stored_grpc_settings(&GrpcSettings::default())
+    }
+}
+
+fn default_grpc_connect_timeout_ms() -> u64 {
+    millis_u64(GrpcSettings::default().connect_timeout)
+}
+
+fn default_grpc_max_receive_bytes() -> u64 {
+    u64::try_from(GrpcSettings::default().max_receive_bytes).unwrap_or(u64::MAX)
+}
+
+fn stored_grpc_settings(settings: &GrpcSettings) -> StoredGrpcSettings {
+    StoredGrpcSettings {
+        verify_tls: settings.verify_tls,
+        proxy: settings.proxy.clone(),
+        connect_timeout_ms: millis_u64(settings.connect_timeout),
+        deadline_ms: settings.deadline.map(millis_u64),
+        max_receive_bytes: u64::try_from(settings.max_receive_bytes).unwrap_or(u64::MAX),
+        include_defaults: settings.include_defaults,
+    }
+}
+
+/// The parts of a gRPC request that live in `grpc_json`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct DecodedGrpc {
+    pub tls: bool,
+    pub method_path: String,
+    pub schema: GrpcSchemaRef,
+    pub message: String,
+    pub settings: GrpcSettings,
+}
+
+pub fn encode_grpc(request: &GrpcRequestDraft) -> Result<String, AppError> {
+    let (reflection, schema_id) = match &request.schema {
+        GrpcSchemaRef::None => (false, None),
+        GrpcSchemaRef::Reflection => (true, None),
+        GrpcSchemaRef::Library(id) => (false, Some(id.clone())),
+    };
+    to_json(&StoredGrpc {
+        tls: request.tls,
+        method_path: request.method_path.clone(),
+        reflection,
+        schema_id,
+        message: request.message.clone(),
+        settings: stored_grpc_settings(&request.settings),
+    })
+}
+
+/// An empty column reads as all defaults, as for `decode_web_socket`. A
+/// stored size above the cap is brought down to it rather than refused.
+pub fn decode_grpc(raw: &str) -> Result<DecodedGrpc, AppError> {
+    let stored: StoredGrpc = if raw.trim().is_empty() {
+        from_json("{}")?
+    } else {
+        from_json(raw)?
+    };
+    let schema = match stored.schema_id {
+        Some(id) if !id.is_empty() => GrpcSchemaRef::Library(id),
+        _ if stored.reflection => GrpcSchemaRef::Reflection,
+        _ => GrpcSchemaRef::None,
+    };
+    let settings = stored.settings;
+    Ok(DecodedGrpc {
+        tls: stored.tls,
+        method_path: stored.method_path,
+        schema,
+        message: stored.message,
+        settings: GrpcSettings {
+            verify_tls: settings.verify_tls,
+            proxy: settings.proxy,
+            connect_timeout: std::time::Duration::from_millis(settings.connect_timeout_ms),
+            deadline: settings.deadline_ms.map(std::time::Duration::from_millis),
+            max_receive_bytes: usize::try_from(settings.max_receive_bytes)
+                .unwrap_or(usize::MAX)
+                .min(MAX_RECEIVE_BYTES_CAP),
+            include_defaults: settings.include_defaults,
+        },
+    })
+}
+
 fn to_stored(pairs: &[KeyValue]) -> Vec<StoredKeyValue> {
     pairs
         .iter()
@@ -700,6 +827,73 @@ fn from_json<T: for<'de> Deserialize<'de>>(raw: &str) -> Result<T, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn grpc_draft(schema: GrpcSchemaRef) -> GrpcRequestDraft {
+        GrpcRequestDraft {
+            url: "{{host}}:50051".into(),
+            tls: false,
+            method_path: "/shop.v1.Shop/GetOrder".into(),
+            schema,
+            metadata: Vec::new(),
+            auth: Auth::None,
+            message: "{\"id\": \"9007199254740993\"}".into(),
+            settings: GrpcSettings {
+                verify_tls: false,
+                proxy: Some("http://proxy:8080".into()),
+                connect_timeout: std::time::Duration::from_millis(1500),
+                deadline: Some(std::time::Duration::from_millis(2500)),
+                max_receive_bytes: 1024,
+                include_defaults: true,
+            },
+        }
+    }
+
+    /// Every field away from its default, and each schema reference, survive.
+    #[test]
+    fn a_grpc_blob_round_trips_for_each_kind_of_schema_reference() {
+        for schema in [
+            GrpcSchemaRef::None,
+            GrpcSchemaRef::Reflection,
+            GrpcSchemaRef::Library("proto_1".into()),
+        ] {
+            let draft = grpc_draft(schema.clone());
+            let decoded = decode_grpc(&encode_grpc(&draft).expect("encode")).expect("decode");
+            assert_eq!(decoded.schema, schema);
+            assert!(!decoded.tls);
+            assert_eq!(decoded.method_path, draft.method_path);
+            assert_eq!(decoded.message, draft.message);
+            assert_eq!(decoded.settings, draft.settings);
+        }
+    }
+
+    /// The name `json_extract` in proto_schemas.rs looks for.
+    #[test]
+    fn a_library_schema_is_stored_under_schema_id() {
+        let raw =
+            encode_grpc(&grpc_draft(GrpcSchemaRef::Library("proto_1".into()))).expect("encode");
+        let value: serde_json::Value = serde_json::from_str(&raw).expect("json");
+        assert_eq!(value["schema_id"], "proto_1");
+    }
+
+    /// An empty or bare blob is a new request: TLS on, certificates checked.
+    #[test]
+    fn an_empty_grpc_blob_reads_as_the_defaults_with_tls_and_verification_on() {
+        for raw in ["", "{}", r#"{"settings":{}}"#] {
+            let decoded = decode_grpc(raw).expect("decode");
+            assert!(decoded.tls);
+            assert_eq!(decoded.schema, GrpcSchemaRef::None);
+            assert_eq!(decoded.settings, GrpcSettings::default());
+            assert!(decoded.settings.verify_tls);
+        }
+    }
+
+    #[test]
+    fn a_stored_receive_size_above_the_cap_is_brought_down_to_it() {
+        let too_big = u64::MAX;
+        let raw = format!(r#"{{"settings":{{"max_receive_bytes":{too_big}}}}}"#);
+        let decoded = decode_grpc(&raw).expect("decode");
+        assert_eq!(decoded.settings.max_receive_bytes, MAX_RECEIVE_BYTES_CAP);
+    }
 
     /// Exactly what `settings_json` looked like before 2026-09-14. Every
     /// saved request, history entry and example in an existing database has

@@ -188,7 +188,7 @@ pub fn upsert_request(
             ],
         )
         .map_err(to_storage_error)?;
-    refuse_other_kind(changed, &saved.id, RequestKind::Http)
+    refuse_other_kind(connection, changed, &saved.id, RequestKind::Http)
 }
 
 /// Returns a Result inside the row mapper's Result: rusqlite reports column

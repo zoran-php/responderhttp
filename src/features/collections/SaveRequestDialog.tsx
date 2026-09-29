@@ -18,11 +18,25 @@ import { buildFolderTree, flattenFolders } from "@/lib/collection-tree";
 import { useCollectionsStore } from "@/store/collections-store";
 import type { WebSocketShape } from "@/lib/ws-request";
 import { EMPTY_COLLECTION_CONTENTS } from "@/types/collections";
+import type { GrpcRequestDraft } from "@/types/grpc";
 import type { SendRequestInput } from "@/types/http";
 
 /** What is being saved, as its tab holds it. */
 export type SavePayload =
-  { kind: "http"; request: SendRequestInput } | { kind: "websocket"; shape: WebSocketShape };
+  | { kind: "http"; request: SendRequestInput }
+  | { kind: "websocket"; shape: WebSocketShape }
+  | {
+      kind: "grpc";
+      request: GrpcRequestDraft;
+      /**
+       * Runs first with the chosen name: puts a schema imported this
+       * session into the library, which a saved request needs. Resolves
+       * with why not, or null.
+       */
+      prepare: (name: string) => Promise<string | null>;
+      /** The draft again after `prepare`, whose schema id may have changed. */
+      currentRequest: () => GrpcRequestDraft;
+    };
 
 /** Where the saved request now lives, whichever kind it is. */
 export interface SavedLocation {
@@ -132,14 +146,23 @@ export function SaveRequestDialog({
         folderId: targetFolderId,
         name: trimmedName,
       };
+      if (payload.kind === "grpc") {
+        const refusal = await payload.prepare(trimmedName);
+        if (refusal !== null) {
+          setError(refusal);
+          return;
+        }
+      }
       const saved =
         payload.kind === "http"
           ? await store.saveRequest({ ...location, request: payload.request })
-          : await store.saveWebSocket({
-              ...location,
-              request: payload.shape.request,
-              draft: payload.shape.draft,
-            });
+          : payload.kind === "grpc"
+            ? await store.saveGrpcRequest({ ...location, request: payload.currentRequest() })
+            : await store.saveWebSocket({
+                ...location,
+                request: payload.shape.request,
+                draft: payload.shape.draft,
+              });
       if (!saved) {
         setError("Could not save the request.");
         return;
@@ -153,7 +176,13 @@ export function SaveRequestDialog({
   return (
     <Modal
       onClose={onClose}
-      title={payload.kind === "http" ? "Save request" : "Save WebSocket request"}
+      title={
+        payload.kind === "http"
+          ? "Save request"
+          : payload.kind === "grpc"
+            ? "Save gRPC request"
+            : "Save WebSocket request"
+      }
     >
       <div className="space-y-3 text-sm">
         <label className="block">

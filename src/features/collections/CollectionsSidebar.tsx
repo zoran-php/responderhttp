@@ -14,6 +14,7 @@ import {
   FileText,
   FolderInput,
   FolderPlus,
+  Network,
   Pencil,
   Plus,
   Trash2,
@@ -38,6 +39,7 @@ import { buildFolderTree } from "@/lib/collection-tree";
 import { useCollectionsStore } from "@/store/collections-store";
 import { useEnvironmentsStore } from "@/store/environments-store";
 import type { SavedRequest, SavedWebSocket } from "@/types/collections";
+import type { SavedGrpcRequest } from "@/types/grpc";
 import type { DocsTarget } from "@/types/docs";
 import type { OpenApiImportResult } from "@/types/openapi-import";
 
@@ -45,6 +47,7 @@ interface CollectionsSidebarProps {
   loadedRequestId: string | null;
   onOpenRequest: (request: SavedRequest) => void;
   onOpenWebSocket: (webSocket: SavedWebSocket) => void;
+  onOpenGrpc: (grpcRequest: SavedGrpcRequest) => void;
   onOpenExample: (exampleId: string) => void;
   onOpenDocs: (target: DocsTarget) => void;
 }
@@ -89,6 +92,7 @@ export function CollectionsSidebar({
   loadedRequestId,
   onOpenRequest,
   onOpenWebSocket,
+  onOpenGrpc,
   onOpenExample,
   onOpenDocs,
 }: CollectionsSidebarProps) {
@@ -146,6 +150,14 @@ export function CollectionsSidebar({
     }
   }
 
+  async function handleOpenGrpc(grpcRequest: SavedGrpcRequest) {
+    // Re-fetched by id for the same reason as handleOpenRequest.
+    const fresh = await store.loadGrpcRequest(grpcRequest.id);
+    if (fresh) {
+      onOpenGrpc(fresh);
+    }
+  }
+
   async function handleCommitRename(
     kind: TreeKind,
     id: string,
@@ -185,6 +197,13 @@ export function CollectionsSidebar({
     protocol: NewRequestProtocol,
   ) {
     setCreatingRequestIn(null);
+    if (protocol === "grpc") {
+      const created = await store.createGrpcRequest(collectionId, parentFolderId, name);
+      if (created) {
+        onOpenGrpc(created);
+      }
+      return;
+    }
     if (protocol === "websocket") {
       const created = await store.createWebSocket(collectionId, parentFolderId, name);
       if (created) {
@@ -256,6 +275,18 @@ export function CollectionsSidebar({
           },
         },
         {
+          label: "New gRPC request",
+          icon: Network,
+          onSelect: () => {
+            store.expandCollection(target.id);
+            setCreatingRequestIn({
+              collectionId: target.id,
+              parentFolderId: null,
+              protocol: "grpc",
+            });
+          },
+        },
+        {
           label: "New folder",
           icon: FolderPlus,
           onSelect: () => {
@@ -321,6 +352,19 @@ export function CollectionsSidebar({
           },
         },
         {
+          label: "New gRPC request",
+          icon: Network,
+          onSelect: () => {
+            store.expandCollection(target.collectionId);
+            store.expandFolder(target.id);
+            setCreatingRequestIn({
+              collectionId: target.collectionId,
+              parentFolderId: target.id,
+              protocol: "grpc",
+            });
+          },
+        },
+        {
           label: "New folder",
           icon: FolderPlus,
           onSelect: () => {
@@ -353,7 +397,7 @@ export function CollectionsSidebar({
         },
       ];
     }
-    if (target.kind === "websocket") {
+    if (target.kind === "websocket" || target.kind === "grpc") {
       // Rename, Docs, Move and Delete act on the row by id, whatever its
       // kind. No Duplicate yet: it would need its own load-and-save path,
       // and nothing asked for it.
@@ -361,7 +405,7 @@ export function CollectionsSidebar({
         {
           label: "Rename",
           icon: Pencil,
-          onSelect: () => setRenaming({ kind: "websocket", id: target.id }),
+          onSelect: () => setRenaming({ kind: target.kind, id: target.id }),
         },
         {
           label: "Docs",
@@ -385,7 +429,7 @@ export function CollectionsSidebar({
           destructive: true,
           onSelect: () =>
             setDeleteTarget({
-              kind: "websocket",
+              kind: target.kind,
               id: target.id,
               collectionId: target.collectionId,
               name: target.name,
@@ -465,6 +509,7 @@ export function CollectionsSidebar({
       onToggleFolder: store.toggleFolder,
       onOpenRequest: (request) => void handleOpenRequest(request),
       onOpenWebSocket: (webSocket) => void handleOpenWebSocket(webSocket),
+      onOpenGrpc: (grpcRequest) => void handleOpenGrpc(grpcRequest),
       loadedRequestId,
       examplesByRequestId,
       expandedRequestIds: store.expandedRequestIds,
@@ -605,6 +650,7 @@ export function CollectionsSidebar({
                     parentFolderId={null}
                     requests={tree.rootRequests}
                     webSockets={tree.rootWebSockets}
+                    grpcRequests={tree.rootGrpcRequests}
                   />
                 ) : (
                   <p className="px-6 py-1 text-xs text-muted-foreground">Loading…</p>
@@ -676,12 +722,13 @@ const DELETE_TITLE_NOUN: Record<TreeKind, string> = {
   request: "request",
   example: "example",
   websocket: "WebSocket request",
+  grpc: "gRPC request",
 };
 
 function deleteMessage(target: DeleteTarget): string {
-  // A WebSocket request has no saved responses under it, so the plain
-  // prompt is the truthful one.
-  if (target.kind === "example" || target.kind === "websocket") {
+  // WebSocket and gRPC requests have no saved responses under them, so the
+  // plain prompt is the truthful one.
+  if (target.kind === "example" || target.kind === "websocket" || target.kind === "grpc") {
     return `Delete "${target.name}"? This cannot be undone.`;
   }
   if (target.kind === "request") {

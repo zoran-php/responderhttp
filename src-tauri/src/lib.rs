@@ -16,6 +16,7 @@ pub mod http;
 pub mod logging;
 pub mod openapi;
 pub mod persistence;
+pub mod proto;
 pub mod secrets;
 
 use std::sync::Arc;
@@ -23,21 +24,25 @@ use std::sync::Arc;
 use tauri::Manager;
 
 use crate::desktop::{menu, startup_error, toast, tray, webview, window};
-use crate::domain::ports::{CookieRepository, HttpClient};
+use crate::domain::ports::{CookieRepository, GrpcTransport, HttpClient};
 use crate::domain::services::collections::Collections;
 use crate::domain::services::cookies::Cookies;
 use crate::domain::services::docs::Docs;
 use crate::domain::services::downloads::Downloads;
 use crate::domain::services::environments::Environments;
+use crate::domain::services::grpc::GrpcCalls;
+use crate::domain::services::grpc_reflection::GrpcReflection;
 use crate::domain::services::history::History;
 use crate::domain::services::openapi::OpenApiExport;
 use crate::domain::services::openapi_import::OpenApiImport;
+use crate::domain::services::proto_schemas::ProtoSchemas;
 use crate::domain::services::send_request::SendRequest;
 use crate::domain::services::tray_notice::TrayNotice;
 use crate::domain::services::websocket::WebSocketSessions;
 use crate::http::cookie_client::CookieClient;
 use crate::http::cookie_websocket::CookieWebSocketConnector;
 use crate::http::curl_client::CurlClient;
+use crate::http::curl_grpc::CurlGrpcTransport;
 use crate::http::curl_websocket::CurlWebSocketConnector;
 use crate::persistence::database::Database;
 use crate::persistence::repositories::app_settings::SqliteAppSettingsRepository;
@@ -46,8 +51,10 @@ use crate::persistence::repositories::cookies::SqliteCookieRepository;
 use crate::persistence::repositories::environments::SqliteEnvironmentRepository;
 use crate::persistence::repositories::examples::SqliteExampleRepository;
 use crate::persistence::repositories::folders::SqliteFolderRepository;
+use crate::persistence::repositories::grpc_requests::SqliteGrpcRequestRepository;
 use crate::persistence::repositories::history::SqliteHistoryRepository;
 use crate::persistence::repositories::import::SqliteImportRepository;
+use crate::persistence::repositories::proto_schemas::SqliteProtoSchemaRepository;
 use crate::persistence::repositories::saved_requests::SqliteSavedRequestRepository;
 use crate::persistence::repositories::secret_upgrade::upgrade_plaintext_secrets;
 use crate::persistence::repositories::web_sockets::SqliteWebSocketRepository;
@@ -67,6 +74,10 @@ fn unix_now() -> u64 {
 pub struct AppState {
     pub send_request: SendRequest,
     pub websockets: WebSocketSessions,
+    /// gRPC calls in flight (PLAN-GRPC.md 16e).
+    pub grpc_calls: GrpcCalls,
+    /// Schemas gRPC calls are made against: imported or reflected.
+    pub proto_schemas: ProtoSchemas,
     pub collections: Collections,
     pub environments: Environments,
     pub cookies: Cookies,
@@ -247,9 +258,18 @@ pub fn run() -> Result<(), StartupError> {
                 cookie_jar.clone(),
             )));
 
+            // One transport for calls and reflection alike: a reflection
+            // question is a gRPC call like any other.
+            let grpc_transport: Arc<dyn GrpcTransport> = Arc::new(CurlGrpcTransport::new());
+
             app.manage(AppState {
                 send_request: SendRequest::new(http_client),
                 websockets,
+                grpc_calls: GrpcCalls::new(grpc_transport.clone()),
+                proto_schemas: ProtoSchemas::new(
+                    GrpcReflection::new(grpc_transport),
+                    Arc::new(SqliteProtoSchemaRepository::new(database.clone())),
+                ),
                 collections: Collections::new(
                     Arc::new(SqliteCollectionRepository::new(database.clone())),
                     Arc::new(SqliteFolderRepository::new(database.clone())),
@@ -259,6 +279,10 @@ pub fn run() -> Result<(), StartupError> {
                     )),
                     Arc::new(SqliteExampleRepository::new(database.clone())),
                     Arc::new(SqliteWebSocketRepository::new(database.clone())),
+                    Arc::new(SqliteGrpcRequestRepository::new(
+                        database.clone(),
+                        cipher.clone(),
+                    )),
                 ),
                 environments: Environments::new(Arc::new(SqliteEnvironmentRepository::new(
                     database.clone(),
@@ -312,6 +336,21 @@ pub fn run() -> Result<(), StartupError> {
             commands::websocket::send_web_socket_message,
             commands::websocket::disconnect_web_socket,
             commands::websocket::disconnect_all_web_sockets,
+            commands::grpc::grpc_reflect,
+            commands::grpc::grpc_choose_proto_files,
+            commands::grpc::grpc_choose_import_folder,
+            commands::grpc::grpc_import_proto,
+            commands::grpc::grpc_schema,
+            commands::grpc::grpc_example_message,
+            commands::grpc::grpc_list_schemas,
+            commands::grpc::grpc_save_schema,
+            commands::grpc::grpc_rename_schema,
+            commands::grpc::grpc_delete_schema,
+            commands::grpc::grpc_invoke,
+            commands::grpc::grpc_send,
+            commands::grpc::grpc_end_stream,
+            commands::grpc::grpc_cancel,
+            commands::grpc::grpc_cancel_all,
             commands::files::choose_file,
             commands::collections::list_collections,
             commands::collections::collection_contents,
@@ -328,6 +367,8 @@ pub fn run() -> Result<(), StartupError> {
             commands::collections::delete_request,
             commands::collections::save_web_socket,
             commands::collections::load_web_socket,
+            commands::collections::save_grpc_request,
+            commands::collections::load_grpc_request,
             commands::collections::save_example,
             commands::collections::load_example,
             commands::collections::rename_example,

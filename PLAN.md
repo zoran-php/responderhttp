@@ -2383,11 +2383,11 @@ Still to see for this check: `{{name}}` resolving with that environment
 active. The screenshot had "No environment" selected.
 
 **Secret variables resolve on send (2026-09-16).** With environment `ll`
-active, a GET to postman-echo used `{{name}}` in the URL, and
+active, a GET to a public echo server used `{{name}}` in the URL, and
 `{{name}}`/`{{lastname}}` in headers and in the raw body. The echo shows
 `zoran`/`davidovic` in `args`, `x-name` and `x-lastname`.
 
-- postman-echo does not echo a GET body. Its `content-length: 51` matches
+- The echo server does not echo a GET body. Its `content-length: 51` matches
   the resolved body with CRLF line endings, not the template, so the body
   was very likely substituted too.
 - The same response shows the cookie jar attaching `__cf_bm`, `_cfuvid`
@@ -2709,7 +2709,7 @@ src/features/collections/ExportOpenApiDialog.tsx   Format dropdown, JSON by defa
   YAML was parsed by:
   - **PyYAML** (YAML 1.1)
   - **ruamel.yaml** (YAML 1.2)
-  - **js-yaml 4.3.2** (used by Swagger UI and Editor)
+  - **js-yaml 4.3.2**
   - **yaml 2.9.1**, which Redocly uses, in both 1.2 and 1.1 mode
 
   All five matched the JSON exactly, so the blind spot noted in the plan
@@ -2949,7 +2949,7 @@ way round.
   - Type `?q=cats&page=2` in the URL bar: the Params tab shows two rows.
   - Edit a value in Params: the URL bar updates. Delete both rows: the `?`
     goes.
-  - A Params value with a space sends successfully (postman-echo `args`
+  - A Params value with a space sends successfully (the echo server's `args`
     shows the space).
   - Open a request saved before today that has Params rows. Its URL now
     carries them, the tab is not marked dirty, and it sends the same
@@ -4748,6 +4748,12 @@ The same manifest declares Windows 10/11 in a `compatibility` block (`supportedO
 - `basH`, `CDb`, `Reg`, `dnx`, `cmd` are case-insensitive substring hits in unrelated data.
 
 The test is optional, and a `runFullTrust` desktop app is allowed to use these APIs, so it does not block submission.
+
+## Phase 16 — gRPC requests — **done 2026-09-29**
+
+The full plan is in `PLAN-GRPC.md`: unary and all three streaming kinds, server reflection and `.proto` import, JSON in the editor and protobuf on the wire. Transport stays libcurl (HTTP/2, trailers, full duplex) if the 16a spike proves it; protox and prost-reflect do the runtime schema work, so no `protoc` is needed. D1–D8 were accepted as recommended; libcurl passed the spike. 16a–16j are done: `verify.bat` and `release.bat` green (exe 12.03 MB, +1.10 MB; still 29 system DLLs) and the manual click-through passed. 16k lists follow-ups, each its own decision.
+
+**Version 1.1.0 (2026-09-29).** Bumped from 1.0.0 (minor: new features, and migration 0011 means 1.0.0 refuses a database 1.1.0 has opened) in `package.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`, `Package.appxmanifest` (`1.1.0.0`) and the `docs/index.html` header. `verify.bat` green (636 library tests, all integration tests, 556 frontend tests); `release.bat` green: `ResponderHTTP_1.1.0_x64-setup.exe` and `ResponderHTTP_1.1.0_x64_en-US.msi`, static-link check PASS with the same 29 system DLLs.
 
 ## Open decisions to confirm before the relevant phase starts
 

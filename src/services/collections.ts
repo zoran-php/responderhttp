@@ -15,6 +15,7 @@ import type {
   SavedRequest,
   SavedWebSocket,
 } from "@/types/collections";
+import type { GrpcRequestDraft, SavedGrpcRequest } from "@/types/grpc";
 import type { ApiError, KeyValue, SendRequestInput } from "@/types/http";
 import type { Result } from "@/types/result";
 import type { WebSocketRequest, WsDraft } from "@/types/websocket";
@@ -110,6 +111,29 @@ export function saveWebSocket(args: SaveWebSocketArgs): Promise<Result<SavedWebS
 
 export function loadWebSocket(id: string): Promise<Result<SavedWebSocket, ApiError>> {
   return call<SavedWebSocket>("load_web_socket", { id });
+}
+
+export interface SaveGrpcRequestArgs {
+  /** null saves a new gRPC request; an existing id overwrites it. */
+  id: string | null;
+  collectionId: string;
+  folderId: string | null;
+  name: string;
+  /** Unresolved: placeholders are kept, as for every saved request. */
+  request: GrpcRequestDraft;
+}
+
+/** Refused when the request's library schema is not in the library yet:
+ * save the schema first (services/grpc.ts, saveProtoSchema). Rename, move,
+ * delete and docs use the request functions above. */
+export function saveGrpcRequest(
+  args: SaveGrpcRequestArgs,
+): Promise<Result<SavedGrpcRequest, ApiError>> {
+  return call<SavedGrpcRequest>("save_grpc_request", { input: args });
+}
+
+export function loadGrpcRequest(id: string): Promise<Result<SavedGrpcRequest, ApiError>> {
+  return call<SavedGrpcRequest>("load_grpc_request", { id });
 }
 
 export interface SaveExampleArgs {

@@ -12,8 +12,10 @@ import { Cookie, Copy, Save } from "lucide-react";
 interface RequestToolbarProps {
   /** Outside in, ending with the request name. See lib/request-path.ts. */
   pathSegments: string[];
-  /** Omitted by the WebSocket builder: there is no cURL for a WebSocket. */
+  /** Omitted by the WebSocket and gRPC builders: there is no cURL for either. */
   onCopyAsCurl?: () => void;
+  /** The gRPC builder's counterpart: the equivalent grpcurl command. */
+  onCopyAsGrpcurl?: () => void;
   /** Omitted by the WebSocket builder, which has its Cookies link in the
    * sub-tab row, as the reference screenshots do. */
   onManageCookies?: () => void;
@@ -26,6 +28,7 @@ const ACTION =
 export function RequestToolbar({
   pathSegments,
   onCopyAsCurl,
+  onCopyAsGrpcurl,
   onManageCookies,
   onSave,
 }: RequestToolbarProps) {
@@ -73,6 +76,18 @@ export function RequestToolbar({
         <button aria-label="Copy as cURL" className={ACTION} onClick={onCopyAsCurl} type="button">
           <Copy aria-hidden className="h-3.5 w-3.5" />
           cURL
+        </button>
+      )}
+
+      {onCopyAsGrpcurl !== undefined && (
+        <button
+          aria-label="Copy as grpcurl"
+          className={ACTION}
+          onClick={onCopyAsGrpcurl}
+          type="button"
+        >
+          <Copy aria-hidden className="h-3.5 w-3.5" />
+          grpcurl
         </button>
       )}
 

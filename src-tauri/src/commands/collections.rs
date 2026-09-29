@@ -6,6 +6,7 @@ use crate::commands::dto::{
     SavedRequestDto, SavedWebSocketDto, SendRequestInput,
 };
 use crate::commands::error::ApiError;
+use crate::commands::grpc_dto::{SaveGrpcRequestInput, SavedGrpcRequestDto};
 use crate::domain::models::{HttpRequest, KeyValue};
 use crate::AppState;
 
@@ -182,6 +183,36 @@ pub async fn load_web_socket(
     id: String,
 ) -> Result<SavedWebSocketDto, ApiError> {
     let saved = blocking!(state, service, service.load_web_socket(&id))?;
+    Ok(saved.into())
+}
+
+/// Rename, move, delete and docs for a gRPC request go through the request
+/// commands too.
+#[tauri::command]
+pub async fn save_grpc_request(
+    state: State<'_, AppState>,
+    input: SaveGrpcRequestInput,
+) -> Result<SavedGrpcRequestDto, ApiError> {
+    let saved = blocking!(
+        state,
+        service,
+        service.save_grpc_request(
+            input.id,
+            &input.collection_id,
+            input.folder_id.as_deref(),
+            &input.name,
+            input.request.into()
+        )
+    )?;
+    Ok(saved.into())
+}
+
+#[tauri::command]
+pub async fn load_grpc_request(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<SavedGrpcRequestDto, ApiError> {
+    let saved = blocking!(state, service, service.load_grpc_request(&id))?;
     Ok(saved.into())
 }
 

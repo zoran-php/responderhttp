@@ -927,7 +927,7 @@ mod tests {
         let saved = request(
             "root",
             HttpMethod::Get,
-            "https://postman-echo.com/get?name={{name}}&page=2&verbose",
+            "https://echo.test/get?name={{name}}&page=2&verbose",
         );
 
         let (doc, notes) = export(&[saved], &[]);

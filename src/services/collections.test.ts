@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as collections from "@/services/collections";
+import { DEFAULT_GRPC_SETTINGS, type GrpcRequestDraft } from "@/types/grpc";
 import { AUTH_NONE, DEFAULT_SETTINGS, type SendRequestInput } from "@/types/http";
 import { DEFAULT_WS_SETTINGS, type WebSocketRequest, type WsDraft } from "@/types/websocket";
 
@@ -44,7 +45,13 @@ describe("collectionContents", () => {
   it("passes the collection id as collectionId", async () => {
     // Mirrors what collection_contents actually returns; the mock is typed
     // as any, so a stale shape here would never fail the type check.
-    invoke.mockResolvedValue({ folders: [], requests: [], examples: [], webSockets: [] });
+    invoke.mockResolvedValue({
+      folders: [],
+      requests: [],
+      examples: [],
+      webSockets: [],
+      grpcRequests: [],
+    });
 
     await collections.collectionContents("col_1");
 
@@ -143,6 +150,43 @@ describe("saveWebSocket", () => {
     });
 
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("saveGrpcRequest and loadGrpcRequest", () => {
+  const grpcRequest: GrpcRequestDraft = {
+    url: "{{host}}:50051",
+    tls: false,
+    methodPath: "/shop.v1.Shop/GetOrder",
+    schema: { kind: "library", schemaId: "proto_1" },
+    metadata: [],
+    auth: AUTH_NONE,
+    message: "{}",
+    settings: DEFAULT_GRPC_SETTINGS,
+  };
+
+  it("sends every field grouped under `input`", async () => {
+    const args = {
+      id: null,
+      collectionId: "col_1",
+      folderId: null,
+      name: "Get order",
+      request: grpcRequest,
+    };
+    invoke.mockResolvedValue({ ...args, id: "req_1", secretState: "ok" });
+
+    const result = await collections.saveGrpcRequest(args);
+
+    expect(invoke).toHaveBeenCalledWith("save_grpc_request", { input: args });
+    expect(result.ok).toBe(true);
+  });
+
+  it("passes the id to load", async () => {
+    invoke.mockResolvedValue(null);
+
+    await collections.loadGrpcRequest("req_1");
+
+    expect(invoke).toHaveBeenCalledWith("load_grpc_request", { id: "req_1" });
   });
 });
 

@@ -10,6 +10,8 @@ pub mod dto;
 pub mod environments;
 pub mod error;
 pub mod files;
+pub mod grpc;
+pub mod grpc_dto;
 pub mod history;
 pub mod openapi;
 pub mod openapi_import;

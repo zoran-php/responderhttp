@@ -1,6 +1,6 @@
 # ResponderHTTP — Privacy Policy
 
-_Last updated: 23 September 2026_
+_Last updated: 28 September 2026_
 
 ResponderHTTP is a desktop API client published by Zoran Davidović. This page
 describes what the app does with your data. It is short because the app does
@@ -18,7 +18,9 @@ server to send it to.
 The app keeps its data in a SQLite database in your Windows user profile,
 inside the app's own storage. That database holds:
 
-- the HTTP and WebSocket requests and collections you save,
+- the HTTP, WebSocket and gRPC requests and collections you save,
+- the gRPC schemas you import or save to the schema library: the text of the
+  .proto files and the compiled schema,
 - the Markdown documentation you write for a collection, folder or request,
 - environments and their variables,
 - your request history,
@@ -36,8 +38,9 @@ which only your Windows account can read. The key never leaves your computer.
 
 ## Network requests
 
-ResponderHTTP sends HTTP requests, and opens WebSocket connections, **only to
-the addresses you enter**. It is a tool for making those requests, so the
+ResponderHTTP sends HTTP requests and gRPC calls, and opens WebSocket
+connections, **only to the addresses you enter**. Loading a gRPC schema by
+server reflection asks the server you entered, and no one else. It is a tool for making those requests, so the
 destination, the headers and the body are entirely under your control. They go
 directly from your computer to the server you named; they do not pass through
 any service operated by the developer.
@@ -46,14 +49,16 @@ any service operated by the developer.
 
 The app writes a local log file to help diagnose problems. Request bodies,
 authentication headers, tokens and cookies are deliberately kept out of it, as
-are the WebSocket messages you send and receive and the events of a streamed
-response; a redaction step strips credentials that would otherwise ride along
+are the WebSocket and gRPC messages you send and receive, gRPC metadata, and
+the events of a streamed response; a redaction step strips credentials that would otherwise ride along
 inside an error message. The log stays on your computer and is never uploaded.
 
 ## Files you open or save
 
 Importing an OpenAPI document, or saving a response to disk, reads and writes
-only the file you chose in the system dialog.
+only the file you chose in the system dialog. Importing .proto files reads the
+files you chose and the files they import, looked up only in their own folders
+and the import folders you chose.
 
 ## Children
 

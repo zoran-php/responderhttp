@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   substitute,
+  substituteGrpcDraft,
   substituteMessage,
   substituteRequestInput,
   substituteWebSocketRequest,
   variableMap,
 } from "@/lib/variables";
+import { DEFAULT_GRPC_SETTINGS, type GrpcRequestDraft } from "@/types/grpc";
 import { DEFAULT_WS_SETTINGS } from "@/types/websocket";
 import { AUTH_NONE, DEFAULT_SETTINGS, type KeyValue, type SendRequestInput } from "@/types/http";
 
@@ -193,5 +195,47 @@ describe("substituteWebSocketRequest and substituteMessage", () => {
       "{{token}}@echo.test",
     );
     expect(substituteMessage("{{token}}", variables)).toBe("s3cret");
+  });
+});
+
+describe("substituteGrpcDraft", () => {
+  const draft: GrpcRequestDraft = {
+    url: "{{host}}:50051",
+    tls: false,
+    methodPath: "/shop.v1.Shop/GetOrder",
+    schema: { kind: "reflection" },
+    metadata: [{ name: "x-tenant", value: "{{tenant}}" }],
+    auth: { kind: "bearer", token: "{{token}}" },
+    message: '{"id": "{{order}}", "big": 9007199254740993}',
+    settings: DEFAULT_GRPC_SETTINGS,
+  };
+  const bindings = [
+    { name: "host", value: "localhost" },
+    { name: "tenant", value: "acme" },
+    { name: "token", value: "s3cret", secret: true },
+    { name: "order", value: "o-1" },
+  ];
+
+  it("substitutes the URL, metadata, auth and message, and leaves the rest", () => {
+    const resolved = substituteGrpcDraft(draft, bindings);
+
+    expect(resolved.url).toBe("localhost:50051");
+    expect(resolved.metadata).toEqual([{ name: "x-tenant", value: "acme" }]);
+    expect(resolved.auth).toEqual({ kind: "bearer", token: "s3cret" });
+    // Text in, text out: the 64-bit number is exactly as typed.
+    expect(resolved.message).toBe('{"id": "o-1", "big": 9007199254740993}');
+    expect(resolved.methodPath).toBe(draft.methodPath);
+    expect(resolved.schema).toEqual(draft.schema);
+  });
+
+  it("leaves a secret as its placeholder when asked", () => {
+    const display = substituteGrpcDraft(draft, bindings, { leaveSecrets: true });
+
+    expect(display.auth).toEqual({ kind: "bearer", token: "{{token}}" });
+    expect(display.url).toBe("localhost:50051");
+  });
+
+  it("returns the draft itself when there is nothing to substitute", () => {
+    expect(substituteGrpcDraft(draft, [])).toBe(draft);
   });
 });

@@ -10,6 +10,13 @@ describe("prettyPrint", () => {
     );
   });
 
+  /** JSON.parse would show 9007199254740992: a different id than was sent. */
+  it("shows every number exactly as the server sent it", () => {
+    expect(prettyPrint('{"id":9007199254740993,"price":1.50}', "json")).toBe(
+      '{\n  "id": 9007199254740993,\n  "price": 1.50\n}',
+    );
+  });
+
   it("returns malformed JSON untouched rather than hiding what the server sent", () => {
     expect(prettyPrint('{"a":1', "json")).toBe('{"a":1');
   });

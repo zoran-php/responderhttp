@@ -132,7 +132,7 @@ fn upsert_web_socket(
             ],
         )
         .map_err(to_storage_error)?;
-    refuse_other_kind(changed, &saved.id, RequestKind::WebSocket)
+    refuse_other_kind(connection, changed, &saved.id, RequestKind::WebSocket)
 }
 
 /// Returns a Result inside the row mapper's Result, as saved_requests.rs

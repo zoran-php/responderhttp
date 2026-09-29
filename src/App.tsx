@@ -12,6 +12,7 @@ import { matchesDocsShortcut, matchesSaveShortcut } from "@/lib/shortcuts";
 import { clampPaneSize, MIN_BUILDER_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/split-pane";
 import { updateMultipartRow, withTrailingBlankPart } from "@/lib/multipart-rows";
 import { chooseFile } from "@/services/files";
+import { cancelAllGrpc } from "@/services/grpc";
 import { disconnectAllWebSockets } from "@/services/websocket";
 import { substituteRequestInput } from "@/lib/variables";
 import { SaveRequestDialog, type SavePayload } from "@/features/collections/SaveRequestDialog";
@@ -21,6 +22,7 @@ import { SaveExampleDialog } from "@/features/examples/SaveExampleDialog";
 import { EnvironmentEditor } from "@/features/environments/EnvironmentEditor";
 import { CookieManagerDialog } from "@/features/cookies/CookieManagerDialog";
 import { EnvironmentSelector } from "@/features/environments/EnvironmentSelector";
+import { GrpcView } from "@/features/grpc/GrpcView";
 import { RequestBuilder } from "@/features/request-builder/RequestBuilder";
 import { TabBar, type TabBarTab } from "@/features/request-builder/TabBar";
 import { ResponseViewer } from "@/features/response-viewer/ResponseViewer";
@@ -30,7 +32,12 @@ import { WebSocketView } from "@/features/websocket/WebSocketView";
 import { useCollectionsStore } from "@/store/collections-store";
 import { useEnvironmentsStore } from "@/store/environments-store";
 import { useLayoutStore } from "@/store/layout-store";
-import { useTabsStore, type RequestTab, type WebSocketTab } from "@/store/request-store";
+import {
+  useTabsStore,
+  type GrpcTab,
+  type RequestTab,
+  type WebSocketTab,
+} from "@/store/request-store";
 
 export default function App() {
   const tabsStore = useTabsStore();
@@ -57,18 +64,22 @@ export default function App() {
   const activeTab = tabsStore.activeTab();
   const requestTab = activeTab.kind === "request" ? activeTab : null;
   const webSocketTab = activeTab.kind === "websocket" ? activeTab : null;
+  const grpcTab = activeTab.kind === "grpc" ? activeTab : null;
 
   // The breadcrumb is built here rather than in the builder because the names
   // it needs live in the collections store, and RequestBuilder is props-in,
   // events-out. A tab that has never been saved has no collection and no
   // folders, so this comes back as the bare name.
-  const loaded = requestTab?.loadedRequest ?? webSocketTab?.loadedRequest ?? null;
+  const loaded =
+    requestTab?.loadedRequest ?? webSocketTab?.loadedRequest ?? grpcTab?.loadedRequest ?? null;
   const pathSegments = requestPathSegments({
     collectionName:
       collections.find((collection) => collection.id === loaded?.collectionId)?.name ?? null,
     folders: (loaded && contentsById[loaded.collectionId]?.folders) || [],
     folderId: loaded?.folderId ?? null,
-    requestName: loaded?.name ?? (webSocketTab ? "Untitled WebSocket" : "Untitled Request"),
+    requestName:
+      loaded?.name ??
+      (webSocketTab ? "Untitled WebSocket" : grpcTab ? "Untitled gRPC" : "Untitled Request"),
   });
   const isSending = requestTab?.status === "sending";
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -83,10 +94,12 @@ export default function App() {
     void loadEnvironments();
   }, [loadEnvironments]);
 
-  // A page that is starting has no connections of its own, so any Rust still
-  // holds belong to a page that was reloaded away (PLAN-WEBSOCKET.md 13h).
+  // A page that is starting has no connections or calls of its own, so any
+  // Rust still holds belong to a page that was reloaded away
+  // (PLAN-WEBSOCKET.md 13h, PLAN-GRPC.md 16h).
   useEffect(() => {
     void disconnectAllWebSockets();
+    void cancelAllGrpc();
   }, []);
 
   // The sidebar's own width is the whole distance from the window's left edge,
@@ -135,7 +148,8 @@ export default function App() {
     saveAction.current = handleSaveClick;
   });
 
-  const canSaveWithShortcut = activeTab.kind === "request" || activeTab.kind === "websocket";
+  const canSaveWithShortcut =
+    activeTab.kind === "request" || activeTab.kind === "websocket" || activeTab.kind === "grpc";
   useEffect(() => {
     if (!canSaveWithShortcut) {
       return;
@@ -164,7 +178,7 @@ export default function App() {
   // survive a click elsewhere, so binding to it would make the shortcut
   // depend on something invisible.
   const docsTargetForShortcut =
-    activeTab.kind === "request" || activeTab.kind === "websocket"
+    activeTab.kind === "request" || activeTab.kind === "websocket" || activeTab.kind === "grpc"
       ? (activeTab.loadedRequest?.id ?? null)
       : null;
   const openDocs = tabsStore.openDocs;
@@ -187,6 +201,11 @@ export default function App() {
   }, [docsTargetForShortcut, openDocs]);
 
   async function handleSaveClick() {
+    const grpc = tabsStore.activeGrpcTab();
+    if (grpc !== null) {
+      await saveGrpcTab(grpc.loadedRequest);
+      return;
+    }
     const socket = tabsStore.activeWebSocketTab();
     if (socket !== null) {
       await saveWebSocketTab(socket.loadedRequest);
@@ -247,8 +266,46 @@ export default function App() {
     }
   }
 
+  /** The gRPC half of Save. A schema imported this session goes into the
+   * library first, under the request's name: a saved request needs it there. */
+  async function saveGrpcTab(loadedGrpc: GrpcTab["loadedRequest"]) {
+    if (loadedGrpc === null) {
+      setSaveDialogOpen(true);
+      return;
+    }
+    const refusal = await tabsStore.ensureGrpcSchemaSaved(loadedGrpc.name);
+    if (refusal !== null) {
+      useCollectionsStore.setState({ error: { kind: "invalidRequest", message: refusal } });
+      return;
+    }
+    const saved = await useCollectionsStore.getState().saveGrpcRequest({
+      id: loadedGrpc.id,
+      collectionId: loadedGrpc.collectionId,
+      folderId: loadedGrpc.folderId,
+      name: loadedGrpc.name,
+      request: useTabsStore.getState().currentGrpcDraft(),
+    });
+    if (saved) {
+      tabsStore.markGrpcSaved({
+        id: saved.id,
+        collectionId: saved.collectionId,
+        folderId: saved.folderId,
+        name: saved.name,
+      });
+    }
+  }
+
   /** What the Save dialog saves: whichever kind of tab is in front. */
   function savePayload(): SavePayload {
+    if (grpcTab !== null) {
+      return {
+        kind: "grpc",
+        request: tabsStore.currentGrpcDraft(),
+        prepare: (name) => useTabsStore.getState().ensureGrpcSchemaSaved(name),
+        // Read fresh: `prepare` may have given the schema a library id.
+        currentRequest: () => useTabsStore.getState().currentGrpcDraft(),
+      };
+    }
     return webSocketTab !== null
       ? { kind: "websocket", shape: tabsStore.currentWebSocketShape() }
       : { kind: "http", request: tabsStore.currentInput() };
@@ -301,7 +358,9 @@ export default function App() {
     // tab, which saves explicitly, reaches the prompt.
     // A live WebSocket asks too: closing the tab closes the connection
     // (assumption 11).
-    const live = tab?.kind === "websocket" && tab.connection !== "idle";
+    const live =
+      (tab?.kind === "websocket" && tab.connection !== "idle") ||
+      (tab?.kind === "grpc" && tab.call !== "idle");
     if ((tab?.kind !== "docs" && tabsStore.isDirty(id)) || live) {
       setClosingTabId(id);
       return;
@@ -345,6 +404,15 @@ export default function App() {
         live: tab.connection === "connected",
       };
     }
+    if (tab.kind === "grpc") {
+      return {
+        kind: "grpc",
+        id: tab.id,
+        label: tab.loadedRequest?.name ?? "Untitled gRPC",
+        isDirty: tabsStore.isDirty(tab.id),
+        live: tab.call !== "idle",
+      };
+    }
     // "Example" until the body arrives; the store caches it after the first
     // open, so this only shows for a moment.
     return { kind: "example", id: tab.id, label: examplesById[tab.exampleId]?.name ?? "Example" };
@@ -358,7 +426,9 @@ export default function App() {
       ? (closing.loadedRequest?.name ?? "Untitled Request")
       : closing?.kind === "websocket"
         ? (closing.loadedRequest?.name ?? "Untitled WebSocket")
-        : null;
+        : closing?.kind === "grpc"
+          ? (closing.loadedRequest?.name ?? "Untitled gRPC")
+          : null;
   const closingMessage =
     closing === null || closingName === null
       ? ""
@@ -366,7 +436,11 @@ export default function App() {
         ? `"${closingName}" is connected. Closing it disconnects${
             tabsStore.isDirty(closing.id) ? " and loses its unsaved changes" : ""
           }.`
-        : `"${closingName}" has unsaved changes. Close it anyway?`;
+        : closing.kind === "grpc" && closing.call !== "idle"
+          ? `"${closingName}" has a call running. Closing it cancels the call${
+              tabsStore.isDirty(closing.id) ? " and loses its unsaved changes" : ""
+            }.`
+          : `"${closingName}" has unsaved changes. Close it anyway?`;
 
   return (
     <div className="flex h-screen bg-background text-foreground">
@@ -379,6 +453,7 @@ export default function App() {
           onOpenHistoryEntry={(request) => tabsStore.openHistoryEntry(request)}
           onOpenRequest={(saved) => tabsStore.openSavedRequest(saved)}
           onOpenWebSocket={(saved) => tabsStore.openSavedWebSocket(saved)}
+          onOpenGrpc={(saved) => tabsStore.openSavedGrpcRequest(saved)}
           width={sidebarWidth}
         />
       )}
@@ -401,7 +476,11 @@ export default function App() {
           activeTabId={tabsStore.activeTabId}
           onClose={handleCloseTab}
           onNew={(kind) =>
-            kind === "websocket" ? tabsStore.openBlankWebSocketTab() : tabsStore.openBlankTab()
+            kind === "websocket"
+              ? tabsStore.openBlankWebSocketTab()
+              : kind === "grpc"
+                ? tabsStore.openBlankGrpcTab()
+                : tabsStore.openBlankTab()
           }
           onSelect={tabsStore.setActiveTab}
           tabs={tabBarTabs}
@@ -414,6 +493,12 @@ export default function App() {
           <ExampleViewer exampleId={activeTab.exampleId} />
         ) : activeTab.kind === "docs" ? (
           <DocsEditor tab={activeTab} />
+        ) : activeTab.kind === "grpc" ? (
+          <GrpcView
+            onSave={() => void handleSaveClick()}
+            pathSegments={pathSegments}
+            tab={activeTab}
+          />
         ) : activeTab.kind === "websocket" ? (
           <WebSocketView
             onManageCookies={() => setCookiesOpen(true)}
@@ -517,7 +602,9 @@ export default function App() {
               folderId: saved.folderId,
               name: saved.name,
             };
-            if (webSocketTab !== null) {
+            if (grpcTab !== null) {
+              tabsStore.markGrpcSaved(location);
+            } else if (webSocketTab !== null) {
               tabsStore.markWebSocketSaved(location);
             } else {
               tabsStore.markSaved(location);
@@ -533,7 +620,9 @@ export default function App() {
           confirmLabel={
             closing.kind === "websocket" && closing.connection !== "idle"
               ? "Close and disconnect"
-              : "Close without saving"
+              : closing.kind === "grpc" && closing.call !== "idle"
+                ? "Close and cancel"
+                : "Close without saving"
           }
           message={closingMessage}
           onCancel={() => setClosingTabId(null)}

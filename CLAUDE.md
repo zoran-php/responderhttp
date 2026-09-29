@@ -8,7 +8,7 @@ Guidance for Claude Code (and any AI assistant) working in this repository.
 
 **ResponderHTTP** is a desktop API client that ships as **one single executable with zero external dependencies**.
 
-The app is a **UI shell over an embedded cURL engine**. It collects request parameters from the UI (URL, HTTP method, headers, query params, body, authentication), passes them to the cURL engine, and formats the response (status code, timing, response headers, response body) back to the user. WebSocket requests (`ws://`, `wss://`) go through the same libcurl, using its WebSocket API (§4). A response that arrives as `text/event-stream` is shown event by event while it is still arriving, rather than after it ends (§4).
+The app is a **UI shell over an embedded cURL engine**. It collects request parameters from the UI (URL, HTTP method, headers, query params, body, authentication), passes them to the cURL engine, and formats the response (status code, timing, response headers, response body) back to the user. WebSocket requests (`ws://`, `wss://`) go through the same libcurl, using its WebSocket API (§4). A response that arrives as `text/event-stream` is shown event by event while it is still arriving, rather than after it ends (§4). gRPC calls (unary and all three streaming kinds) go over the same libcurl too, as HTTP/2 with the protobuf messages encoded and decoded in Rust from a schema that comes from server reflection or imported `.proto` files (§4).
 
 **Non-negotiable constraint:** `curl` must **not** be required on the user's machine. `libcurl` is **statically linked into the binary**. Never shell out to a `curl` process, and never assume any system library is present.
 
@@ -16,7 +16,8 @@ The app is a **UI shell over an embedded cURL engine**. It collects request para
 |---|---|
 | Shell | Tauri 2.x (Rust) |
 | Frontend | React 18 + TypeScript + Vite |
-| HTTP engine | `libcurl` via the `curl` crate, statically linked; WebSocket through libcurl's own WS API |
+| HTTP engine | `libcurl` via the `curl` crate, statically linked; WebSocket through libcurl's own WS API; gRPC as HTTP/2 through its multi interface |
+| gRPC schemas | `protox` (compiles `.proto` in memory, no `protoc`), `prost-reflect` (dynamic messages and the JSON mapping), `prost`, and `miette` for the line and column of a schema error — all pure Rust |
 | Persistence | SQLite via `rusqlite` (bundled, statically linked) |
 | Output | `app.exe` (Windows) / single ELF binary (Linux) / `.app` (macOS) |
 
@@ -67,14 +68,15 @@ Strict three-layer separation. **Business logic never lives in a React component
 /
 ├── src/                          # React frontend
 │   ├── components/ui/            # shadcn/ui primitives (generated — do not hand-edit)
-│   ├── components/               # shared presentational components
+│   ├── components/               # shared presentational components (KeyValueTable, MessageStreamLog…)
 │   ├── features/
 │   │   ├── request-builder/      # URL bar, method select, headers/params tables, body
 │   │   ├── response-viewer/      # status bar, headers table, Monaco body viewer, live SSE events
 │   │   ├── collections/          # sidebar tree, save/rename/delete
 │   │   ├── history/
 │   │   ├── environments/         # variables + {{substitution}}
-│   │   └── websocket/            # WebSocket builder, composer, message log
+│   │   ├── websocket/            # WebSocket builder, composer, message log
+│   │   └── grpc/                 # gRPC builder, method picker, schema panel, response
 │   ├── services/                 # invoke() wrappers — the ONLY place invoke appears
 │   ├── store/                    # Zustand stores (UI + session state)
 │   ├── lib/                      # pure functions: validators, formatters, curl-string builder
@@ -95,8 +97,9 @@ Strict three-layer separation. **Business logic never lives in a React component
 │   │   ├── domain/
 │   │   │   ├── models.rs         # HttpRequest, HttpResponse, Auth, Collection…
 │   │   │   ├── ports.rs          # traits: HttpClient, CollectionRepository…
-│   │   │   ├── services/         # use-cases orchestrating ports (websocket.rs: live connections)
+│   │   │   ├── services/         # use-cases orchestrating ports (websocket.rs, grpc.rs: live connections and calls)
 │   │   │   ├── ws_frames.rs      # WebSocket frame reassembly and close codes, pure
+│   │   │   ├── grpc_wire.rs      # gRPC framing, status and trailers, metadata rules, pure
 │   │   │   ├── sse.rs            # server-sent-events parser, pure
 │   │   │   ├── clock.rs          # now_ms(), the one wall clock the domain uses
 │   │   │   └── error.rs          # AppError + thiserror
@@ -106,7 +109,9 @@ Strict three-layer separation. **Business logic never lives in a React component
 │   │   │   ├── mapping.rs        # domain ⇄ libcurl option mapping
 │   │   │   ├── curl_websocket.rs # libcurl implementation of WebSocketConnector
 │   │   │   ├── cookie_websocket.rs # cookie jar for WebSocket handshakes (decorator)
+│   │   │   ├── curl_grpc.rs      # libcurl (Multi, HTTP/2) implementation of GrpcTransport
 │   │   │   └── curl_ws_ffi.rs    # hand-written libcurl WebSocket bindings — the ONLY unsafe
+│   │   ├── proto/                # protox + prost-reflect: compile, catalog, JSON codec, example, reflection — pure, no I/O
 │   │   └── persistence/
 │   │       ├── migrations/       # NNNN_name.sql, append-only
 │   │       └── repositories/     # SQLite implementations of repo traits
@@ -155,6 +160,24 @@ WebSocket requests use **libcurl's WebSocket API** (`CURLOPT_CONNECT_ONLY = 2`, 
 - Messages that arrive after Disconnect, before the server's close answer, are still reported. Messages queued before Disconnect go out before the close frame.
 - Integration tests run against the std-only local server in `src-tauri/tests/support/ws_server.rs`, never a public echo server. The one public `wss://` test is `#[ignore]`d.
 
+### gRPC
+
+gRPC calls go over the **same statically linked libcurl**, as HTTP/2 through the `curl` crate's `Multi` interface — h2c with prior knowledge, or TLS with ALPN `h2` — so they share the HTTP path's TLS stack, proxy handling, CA setup and verify-TLS toggle, and need **no `unsafe`**. The plan, its decisions and the spike that proved it on Windows are in `PLAN-GRPC.md` (16a, 16d).
+
+- **Layers.** `proto/` is a pure mapping layer over `protox` and `prost-reflect`, like `openapi/`: compile, catalog of services and methods, JSON ⇄ protobuf codec, example message, reflection messages. There is no trait in front of it — it would have one implementation and no test seam. `domain/grpc_wire.rs` is the wire protocol, pure: framing, `grpc-status` from trailers or a trailers-only answer, `grpc-timeout`, metadata and auth rules. `GrpcTransport` / `GrpcCall` are traits in `domain/ports.rs`; `CurlGrpcTransport` (`http/curl_grpc.rs`) implements them. `GrpcCalls` (`domain/services/grpc.rs`) owns the rules — registry, owner loop, deadline, size limit, event order — and `GrpcReflection` the reflection conversation (v1, then v1alpha); both are tested against a scripted call with no network. `ProtoSchemas` keeps compiled schemas in memory and the schema library in SQLite.
+- **One owner thread per call.** `curl::multi::Multi` and `Easy2Handle` are neither `Send` nor `Sync`, so the call is **opened on** its owner thread (`GrpcCall` has no `Send` bound). For `grpc_invoke` that thread is the command's blocking task. Events go back over a per-call Tauri `ipc::Channel`.
+- libcurl behaviour the design depends on (PLAN-GRPC.md 16a and 16d findings):
+  - HTTP/2 **trailers reach the header callback** after the blank line that ends the header block; a header block counts as the response's only once body data, a trailer or the end proves it is the last one (a proxy's CONNECT answer is not).
+  - Client streaming is a read callback that returns `ReadError::Pause` when nothing is queued. **Unpause only a read side libcurl has actually paused** — before the first perform, `curl_easy_pause` fails with `CURLE_BAD_FUNCTION_ARGUMENT`. Returning 0 ends the stream.
+  - Cancel is removing the handle from the multi, which resets the stream.
+  - libcurl adds `accept: */*`; an empty `Accept:` removes it. `te: trailers` and `content-type: application/grpc` come from `grpc_wire::request_headers`.
+  - A non-gRPC answer (anything but HTTP 200 with `application/grpc…`) is never framed: `is_grpc_response` decides, and the status comes from the HTTP code.
+  - **On Windows, `multi.wait` sleeps its whole timeout, rounded up to the 15.6 ms timer tick.** A message's round trip is therefore about one tick (~16 ms) — accepted, since beating it would need a second `unsafe` file. Throughput is not affected. An integration test pins the round trip under 25 ms.
+- **Messages cross the IPC boundary as JSON text**, never as parsed values, so a 64-bit integer is never touched by JavaScript's number type. For the same reason the frontend formats JSON with `lib/json-reformat.ts`, which re-indents without `JSON.parse`; every pretty-printer in the app uses it.
+- **Schemas.** Imported `.proto` files are read once (only the files the compiler asks for; limits on size and count) and stored with their compiled `FileDescriptorSet` in `proto_schemas` (migration 0011), so a saved request keeps working after the folder moves. A saved request refers to a library schema by id, or to reflection. A reflected schema is asked for again when the URL field is left or the method list opens, only when the server changed.
+- **Secrets.** A saved gRPC request keeps its metadata in `headers_json` and its auth in `auth_json`, sealed by the same path as HTTP. The log shows secret variables as placeholders: Rust reports sent messages re-encoded and resolved, and the store pairs each `sent` event with what was typed (`lib/grpc-log.ts`).
+- Integration tests run against the raw `h2` test server in `src-tauri/tests/support/grpc_server.rs` (dev-dependencies `h2`, `http`, `bytes`, `tokio`, which never reach the release binary).
+
 ### Streaming responses (server-sent events)
 
 Any response whose `Content-Type` is `text/event-stream` is reported to the UI as it arrives. There is nothing to turn on and Send stays one button — it is the *response* that differs, not the request. The plan and its decisions are in `PLAN-SSE.md`.
@@ -191,7 +214,7 @@ SQLite through the `rusqlite` crate (`bundled` feature, so SQLite is compiled in
 
 - Repository traits live in `domain/ports.rs`; SQLite implementations in `persistence/repositories/`. Domain code never sees SQL.
 - Migrations are **numbered, append-only files**. Never edit a shipped migration; add a new one.
-- Core tables: `collections`, `folders`, `requests`, `environments`, `environment_variables`, `history`.
+- Core tables: `collections`, `folders`, `requests`, `environments`, `environment_variables`, `history`, and `proto_schemas` (the gRPC schema library). `requests.kind` is `http`, `websocket` or `grpc`; each kind's own fields sit in its JSON column (`ws_json`, `grpc_json`), and an upsert refuses an id that belongs to another kind.
 - Requests store headers/params/body as JSON columns — the schema should not need a migration every time a request feature is added.
 - Secrets (tokens, passwords) are **never** written in plaintext. Since Phase 9 (PLAN.md), one data key lives in the OS credential store (`secrets/keychain.rs`) and every secret is sealed with it (`secrets/envelope.rs`) before it reaches SQLite. Which fields are secrets is decided once, in `domain/secrets.rs`. History and saved responses keep none. Never add a code path that writes a secret without going through `json::encode_auth` or the environment repository.
 - Every write path runs in a transaction. Every query is parameterised — string-concatenated SQL is a bug, always.

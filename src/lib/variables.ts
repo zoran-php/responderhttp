@@ -4,6 +4,7 @@
 // inline in the store (CLAUDE.md section 6), and applied only on the way out
 // — a saved request keeps its placeholders, so the same request can be sent
 // against a different environment tomorrow.
+import type { GrpcRequestDraft } from "@/types/grpc";
 import type { Auth, KeyValue, RequestBody, SendRequestInput } from "@/types/http";
 import type { WebSocketRequest } from "@/types/websocket";
 
@@ -111,6 +112,32 @@ export function substituteWebSocketRequest(
     ...request,
     url: substitute(request.url, map),
     headers: substitutePairs(request.headers, map),
+  };
+}
+
+/**
+ * The gRPC counterpart: the URL, every metadata row, the auth fields and the
+ * message. The method path is picked from a list, not typed, and the
+ * settings hold nothing typed as text but the proxy, which the HTTP path
+ * does not substitute either. The message is substituted as text before it
+ * is parsed as JSON in Rust, so a variable inside a string value stays text
+ * and a 64-bit number is never touched here (PLAN-GRPC.md section 3).
+ */
+export function substituteGrpcDraft(
+  draft: GrpcRequestDraft,
+  variables: readonly VariableBinding[],
+  options: SubstituteOptions = {},
+): GrpcRequestDraft {
+  const map = variableMap(variables, options);
+  if (map.size === 0) {
+    return draft;
+  }
+  return {
+    ...draft,
+    url: substitute(draft.url, map),
+    metadata: substitutePairs(draft.metadata, map),
+    auth: substituteAuth(draft.auth, map),
+    message: substitute(draft.message, map),
   };
 }
 

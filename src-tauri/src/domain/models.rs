@@ -667,3 +667,179 @@ pub struct ExampleSummary {
     pub name: String,
     pub status: u16,
 }
+
+// --- gRPC (PLAN-GRPC.md) -------------------------------------------------
+
+/// How long connecting may take, TLS included. Only connecting: a call
+/// that streams for an hour is still a working call, and its length is the
+/// deadline's business.
+pub const DEFAULT_GRPC_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Per-request settings for a gRPC call (PLAN-GRPC.md section 2, Settings).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrpcSettings {
+    /// Off is an explicit, per-request user opt-in and never the default
+    /// (CLAUDE.md section 11, rule 7). Independent of whether TLS is used,
+    /// which is the target's `tls`.
+    pub verify_tls: bool,
+    pub proxy: Option<String>,
+    pub connect_timeout: Duration,
+    /// Sent as `grpc-timeout` and enforced by the client too. None, the
+    /// default, lets a call run as long as the server keeps it open (D5).
+    pub deadline: Option<Duration>,
+    pub max_receive_bytes: usize,
+    /// Show every field of a received message, defaults included, rather
+    /// than following the JSON mapping and leaving them out.
+    pub include_defaults: bool,
+}
+
+impl Default for GrpcSettings {
+    fn default() -> Self {
+        Self {
+            verify_tls: true,
+            proxy: None,
+            connect_timeout: DEFAULT_GRPC_CONNECT_TIMEOUT,
+            deadline: None,
+            max_receive_bytes: crate::domain::grpc_wire::DEFAULT_MAX_RECEIVE_BYTES,
+            include_defaults: false,
+        }
+    }
+}
+
+/// Where a call goes. gRPC has no URL of its own: a server is a host and a
+/// port, plus whether to speak TLS (D6).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrpcTarget {
+    /// `host:port`, as HTTP/2 puts it in `:authority`.
+    pub authority: String,
+    pub tls: bool,
+}
+
+/// One call as the transport needs it. The message bytes are not here: they
+/// go through the open call one frame at a time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrpcCallRequest {
+    pub target: GrpcTarget,
+    /// `/package.Service/Method`.
+    pub path: String,
+    /// As the user typed it. The transport checks it (domain/grpc_wire.rs)
+    /// together with what `auth` adds.
+    pub metadata: Vec<KeyValue>,
+    pub auth: Auth,
+    pub settings: GrpcSettings,
+}
+
+/// Who ended a gRPC call. The server ends it with its status; the client
+/// ends it for Cancel, a passed deadline, a message over the size limit, a
+/// response that breaks the protocol, or a transport that failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GrpcEndedBy {
+    Server,
+    Client,
+}
+
+/// Everything a gRPC call reports, in the order it happened. `at_ms` is Unix
+/// time in milliseconds. Messages are JSON **text**, never parsed here or in
+/// the UI (PLAN-GRPC.md section 3, point 5). `bytes` is the protobuf size.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GrpcEvent {
+    /// The response's headers (initial metadata), once they arrive and prove
+    /// to be a gRPC response.
+    ResponseMetadata { at_ms: u64, metadata: Vec<KeyValue> },
+    /// Reported once the message is handed to the transport.
+    Sent {
+        at_ms: u64,
+        json: String,
+        bytes: usize,
+    },
+    Received {
+        at_ms: u64,
+        json: String,
+        bytes: usize,
+    },
+    /// End Streaming took effect: the server has been told no more messages
+    /// are coming.
+    StreamEnded { at_ms: u64 },
+    /// The last event of every call.
+    Ended {
+        at_ms: u64,
+        status: crate::domain::grpc_wire::GrpcStatus,
+        trailers: Vec<KeyValue>,
+        by: GrpcEndedBy,
+        total_ms: u64,
+    },
+}
+
+/// Which schema a saved gRPC request uses (PLAN-GRPC.md 16g-2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GrpcSchemaRef {
+    /// None chosen yet: a draft saved before a schema was loaded.
+    None,
+    /// Asked of the server by reflection when the request is opened. A
+    /// reflection id names a target, not a schema, so none is stored.
+    Reflection,
+    /// A schema in the library, by id.
+    Library(String),
+}
+
+/// A gRPC request as its tab holds it: unresolved, `{{variables}}` and all.
+/// The URL is kept as typed; the target is parsed from it when invoking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrpcRequestDraft {
+    pub url: String,
+    pub tls: bool,
+    /// `/package.Service/Method`; empty until a method is picked.
+    pub method_path: String,
+    pub schema: GrpcSchemaRef,
+    pub metadata: Vec<KeyValue>,
+    pub auth: Auth,
+    /// The Message tab's JSON text, exactly as typed.
+    pub message: String,
+    pub settings: GrpcSettings,
+}
+
+/// A gRPC request the user saved. A row in `requests` with `kind = 'grpc'`,
+/// so, like `SavedWebSocket`, it sits in any collection or folder, and
+/// renaming, moving, deleting and documenting it act on the row by id.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SavedGrpcRequest {
+    pub id: String,
+    pub collection_id: String,
+    pub folder_id: Option<String>,
+    pub name: String,
+    pub request: GrpcRequestDraft,
+    /// Whether `request.auth`'s secret opened, as for `SavedRequest`.
+    pub secret_state: SecretState,
+}
+
+/// Where a gRPC schema came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SchemaOrigin {
+    /// `.proto` files read from disk.
+    Import,
+    /// Asked of a server by reflection.
+    Reflection,
+}
+
+/// A schema in the library (PLAN-GRPC.md D3, 16g), as stored.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredProtoSchema {
+    pub id: String,
+    pub name: String,
+    pub origin: SchemaOrigin,
+    /// A serialized `FileDescriptorSet`, imports included.
+    pub encoded: Vec<u8>,
+    /// An import's source text by import name. Empty for reflection.
+    pub sources: std::collections::BTreeMap<String, String>,
+    /// Set by storage on every save and rename.
+    pub updated_at: String,
+}
+
+/// Enough to list a schema without loading its descriptors.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProtoSchemaSummary {
+    pub id: String,
+    pub name: String,
+    pub origin: SchemaOrigin,
+    pub updated_at: String,
+}

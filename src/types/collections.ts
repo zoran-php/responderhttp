@@ -4,6 +4,7 @@
 // SavedRequest reuses SendRequestInput from types/http.ts rather than
 // duplicating the request shape a second time.
 import type { KeyValue, SecretState, SendRequestInput } from "@/types/http";
+import type { SavedGrpcRequest } from "@/types/grpc";
 import type { WebSocketRequest, WsDraft } from "@/types/websocket";
 
 export interface Collection {
@@ -72,13 +73,14 @@ export interface ExampleSummary {
   status: number;
 }
 
-/** One collection's folders, requests, example summaries and WebSocket
+/** One collection's folders, requests, example summaries, WebSocket and gRPC
  * requests — what collection_contents returns. */
 export interface CollectionContents {
   folders: Folder[];
   requests: SavedRequest[];
   examples: ExampleSummary[];
   webSockets: SavedWebSocket[];
+  grpcRequests: SavedGrpcRequest[];
 }
 
 /**
@@ -92,4 +94,5 @@ export const EMPTY_COLLECTION_CONTENTS: CollectionContents = {
   requests: [],
   examples: [],
   webSockets: [],
+  grpcRequests: [],
 };

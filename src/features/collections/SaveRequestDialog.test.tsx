@@ -41,6 +41,7 @@ const mixed: CollectionContents = {
   ],
   examples: [],
   webSockets: [],
+  grpcRequests: [],
 };
 
 beforeEach(() => {

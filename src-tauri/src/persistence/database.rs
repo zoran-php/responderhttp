@@ -8,7 +8,7 @@ use crate::domain::error::AppError;
 
 /// Numbered, append-only. `PRAGMA user_version` records how many have run,
 /// so adding a migration means appending to this list and nothing else.
-const MIGRATIONS: [&str; 10] = [
+const MIGRATIONS: [&str; 11] = [
     include_str!("migrations/0001_initial.sql"),
     include_str!("migrations/0002_request_auth.sql"),
     include_str!("migrations/0003_environments.sql"),
@@ -19,6 +19,7 @@ const MIGRATIONS: [&str; 10] = [
     include_str!("migrations/0008_app_settings.sql"),
     include_str!("migrations/0009_item_docs.sql"),
     include_str!("migrations/0010_web_sockets.sql"),
+    include_str!("migrations/0011_grpc.sql"),
 ];
 
 /// Shared handle to the SQLite file. rusqlite's Connection is not Sync, so a

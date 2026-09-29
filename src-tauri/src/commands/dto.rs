@@ -8,6 +8,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::error::ApiError;
+use crate::commands::grpc_dto::SavedGrpcRequestDto;
 use crate::domain::models::{
     ApiKeyLocation, Auth, ClosedBy, Collection, Cookie, Environment, EnvironmentVariable, Example,
     ExampleSummary, Folder, HistoryEntry, HttpMethod, HttpRequest, HttpResponse,
@@ -1149,6 +1150,7 @@ pub struct CollectionContentsDto {
     /// Summaries only — see CollectionContents.
     pub examples: Vec<ExampleSummaryDto>,
     pub web_sockets: Vec<SavedWebSocketDto>,
+    pub grpc_requests: Vec<SavedGrpcRequestDto>,
 }
 
 impl From<CollectionContents> for CollectionContentsDto {
@@ -1169,6 +1171,11 @@ impl From<CollectionContents> for CollectionContentsDto {
                 .web_sockets
                 .into_iter()
                 .map(SavedWebSocketDto::from)
+                .collect(),
+            grpc_requests: contents
+                .grpc_requests
+                .into_iter()
+                .map(SavedGrpcRequestDto::from)
                 .collect(),
         }
     }
