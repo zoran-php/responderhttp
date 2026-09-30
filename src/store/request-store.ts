@@ -77,6 +77,7 @@ import {
 import { beautify, isBeautifiable } from "@/lib/beautify";
 import { applyStreamEvents, EMPTY_STREAM, type ResponseStream } from "@/lib/sse-log";
 import { encodeOutgoing } from "@/lib/ws-payload";
+import { quitSummary, type QuitSummary } from "@/lib/quit-guard";
 import type { WsConnectionState } from "@/lib/ws-status";
 import { webSocketShapesEqual, type WebSocketShape } from "@/lib/ws-request";
 // Reading the active environment here, rather than threading it through
@@ -349,6 +350,11 @@ interface TabsState {
   /** Null while an environment tab is in front — the builder is not rendered then. */
   activeRequestTab: () => RequestTab | null;
   isDirty: (tabId: string) => boolean;
+  /** What quitting now would throw away: unsaved tabs and running work
+   * (PLAN-LINUX.md 17b-2). */
+  quitSummary: () => QuitSummary;
+  /** Writes every Docs tab's pending autosave, so quitting loses no prose. */
+  saveAllDocs: () => Promise<void>;
 
   openBlankTab: () => string;
   /** Focuses the tab already open for this saved request, if there is one;
@@ -873,6 +879,23 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       return false;
     }
     return !requestInputsEqual(inputFromTab(tab), tab.savedSnapshot);
+  },
+
+  quitSummary: () =>
+    quitSummary(
+      get().tabs.map((tab) => ({
+        kind: tab.kind,
+        dirty: get().isDirty(tab.id),
+        running:
+          (tab.kind === "request" && tab.status === "sending") ||
+          (tab.kind === "websocket" && tab.connection !== "idle") ||
+          (tab.kind === "grpc" && tab.call !== "idle"),
+      })),
+    ),
+
+  saveAllDocs: async () => {
+    const docsTabs = get().tabs.filter((tab) => tab.kind === "docs");
+    await Promise.all(docsTabs.map((tab) => get().saveDocs(tab.id)));
   },
 
   openBlankTab: () => {

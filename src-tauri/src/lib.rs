@@ -319,7 +319,10 @@ pub fn run() -> Result<(), StartupError> {
                 ))),
             });
 
-            tray::build_tray(app)?;
+            // Whether the close button can hide the window, or has to quit
+            // instead because nothing could bring it back (window.rs).
+            let hides_to_tray = tray::build_tray(app)?;
+            app.manage(window::CloseToTray(hides_to_tray));
             Ok(())
         })
         // Set on the builder rather than in setup: Tauri creates the window
@@ -329,6 +332,7 @@ pub fn run() -> Result<(), StartupError> {
         .on_menu_event(menu::handle_menu_event)
         .on_window_event(window::hide_main_window_on_close)
         .invoke_handler(tauri::generate_handler![
+            commands::app::quit_app,
             commands::request::send_request,
             commands::request::cancel_request,
             commands::request::send_and_download,

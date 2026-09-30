@@ -1,11 +1,23 @@
 // http_client/src-tauri/src/desktop/window.rs
-use tauri::{AppHandle, Manager, Runtime, Window, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, Runtime, Window, WindowEvent};
 
 use crate::desktop::toast;
 use crate::AppState;
 
 /// Must match `app.windows[].label` in tauri.conf.json.
 pub const MAIN_WINDOW_LABEL: &str = "main";
+
+/// Every way out of the app (tray, File menu, close button) exits with this.
+pub const EXIT_CODE_SUCCESS: i32 = 0;
+
+/// Asks the frontend whether quitting would lose anything. Must match
+/// QUIT_REQUESTED_EVENT in src/services/app-lifecycle.ts.
+pub const QUIT_REQUESTED_EVENT: &str = "quit-requested";
+
+/// Whether this session has a tray to hide the window into, as found when
+/// the tray was built (desktop/tray.rs). Always true on Windows. False on a
+/// Linux desktop with no StatusNotifier host, stock GNOME among them.
+pub struct CloseToTray(pub bool);
 
 /// Brings the main window back from hidden (tray) or minimized, and focuses it.
 /// Shared by the tray "Show" item and the single-instance callback.
@@ -25,6 +37,11 @@ pub fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 /// The first closes also raise a toast saying so, because a window that
 /// vanishes on X looks like a quit (desktop/toast.rs). Whether to show it is
 /// TrayNotice's call, not this function's.
+///
+/// With no tray (PLAN-LINUX.md 17b-2, decision D4), a hidden window could not
+/// be brought back, so the close button quits instead. It asks the frontend
+/// first, because only the tabs know whether anything would be lost; the
+/// frontend then calls `quit_app` (commands/app.rs), after asking if it must.
 pub fn hide_main_window_on_close<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
     let WindowEvent::CloseRequested { api, .. } = event else {
         return;
@@ -33,6 +50,18 @@ pub fn hide_main_window_on_close<R: Runtime>(window: &Window<R>, event: &WindowE
         return;
     }
     api.prevent_close();
+
+    // try_state: a close before setup has run finds no answer yet, and keeps
+    // the old behaviour rather than panicking (see notify_hidden_to_tray).
+    let hides_to_tray = window
+        .app_handle()
+        .try_state::<CloseToTray>()
+        .is_none_or(|close| close.0);
+    if !hides_to_tray {
+        ask_frontend_to_quit(window);
+        return;
+    }
+
     if let Err(err) = window.hide() {
         report_window_error("hide main window", &err);
     }
@@ -40,6 +69,15 @@ pub fn hide_main_window_on_close<R: Runtime>(window: &Window<R>, event: &WindowE
     // After hiding, never before: the toast describes a window that has
     // already gone, and showing it first would race the user's eyes.
     notify_hidden_to_tray(window.app_handle());
+}
+
+/// If the frontend cannot be asked, there is nobody to answer, and a close
+/// button that does nothing is worse than one that quits.
+fn ask_frontend_to_quit<R: Runtime>(window: &Window<R>) {
+    if let Err(err) = window.emit(QUIT_REQUESTED_EVENT, ()) {
+        report_window_error("ask the window whether to quit", &err);
+        window.app_handle().exit(EXIT_CODE_SUCCESS);
+    }
 }
 
 /// Raises the close-to-tray notice if the user has not turned it off.

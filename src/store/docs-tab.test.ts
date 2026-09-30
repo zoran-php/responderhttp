@@ -283,3 +283,29 @@ describe("setDocsView", () => {
     expect(onlyDocsTab().view).toBe("preview");
   });
 });
+
+describe("quitting", () => {
+  it("saveAllDocs writes every pending Docs tab without waiting for the debounce", async () => {
+    useTabsStore.getState().openDocs(collection);
+    useTabsStore.getState().openDocs(request);
+    await settle();
+    await Promise.resolve();
+    for (const tab of docsTabs()) {
+      useTabsStore.getState().setDocsMarkdown(tab.id, `notes for ${tab.target.id}`);
+    }
+
+    await useTabsStore.getState().saveAllDocs();
+
+    expect(setItemDocs).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(DOCS_AUTOSAVE_MS * 2);
+    expect(setItemDocs).toHaveBeenCalledTimes(2);
+  });
+
+  it("never counts a Docs tab's pending save as something quitting would lose", async () => {
+    useTabsStore.getState().openDocs(collection);
+    await settle();
+    useTabsStore.getState().setDocsMarkdown(onlyDocsTab().id, "not yet written");
+
+    expect(useTabsStore.getState().quitSummary().unsavedTabs).toBe(0);
+  });
+});

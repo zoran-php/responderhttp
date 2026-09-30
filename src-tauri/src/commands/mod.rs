@@ -3,6 +3,7 @@
 // #[tauri::command] adapters, grouped by feature. A command parses input,
 // calls a domain service, and maps the result — no business logic, no curl
 // calls, no SQL. See CLAUDE.md section 2 and section 11 rule 3.
+pub mod app;
 pub mod collections;
 pub mod cookies;
 pub mod docs;

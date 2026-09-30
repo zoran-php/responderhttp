@@ -11,6 +11,8 @@ import { requestPathSegments } from "@/lib/request-path";
 import { matchesDocsShortcut, matchesSaveShortcut } from "@/lib/shortcuts";
 import { clampPaneSize, MIN_BUILDER_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/split-pane";
 import { updateMultipartRow, withTrailingBlankPart } from "@/lib/multipart-rows";
+import { quitWarning } from "@/lib/quit-guard";
+import { onQuitRequested, quitApp } from "@/services/app-lifecycle";
 import { chooseFile } from "@/services/files";
 import { cancelAllGrpc } from "@/services/grpc";
 import { disconnectAllWebSockets } from "@/services/websocket";
@@ -85,6 +87,8 @@ export default function App() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   // A tab with unsaved changes asks before closing; a clean one just closes.
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
+  // What quitting would lose, while the close button is asking about it.
+  const [quitMessage, setQuitMessage] = useState<string | null>(null);
   const [cookiesOpen, setCookiesOpen] = useState(false);
   const [savingExample, setSavingExample] = useState(false);
 
@@ -100,6 +104,34 @@ export default function App() {
   useEffect(() => {
     void disconnectAllWebSockets();
     void cancelAllGrpc();
+  }, []);
+
+  // On a Linux desktop with no tray, the close button quits rather than
+  // hiding the window where nothing could bring it back (PLAN-LINUX.md
+  // 17b-2). Rust asks through this event instead of closing, because only
+  // the tabs know what quitting would lose. The store is read when the event
+  // arrives, not when the listener is made, so the answer is current.
+  useEffect(() => {
+    let stopListening: (() => void) | undefined;
+    let unmounted = false;
+    void onQuitRequested(() => {
+      const warning = quitWarning(useTabsStore.getState().quitSummary());
+      if (warning === null) {
+        void quitNow();
+      } else {
+        setQuitMessage(warning);
+      }
+    }).then((stop) => {
+      if (unmounted) {
+        stop();
+      } else {
+        stopListening = stop;
+      }
+    });
+    return () => {
+      unmounted = true;
+      stopListening?.();
+    };
   }, []);
 
   // The sidebar's own width is the whole distance from the window's left edge,
@@ -615,6 +647,19 @@ export default function App() {
         />
       )}
 
+      {quitMessage !== null && (
+        <ConfirmDialog
+          confirmLabel="Quit"
+          message={quitMessage}
+          onCancel={() => setQuitMessage(null)}
+          onConfirm={() => {
+            setQuitMessage(null);
+            void quitNow();
+          }}
+          title="Quit ResponderHTTP"
+        />
+      )}
+
       {closing && closingName !== null && (
         <ConfirmDialog
           confirmLabel={
@@ -635,4 +680,11 @@ export default function App() {
       )}
     </div>
   );
+}
+
+/** Writes any pending Docs autosave, then ends the app. A failed quit is
+ * already logged by the service, and the window simply stays open. */
+async function quitNow(): Promise<void> {
+  await useTabsStore.getState().saveAllDocs();
+  await quitApp();
 }

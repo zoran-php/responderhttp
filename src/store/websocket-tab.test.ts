@@ -332,6 +332,25 @@ describe("tab lifetime", () => {
   });
 });
 
+describe("what quitting would lose", () => {
+  it("counts an open connection until it closes, beside the tabs left unsaved", async () => {
+    const onEvents = await connected();
+
+    expect(useTabsStore.getState().quitSummary()).toEqual({
+      // The blank request tab left by the teardown is clean; the WebSocket
+      // tab has a URL typed into it and was never saved.
+      unsavedTabs: 1,
+      runningRequests: 0,
+      openConnections: 1,
+      runningCalls: 0,
+    });
+
+    onEvents([closedEvent]);
+
+    expect(useTabsStore.getState().quitSummary().openConnections).toBe(0);
+  });
+});
+
 describe("saved WebSocket requests", () => {
   const saved: SavedWebSocket = {
     id: "req_ws",

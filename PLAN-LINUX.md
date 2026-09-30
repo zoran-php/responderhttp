@@ -180,8 +180,33 @@ On Fedora 44 in WSL2: Rust 1.98.1 (Fedora's package, not rustup), Node 26, pnpm 
   - Every platform's text is built and tested on every build: no links, under 2,000 characters, the core promises, every placeholder filled, and **each platform names only its own system** (no "Windows", "WebView2" or "Credential Manager" in the Linux texts, and no "GNOME", "KWallet", "Flatpak" or "WebKitGTK" in the Windows ones). Linux Privacy is 1,563 characters and Terms 1,443.
 - **`desktop/menu.rs`:** calls the two functions with `Platform::CURRENT`.
 - **`desktop/webview.rs`:** a Linux arm. "ResponderHTTP draws its window with WebKitGTK, and it could not be started…", then update the Flatpak and its runtime, or `sudo dnf reinstall webkit2gtk4.1`. The module header explains that a *missing* WebKitGTK stops the loader before `main`, so the dialog covers one that loads but cannot start. One Linux-only test.
-- **`verify.sh`: green.** vitest 556, **642 library tests** (637 + 3 notices + the tray name test + the webview test; the tray test is ignored), and every integration suite. **Expected from `verify.bat`: 641 library tests**, because the tray-name and webview tests are Linux-only.
+- **`verify.sh`: green.** vitest 556, **642 library tests** (637 + 3 notices + the tray name test + the webview test; the tray test is ignored), and every integration suite. **`verify.bat` on Windows, 2026-09-30: green, 641 library tests as predicted** (the tray-name and webview tests are Linux-only), every integration suite unchanged. The notices tests ran there too: `the_build_reads_its_own_platform` confirms Windows picks its own wording, and `each_platform_names_only_its_own_system` checked the Linux texts from a Windows build.
 - **Still to change with 17f:** `store/privacy-policy.md`, `docs/privacy-policy.html` and `docs/terms.html`, the published full versions, still describe Windows only. The dialogs now say more for Linux than the published policy does; the two must agree before a Linux release.
+
+#### 17b-2 as built — 2026-09-30, `verify.sh` green
+
+**Closing the window on Linux (D4).** With a tray, closing hides the window, as on Windows. With no tray host, closing quits, but asks first when quitting would lose something.
+
+**Why the frontend decides.** What quitting loses is unsaved tabs (tabs live only in memory) and running work, and only the tab store knows either. So Rust does not close the window itself: it asks, and the frontend answers. The rule is the one a single tab already uses when it is closed (`App.tsx`), applied to every tab at once, plus a request that is still sending or streaming.
+
+- **Rust**
+  - `desktop/tray.rs`: `build_tray` returns whether a tray was made (17b-1's check). `lib.rs` keeps the answer as `window::CloseToTray`.
+  - `desktop/window.rs`: the close handler hides to the tray when `CloseToTray` is true (always on Windows), or when setup has not run yet. Otherwise it emits `QUIT_REQUESTED_EVENT` (`"quit-requested"`) and leaves the window open. If the emit fails, nobody can answer, and it quits: a close button that does nothing is worse than one that quits.
+  - `commands/app.rs` (new): `quit_app`, which logs `quitting from the window's close button` and calls `AppHandle::exit`, the same exit as the tray and the File menu. `EXIT_CODE_SUCCESS` now lives once, in `window.rs`, where the tray and the menu each had their own copy.
+- **Frontend**
+  - `lib/quit-guard.ts` (new, pure): `quitSummary` counts unsaved tabs (never a Docs tab, which autosaves and is flushed on quit), sending requests, open WebSockets and running gRPC calls. `quitWarning` turns that into one sentence, or `null`: "Quitting ResponderHTTP loses the unsaved changes in 2 tabs, stops 1 running request, disconnects 3 WebSocket connections and cancels 1 gRPC call."
+  - `services/app-lifecycle.ts` (new): `onQuitRequested` (the one `listen` for that event) and `quitApp` (the `quit_app` command).
+  - `store/request-store.ts`: `quitSummary()`, built from each tab's kind, `isDirty` and running state, and `saveAllDocs()`, which writes every pending Docs autosave before the app ends.
+  - `App.tsx`: listens for the event and reads the store when it arrives, not when the listener is made. With nothing to lose it quits at once; otherwise it shows the existing `ConfirmDialog` ("Quit ResponderHTTP", Cancel / Quit). `quitNow` flushes Docs, then calls `quitApp`.
+- **Checked in the real app** (WSLg, which has no tray host, so it is the no-tray path), in a private D-Bus session. The close request was a `WM_DELETE_WINDOW` sent by a throwaway X11 tool, which is what a window manager's close button sends. WSLg's window manager publishes no window list, so `wmctrl` could not find the window.
+  - All tabs clean: exit code 0, 107 ms after the close request, with `quitting from the window's close button` in the log.
+  - A URL typed into the blank tab, then close: the app stayed open and showed "Quitting ResponderHTTP loses the unsaved changes in 1 tab." (screenshot checked). Typing had to go through XTest; `xdotool type --window` sends synthetic events, which GTK ignores.
+  - Cancel: the dialog closes, and the app and the unsaved URL stay (screenshot checked). Close again, then Quit: exit code 0.
+- **Tests:** `quit-guard.test.ts` (6), `app-lifecycle.test.ts` (3), and three store tests: an open connection counted until it closes, `saveAllDocs` writing every pending Docs tab at once, and a Docs tab never counted as unsaved.
+- **`verify.sh`: green.** vitest **568** (556 + 12), 642 library tests (unchanged: the close handler needs a real window, so the end-to-end check above is its test), and every integration suite.
+- **Expected from `verify.bat`:** vitest 568, 641 library tests. On Windows `CloseToTray` is always true, so closing hides to the tray exactly as before.
+- **Not covered:** a webview that has hung. The close request then gets no answer and the window stays open, so the user has to end the process. No fallback was added: nothing so far calls for one, and a timer that quits under a slow but working page would be worse.
+- **For 17f:** `CLAUDE.md` §3 describes `desktop/window.rs` as "show/focus main window, close-to-tray". It should also say "or quit, asking first, when there is no tray", and list `commands/app.rs`.
 
 ### 17c — The Linux credential store (D3)
 

@@ -7,12 +7,11 @@ use tauri::{
     App, AppHandle, Runtime,
 };
 
-use super::window::{report_window_error, show_main_window};
+use super::window::{report_window_error, show_main_window, EXIT_CODE_SUCCESS};
 
 const TRAY_ID: &str = "main-tray";
 const MENU_ID_SHOW: &str = "show";
 const MENU_ID_QUIT: &str = "quit";
-const EXIT_CODE_SUCCESS: i32 = 0;
 
 /// The notification area draws icons at 16 px times the display scale. The
 /// bundle icon is drawn for large sizes, where a gradient and soft corners
@@ -48,10 +47,13 @@ const TRAY_HOST_NAMES: [&str; 2] = [
 /// startup (found in 17a, traced with G_DEBUG=fatal-criticals). So on Linux
 /// the icon is made only when a tray host is running. A host that starts
 /// later is picked up on the next launch.
-pub fn build_tray<R: Runtime>(app: &App<R>) -> tauri::Result<()> {
+///
+/// Returns whether there is a tray, which decides what the close button does
+/// (desktop/window.rs).
+pub fn build_tray<R: Runtime>(app: &App<R>) -> tauri::Result<bool> {
     if !tray_host_available() {
         log::info!("tray: this desktop has no tray host; running without a tray icon");
-        return Ok(());
+        return Ok(false);
     }
 
     let show = MenuItem::with_id(app, MENU_ID_SHOW, "Show", true, None::<&str>)?;
@@ -74,7 +76,7 @@ pub fn build_tray<R: Runtime>(app: &App<R>) -> tauri::Result<()> {
     builder = builder.icon(tray_icon(scale).clone());
 
     builder.build(app)?;
-    Ok(())
+    Ok(true)
 }
 
 /// Windows always has a notification area.

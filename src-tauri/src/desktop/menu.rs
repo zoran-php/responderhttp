@@ -15,13 +15,12 @@ use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use crate::desktop::notices;
-use crate::desktop::window::MAIN_WINDOW_LABEL;
+use crate::desktop::window::{EXIT_CODE_SUCCESS, MAIN_WINDOW_LABEL};
 
 const MENU_ID_ABOUT: &str = "app-menu:about";
 const MENU_ID_PRIVACY: &str = "app-menu:privacy";
 const MENU_ID_TERMS: &str = "app-menu:terms";
 const MENU_ID_QUIT: &str = "app-menu:quit";
-const EXIT_CODE_SUCCESS: i32 = 0;
 
 /// Handed to `tauri::Builder::menu`, so the menu exists before Tauri creates
 /// the window from tauri.conf.json and that window gets it from the start.
