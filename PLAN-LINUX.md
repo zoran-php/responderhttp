@@ -88,8 +88,10 @@ Where Linux keeps data:
 
 | Build | Database and logs |
 |---|---|
-| RPM, `tauri dev` | `~/.local/share/<identifier>/` |
-| Flatpak | `~/.var/app/io.github.zoran_php.responderhttp/data/<identifier>/` |
+| RPM, AppImage, `tauri dev` | `~/.local/share/io.github.zoran-php.responderhttp/` |
+| Flatpak | `~/.var/app/io.github.zoran_php.responderhttp/data/io.github.zoran_php.responderhttp/` |
+
+(As revised in D1: only the Flatpak uses the underscore spelling.)
 
 ### F7. Smaller things, each one line in a sub-phase
 
@@ -108,7 +110,7 @@ Where Linux keeps data:
 
 | # | Question | Recommendation |
 |---|---|---|
-| **D1** | The Linux identifier | **`io.github.zoran_php.responderhttp` on Linux only**, through `tauri.linux.conf.json`. Flathub requires it. Windows is unchanged. |
+| **D1** | The Linux identifier | ~~`io.github.zoran_php.responderhttp` on Linux only, through `tauri.linux.conf.json`.~~ **Revised 2026-09-30: split by package.** The Tauri CLI's bundler refuses an underscore in the identifier (17d), so the RPM, the AppImage and Windows keep `io.github.zoran-php.responderhttp`, and only the Flatpak, which Flathub requires to use the underscore spelling, is compiled with `TAURI_CONFIG='{"identifier":"io.github.zoran_php.responderhttp"}' cargo build` (17e). The data folder, the keyring item and the single-instance bus name all follow the identifier the binary was built with. |
 | **D2** | What to ship | ~~Flathub plus an `.rpm`~~ **Decided: Flathub, plus an `.rpm` and an AppImage on the GitHub release.** No `.deb`. The AppImage is for other distributions; it bundles GTK and WebKitGTK, so it is the one Linux artefact whose contents 17d must inspect beyond `NEEDED`. |
 | **D3** | Where the data key lives on Linux | **Decided as recommended.** One library that uses the Secret portal inside a Flatpak and Secret Service outside it (candidate `oo7`, to be checked in 17c). No plain-text fallback, ever: without a store, secrets refuse to save, as on Windows today. |
 | **D4** | Closing the window on Linux | **Decided as recommended.** Hide to the tray only when a tray host is present; otherwise closing quits, first asking when a request, stream, WebSocket or gRPC call is live. On stock GNOME that gives normal app behaviour, and on KDE it matches Windows. |
@@ -204,7 +206,7 @@ On Fedora 44 in WSL2: Rust 1.98.1 (Fedora's package, not rustup), Node 26, pnpm 
   - Cancel: the dialog closes, and the app and the unsaved URL stay (screenshot checked). Close again, then Quit: exit code 0.
 - **Tests:** `quit-guard.test.ts` (6), `app-lifecycle.test.ts` (3), and three store tests: an open connection counted until it closes, `saveAllDocs` writing every pending Docs tab at once, and a Docs tab never counted as unsaved.
 - **`verify.sh`: green.** vitest **568** (556 + 12), 642 library tests (unchanged: the close handler needs a real window, so the end-to-end check above is its test), and every integration suite.
-- **Expected from `verify.bat`:** vitest 568, 641 library tests. On Windows `CloseToTray` is always true, so closing hides to the tray exactly as before.
+- **`verify.bat` on Windows, 2026-09-30: green, as predicted:** vitest 568 in 60 files, 641 library tests, and every integration suite. On Windows `CloseToTray` is always true, so closing hides to the tray exactly as before.
 - **Not covered:** a webview that has hung. The close request then gets no answer and the window stays open, so the user has to end the process. No fallback was added: nothing so far calls for one, and a timer that quits under a slow but working page would be worse.
 - **For 17f:** `CLAUDE.md` §3 describes `desktop/window.rs` as "show/focus main window, close-to-tray". It should also say "or quit, asking first, when there is no tray", and list `commands/app.rs`.
 
@@ -229,6 +231,7 @@ On Fedora 44 in WSL2: Rust 1.98.1 (Fedora's package, not rustup), Node 26, pnpm 
 - **`verify.sh`: green.** vitest 556, **637 library tests** (635 + 2), 14 curl, 14 gRPC, 10, 9, 69 repository, 9 SSE, 19 WebSocket; `linux_keyring` 1 ignored. fmt and clippy clean.
 - **`verify.bat` on Windows, 2026-09-30: green.** vitest 556, **638 library tests** (636 + the two identifier tests, which read config files and so run on Windows too), 14 curl, 14 gRPC (the bidirectional test still inside its 25 ms bound with the `TCP_NODELAY` server), 10, 9, 69 repository, 9 SSE, 19 WebSocket; `linux_keyring` compiles to no tests there. fmt and clippy 1.97 clean, so `as_chunks` and the `i64` comparison hold on both toolchains. Every shared-code change in 17a and 17c is now verified on both platforms.
 - **Not yet seen:** the Secret portal path inside a Flatpak (17e), and the unlock prompt of a locked keyring on a real GNOME desktop (D6).
+- **Superseded in 17d:** the identifier override in `tauri.linux.conf.json` and the two tests tied to it are gone (D1 as revised). The keyring item is now named after the identifier the app runs under, passed in from `lib.rs`.
 
 - A spike first: the chosen library against GNOME Keyring in WSL (`dnf install gnome-keyring`, unlocked in the session) and against the portal in a Flatpak.
 - `secrets/keychain.rs` gains a `cfg(target_os = "linux")` implementation of `DataKeyStore`, with the same rule that only "no entry" creates a key.
@@ -236,10 +239,25 @@ On Fedora 44 in WSL2: Rust 1.98.1 (Fedora's package, not rustup), Node 26, pnpm 
 
 ### 17d — RPM and the release gate
 
-- `release.sh`: `verify.sh`, then `pnpm tauri build --bundles rpm,appimage`, then `check-linux.sh` on the binary.
+- `release.sh`: `verify.sh`, then `pnpm tauri build` (the targets come from `tauri.linux.conf.json`), then `check-linux.sh` on the binary.
 - The AppImage carries its own GTK and WebKitGTK, so its check is different: list what it bundles, and run it in a clean container with none of the `-devel` packages installed.
 - `check-linux.sh`: the `NEEDED` allowlist from F1, each entry with its reason, as in `check-windows.ps1`.
 - Install the `.rpm` in a clean Fedora 44 container (`podman`), confirm that `dnf` pulls in WebKitGTK and nothing unexpected, and send a request.
+
+#### 17d as built (RPM) — 2026-09-30, `release.sh` green
+
+The AppImage is the next step, and is not covered here.
+
+- **The identifier (D1 revised).** `pnpm tauri build` stopped before bundling: the Tauri CLI validates the identifier and refuses the underscore, though `cargo build` and tauri-build accept it (17c). The override came out of `tauri.linux.conf.json`, so the RPM, the AppImage and Windows share `io.github.zoran-php.responderhttp`. The Flatpak will be compiled with `TAURI_CONFIG='{"identifier":"io.github.zoran_php.responderhttp"}' cargo build`, which Flathub's own build runs anyway. **Checked with a build in a separate target folder:** that binary used `~/.local/share/io.github.zoran_php.responderhttp/` and owned `io.github.zoran_php.responderhttp.SingleInstance`.
+- **`secrets/keychain.rs`:** `KeychainDataKeyStore::new(app_identifier)` takes the identifier from `app.config().identifier`, so each build keeps its key beside its own database. `linux_attributes(identifier)` replaces `LINUX_ATTRIBUTES`. Windows passes the same identifier as before, so the Credential Manager target and the uninstall hook are unchanged. Tests: the two that tied the Linux service to `tauri.linux.conf.json` became one (`the_linux_item_is_named_after_the_running_identifier`), so there is **one library test fewer**. `tests/linux_keyring.rs` passes `KEYCHAIN_SERVICE`, and still passes in `tools/test-linux-session.sh`.
+- **`tauri.linux.conf.json`:** targets `rpm` (the AppImage is added back in its own step), licence `LicenseRef-Proprietary`, homepage, a long description, and the LICENSE installed as `/usr/share/licenses/responder-http/LICENSE`.
+- **The RPM:** `ResponderHTTP-1.1.0-1.x86_64.rpm`, 7.6 MB. Package `responder-http`. It contains `/usr/bin/responderhttp` (15.6 MB), `ResponderHTTP.desktop` (passes `desktop-file-validate`), the icons and the licence. **Requires only `libwebkit2gtk-4.1.so.0`, `libgtk-3.so.0` and `libappindicator3.so.1`.** rpmlint's remaining findings are accepted: the spelling check on "gRPC" and "keyring", the proprietary licence tag, the missing changelog and build-host tags and man page (Tauri's bundler cannot set them), and the file name, which differs from the package name.
+- **`spikes/static-link-proof/check-linux.sh`** (new): the `NEEDED` allowlist from F1, each entry with its reason. libcurl, OpenSSL, SQLite, nghttp2, rustls, ssh, brotli and zstd fail by name, whatever the allowlist says. **The release binary names 15 libraries, all allowed:** libc, libm, libgcc_s, WebKitGTK 4.1, JavaScriptCore, libsoup 3, GTK 3, GDK, gdk-pixbuf, cairo, gio, gobject, glib, libdbus and zlib. A negative test (a binary linked against libcurl and libssl) failed, naming both.
+- **`release.sh`** (new): the Linux twin of `release.bat`. It runs `verify.sh` and stops on any failing step, then `pnpm tauri build`, the link check, and each RPM's requirements, all into `release-log.txt`. **Green:** vitest 568, **641 library tests**, and every integration suite.
+- **`tools/test-rpm-install.sh`** (new): installs the RPM into a clean `registry.fedoraproject.org/fedora:44` container through `dnf`, as a user would, then fails on any `ldd` "not found" and checks the desktop file and the licence. **Passed:** `dnf` resolved 343 packages, all from Fedora (a bare container has no desktop; a Workstation already has nearly all of them), and the loader found every library.
+- **`--gui`** starts the installed app from inside that container on the WSLg display. **It drew, and a GET to `https://fedoraproject.org/` returned 200 in 688 ms** with TLS verified: `Loaded 121 CA root certificates from the system`, from the container's own `/etc/pki`. The container has no session bus, and the app handled that as designed: `secrets: no usable data key this session` (secrets refuse to save, no plain-text fallback), and `this desktop has no tray host; running without a tray icon`.
+- **Expected from `verify.bat`:** vitest 568, **640 library tests** (641 − 2 + 1). Nothing else shared changed.
+- **Not yet seen:** the RPM on a real Fedora Workstation, with a keyring and GNOME Shell (D6).
 
 ### 17e — Flatpak
 

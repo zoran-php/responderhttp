@@ -2,7 +2,7 @@
 //
 // The data key's home in the OS credential store. On Windows it is one
 // generic credential in Credential Manager, named KEYCHAIN_TARGET. On Linux
-// it is one item found by LINUX_ATTRIBUTES, kept by oo7 (PLAN-LINUX.md 17c):
+// it is one item found by `linux_attributes`, kept by oo7 (PLAN-LINUX.md 17c):
 // in Secret Service (GNOME Keyring, KWallet) on the host, and inside a
 // Flatpak in an encrypted keyring file whose key comes from the Secret
 // portal. macOS is still deferred and reports the store as unavailable,
@@ -19,10 +19,17 @@
 // Renamed 2026-09-18 (PLAN.md Phase 10): the identifier became
 // io.github.zoran-php.responderhttp when the app moved to an individual
 // publisher. Nothing is shipped yet, so no key is orphaned.
+//
+// The store is named after the identifier the app is running under, passed
+// in from lib.rs, rather than a constant (PLAN-LINUX.md, D1 as revised
+// 2026-09-30). Every build uses KEYCHAIN_SERVICE except the Flatpak, which
+// Flathub compiles with io.github.zoran_php.responderhttp.
 use crate::domain::error::AppError;
 use crate::domain::ports::DataKeyStore;
 
-/// The app's identifier, as in tauri.conf.json.
+/// The app's identifier, as in tauri.conf.json. What every build but the
+/// Flatpak passes to `KeychainDataKeyStore::new`; the tests below tie it to
+/// the config and the uninstall hook.
 pub const KEYCHAIN_SERVICE: &str = "io.github.zoran-php.responderhttp";
 pub const KEYCHAIN_USER: &str = "data-key";
 /// What Credential Manager shows, and what the NSIS uninstall hook deletes
@@ -37,7 +44,9 @@ pub struct KeychainDataKeyStore {
 
 #[cfg(windows)]
 impl KeychainDataKeyStore {
-    pub fn new() -> Result<Self, AppError> {
+    /// `app_identifier` is always KEYCHAIN_SERVICE on Windows, the name the
+    /// uninstall hook deletes.
+    pub fn new(app_identifier: &str) -> Result<Self, AppError> {
         use keyring_core::api::CredentialStoreApi;
         use std::collections::HashMap;
 
@@ -53,7 +62,7 @@ impl KeychainDataKeyStore {
         let store = windows_native_keyring_store::Store::new_with_configuration(&config)
             .map_err(describe)?;
         let entry = store
-            .build(KEYCHAIN_SERVICE, KEYCHAIN_USER, None)
+            .build(app_identifier, KEYCHAIN_USER, None)
             .map_err(describe)?;
         Ok(Self { entry })
     }
@@ -104,21 +113,20 @@ fn describe(error: keyring_core::Error) -> AppError {
     AppError::SecretStore(message)
 }
 
-/// The Linux app identifier, as in tauri.linux.conf.json. It differs from
-/// KEYCHAIN_SERVICE because Flathub allows a dash only in an ID's last
-/// component (PLAN-LINUX.md, decision D1); a test keeps the two in step.
-pub const LINUX_SERVICE: &str = "io.github.zoran_php.responderhttp";
 /// How the item is found. "service" and "username" are the attribute names
-/// libsecret-based tools use, so `secret-tool lookup service <id> username
-/// data-key` finds the same item.
-pub const LINUX_ATTRIBUTES: [(&str, &str); 2] =
-    [("service", LINUX_SERVICE), ("username", KEYCHAIN_USER)];
+/// libsecret-based tools use, so `secret-tool lookup service <identifier>
+/// username data-key` finds the same item.
+pub fn linux_attributes(app_identifier: &str) -> [(&str, &str); 2] {
+    [("service", app_identifier), ("username", KEYCHAIN_USER)]
+}
+
 /// What a keyring manager such as Seahorse shows for the item.
 pub const LINUX_LABEL: &str = "ResponderHTTP data key";
 
 #[cfg(target_os = "linux")]
 pub struct KeychainDataKeyStore {
     keyring: oo7::Keyring,
+    app_identifier: String,
 }
 
 #[cfg(target_os = "linux")]
@@ -126,9 +134,12 @@ impl KeychainDataKeyStore {
     /// Fails when there is neither a Secret portal (in a Flatpak) nor a
     /// Secret Service on the session bus: secrets are then unavailable for
     /// the session, as when Credential Manager cannot be reached on Windows.
-    pub fn new() -> Result<Self, AppError> {
+    pub fn new(app_identifier: &str) -> Result<Self, AppError> {
         let keyring = block_on(oo7::Keyring::new())?.map_err(describe)?;
-        Ok(Self { keyring })
+        Ok(Self {
+            keyring,
+            app_identifier: app_identifier.to_string(),
+        })
     }
 }
 
@@ -141,7 +152,7 @@ impl DataKeyStore for KeychainDataKeyStore {
             self.keyring.unlock().await.map_err(describe)?;
             let items = self
                 .keyring
-                .search_items(&LINUX_ATTRIBUTES)
+                .search_items(&linux_attributes(&self.app_identifier))
                 .await
                 .map_err(describe)?;
             match items.as_slice() {
@@ -162,7 +173,12 @@ impl DataKeyStore for KeychainDataKeyStore {
         block_on(async {
             self.keyring.unlock().await.map_err(describe)?;
             self.keyring
-                .create_item(LINUX_LABEL, &LINUX_ATTRIBUTES, key, true)
+                .create_item(
+                    LINUX_LABEL,
+                    &linux_attributes(&self.app_identifier),
+                    key,
+                    true,
+                )
                 .await
                 .map_err(describe)
         })?
@@ -196,7 +212,7 @@ pub struct KeychainDataKeyStore;
 
 #[cfg(not(any(windows, target_os = "linux")))]
 impl KeychainDataKeyStore {
-    pub fn new() -> Result<Self, AppError> {
+    pub fn new(_app_identifier: &str) -> Result<Self, AppError> {
         Err(AppError::SecretStore(
             "no OS credential store is wired up for this platform yet".into(),
         ))
@@ -206,11 +222,11 @@ impl KeychainDataKeyStore {
 #[cfg(not(any(windows, target_os = "linux")))]
 impl DataKeyStore for KeychainDataKeyStore {
     fn load(&self) -> Result<Option<zeroize::Zeroizing<Vec<u8>>>, AppError> {
-        Self::new().map(|_| None)
+        Self::new(KEYCHAIN_SERVICE).map(|_| None)
     }
 
     fn store(&self, _key: &[u8]) -> Result<(), AppError> {
-        Self::new().map(|_| ())
+        Self::new(KEYCHAIN_SERVICE).map(|_| ())
     }
 }
 
@@ -246,22 +262,15 @@ mod tests {
         assert!(config.contains(&format!("\"identifier\": \"{KEYCHAIN_SERVICE}\"")));
     }
 
+    /// The Linux item is found by the identifier the app runs under, so a
+    /// Flatpak build and an RPM keep separate keys, as they keep separate
+    /// databases.
     #[test]
-    fn the_linux_service_is_the_linux_app_identifier() {
-        let config = include_str!("../../tauri.linux.conf.json");
-
-        assert!(config.contains(&format!("\"identifier\": \"{LINUX_SERVICE}\"")));
-    }
-
-    /// Flathub's rule for an app ID: a dash only in the last component.
-    #[test]
-    fn the_linux_service_is_a_valid_flathub_id() {
-        let components: Vec<&str> = LINUX_SERVICE.split('.').collect();
-        let (last, rest) = components.split_last().expect("has components");
-
-        assert!(components.len() >= 4, "io.github.<user>.<repo>");
-        assert!(rest.iter().all(|part| !part.contains('-')));
-        assert!(!last.is_empty());
+    fn the_linux_item_is_named_after_the_running_identifier() {
+        assert_eq!(
+            linux_attributes("io.example.app"),
+            [("service", "io.example.app"), ("username", KEYCHAIN_USER)]
+        );
     }
 
     /// The store refuses a service containing the divider, so the divider

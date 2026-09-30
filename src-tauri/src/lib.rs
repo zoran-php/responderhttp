@@ -221,7 +221,7 @@ pub fn run() -> Result<(), StartupError> {
             // (PLAN.md Phase 9). A store that cannot be used does not stop the
             // app: secrets then load as unavailable and cannot be saved, and
             // nothing is ever written in plain text instead.
-            let (cipher, origin) = match KeychainDataKeyStore::new() {
+            let (cipher, origin) = match KeychainDataKeyStore::new(&app.config().identifier) {
                 Ok(store) => open_cipher(&store),
                 Err(error) => without_key(error.to_string()),
             };

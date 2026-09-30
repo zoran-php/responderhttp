@@ -8,13 +8,13 @@
 #![cfg(target_os = "linux")]
 
 use responderhttp_lib::domain::ports::OpenedSecret;
-use responderhttp_lib::secrets::keychain::KeychainDataKeyStore;
+use responderhttp_lib::secrets::keychain::{KeychainDataKeyStore, KEYCHAIN_SERVICE};
 use responderhttp_lib::secrets::{open_cipher, CipherOrigin};
 
 #[test]
 #[ignore = "needs a Secret Service: run tools/test-linux-session.sh"]
 fn the_data_key_is_created_once_and_read_back_by_the_next_start() {
-    let first = KeychainDataKeyStore::new().expect("a Secret Service is reachable");
+    let first = KeychainDataKeyStore::new(KEYCHAIN_SERVICE).expect("a Secret Service is reachable");
     let (cipher, origin) = open_cipher(&first);
     assert_eq!(
         origin,
@@ -24,7 +24,8 @@ fn the_data_key_is_created_once_and_read_back_by_the_next_start() {
     let sealed = cipher.seal("scope", "hunter2").expect("should seal");
 
     // A second store is what the next start of the app does.
-    let second = KeychainDataKeyStore::new().expect("a Secret Service is reachable");
+    let second =
+        KeychainDataKeyStore::new(KEYCHAIN_SERVICE).expect("a Secret Service is reachable");
     let (cipher, origin) = open_cipher(&second);
 
     assert_eq!(origin, CipherOrigin::ExistingKey);
