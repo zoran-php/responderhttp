@@ -149,7 +149,7 @@
             <div class="max-w-3xl">
                 <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-themeCard border border-themeBorder text-xs text-textMuted font-mono mb-4">
                     <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    <span>Effective Date: 28 September 2026</span>
+                    <span>Effective Date: 30 September 2026</span>
                 </div>
                 <h1 class="text-3xl sm:text-5xl font-extrabold text-textPrimary tracking-tight print-text-dark">
                     Privacy Policy
@@ -183,7 +183,7 @@
                 </div>
                 <div>
                     <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">100% Local Storage</h2>
-                    <p class="text-xs text-textSecondary mt-1 leading-snug">Data stays inside your local Windows profile SQLite database.</p>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">Data stays in a local SQLite database in your user profile or home folder.</p>
                 </div>
             </div>
 
@@ -192,8 +192,8 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                 </div>
                 <div>
-                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">Hardware Encrypted</h2>
-                    <p class="text-xs text-textSecondary mt-1 leading-snug">Secrets protected via Windows Credential Manager keys.</p>
+                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">Encrypted Secrets</h2>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">Secrets encrypted with a key in your system's credential store.</p>
                 </div>
             </div>
 
@@ -283,7 +283,7 @@
                         </h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed mb-4 print-text-dark">
-                        The app keeps its data in a SQLite database in your Windows user profile, inside the app's own storage. That database holds:
+                        The app keeps its data in a SQLite database inside the app's own storage: in your Windows user profile on Windows, and in your home folder on Linux. That database holds:
                     </p>
                     
                     <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
@@ -333,7 +333,7 @@
 
                     <div class="mt-6 pt-4 border-t border-themeBorder/80 flex items-center text-xs text-textMuted font-mono">
                         <svg class="w-4 h-4 text-brandAccent mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        <span>Uninstalling the app removes this data.</span>
+                        <span>On Windows, uninstalling the app removes this data. On Linux, uninstalling leaves it in your home folder; delete the app's data folder to remove it.</span>
                     </div>
                 </section>
 
@@ -348,7 +348,7 @@
                         </h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        Values the app treats as secrets — passwords, bearer tokens, API keys, and environment variables marked secret — are never written to the database in plain text. They are encrypted with a key held in <strong class="text-textPrimary font-semibold print-text-dark">Windows Credential Manager</strong>, which only your Windows account can read. The key never leaves your computer.
+                        Values the app treats as secrets — passwords, bearer tokens, API keys, and environment variables marked secret — are never written to the database in plain text. They are encrypted with a key held in the operating system&rsquo;s credential store, which only your user account can read: <strong class="text-textPrimary font-semibold print-text-dark">Windows Credential Manager</strong> on Windows, and your desktop&rsquo;s <strong class="text-textPrimary font-semibold print-text-dark">keyring</strong> on Linux (GNOME Keyring or KWallet, reached through the secret portal when the app runs as a Flatpak). The key never leaves your computer.
                     </p>
                 </section>
 
@@ -446,7 +446,7 @@
                         </h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        Importing an OpenAPI document, or saving a response to disk, reads and writes only the file you chose in the system dialog. Importing .proto files reads the files you chose and the files they import, looked up only in their own folders and the import folders you chose.
+                        Importing an OpenAPI document, or saving a response to disk, reads and writes only the file you chose in the system dialog. Importing .proto files reads the files you chose and the files they import, looked up only in their own folders and the import folders you chose. When the app runs as a Flatpak, it has no access to your files of its own: the system dialog grants it the files you choose, and nothing else.
                     </p>
                 </section>
 

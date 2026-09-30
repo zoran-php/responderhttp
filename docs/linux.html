@@ -222,14 +222,14 @@
                                     <td class="px-4 py-2.5 text-textSecondary print-text-dark">Download the newer AppImage. It carries its own WebKitGTK, which is only updated with it</td>
                                 </tr>
                                 <tr class="hover:bg-themeCardHover/40 transition-colors">
-                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Flatpak (Flathub)</td>
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Flatpak</td>
                                     <td class="px-4 py-2.5 text-textSecondary print-text-dark">Any distribution with Flatpak, including older ones</td>
-                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Automatic, through Flathub and the GNOME runtime</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Install the newer bundle. Its GNOME runtime, with WebKitGTK, is updated by Flatpak on its own</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">Status:</strong> all three packages are built and tested for version 1.1.0, but none is published yet: the RPM and the AppImage are not yet available for download, and the Flatpak has still to be submitted to Flathub.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">Status:</strong> all three packages are built and tested for version 1.1.0, but none is published yet; they will be attached to the release on the project’s GitHub page. A Flathub listing is planned.</p>
                 </section>
                 <section id="requirements" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
@@ -290,7 +290,7 @@
                                 <tr class="hover:bg-themeCardHover/40 transition-colors">
                                     <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Flatpak</td>
                                     <td class="px-4 py-2.5 text-textSecondary print-text-dark">Flatpak itself; the GNOME runtime brings its own libraries</td>
-                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Expected to run on older distributions too; to be tested before it is published</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Expected to run on older distributions too; not yet tried on them</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -350,7 +350,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Each test started the app on a clean installation with only a desktop’s base libraries, under X11, and checked that its window came up. An HTTPS request was sent on Fedora 44 and Ubuntu 22.04, verified against each system’s own certificate store. For Debian 10 and 11 and Ubuntu 20.04, the Flatpak will be the way to run ResponderHTTP.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Each test started the app on a clean installation with only a desktop’s base libraries, under X11, and checked that its window came up. An HTTPS request was sent on Fedora 44 and Ubuntu 22.04, verified against each system’s own certificate store. For Debian 10 and 11 and Ubuntu 20.04, the Flatpak is the way to run ResponderHTTP; it has not yet been tried on them.</p>
                 </section>
                 <section id="install" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
@@ -369,7 +369,9 @@
 ./ResponderHTTP_1.1.0_amd64.AppImage</pre>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">An AppImage is one file you run directly, with nothing to install. It needs <span class="font-mono text-xs">fuse3</span> to open itself, which most desktops already have. If it says <span class="font-mono text-xs">No suitable fusermount binary found</span>, install it (<span class="font-mono text-xs">sudo apt install fuse3</span> on Ubuntu and Debian), or start the AppImage with <span class="font-mono text-xs">--appimage-extract-and-run</span>. It does not add itself to the applications menu; a tool such as Gear Lever or AppImageLauncher can do that.</p>
                     <h3 class="text-sm font-bold text-textPrimary uppercase tracking-wider mt-6 mb-3 print-text-dark">Flatpak (any distribution)</h3>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Not yet available. Once the app is on Flathub it will install from GNOME Software, KDE Discover or <span class="font-mono text-xs">flatpak install flathub io.github.zoran_php.responderhttp</span>. Flathub’s naming rules are why that ID has an underscore where the other packages use a hyphen.</p>
+                    <pre class="mb-4 overflow-x-auto rounded-xl border border-themeBorder bg-themeBg/80 p-4 font-mono text-xs text-textSecondary leading-relaxed print-text-dark">flatpak install --user ResponderHTTP-1.1.0.flatpak
+flatpak run io.github.zoran_php.responderhttp</pre>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">The Flatpak comes as one file from the project’s release page. Installing it also fetches the GNOME runtime it runs on from Flathub, if that is not there already, and adds the app to the applications menu. It runs in Flatpak’s sandbox with no access to your files: you choose files through the system dialog, which hands over only those. Its ID has an underscore where the other packages use a hyphen, because Flathub’s naming rules require it. A listing on Flathub itself, where GNOME Software and KDE Discover would find it, is planned.</p>
                 </section>
                 <section id="behaviour" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
@@ -464,7 +466,7 @@
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The AppImage stops with “version `GLIBC_2.xx' not found” or “GLIBCXX_3.4.xx not found”.</strong> Your distribution is older than the AppImage supports; see the requirements above. Use the Flatpak once it is available</span>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The AppImage stops with “version `GLIBC_2.xx' not found” or “GLIBCXX_3.4.xx not found”.</strong> Your distribution is older than the AppImage supports; see the requirements above. Use the Flatpak instead</span>
                         </li>
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">

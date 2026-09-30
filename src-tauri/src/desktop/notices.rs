@@ -85,7 +85,7 @@ const PRIVACY_STORAGE_LINUX: &str = "Your data stays on your computer. Saved req
 /// secret the portal gets from the desktop's keyring (secrets/keychain.rs).
 const PRIVACY_CREDENTIALS_LINUX: &str = "Credentials are encrypted. Passwords, bearer tokens, API keys and secret variables are never stored in plain text. They are encrypted with a key held in your desktop's keyring (GNOME Keyring or KWallet, reached through the secret portal when the app runs as a Flatpak), which only your user account can read.";
 
-const PRIVACY_OPENING: &str = "Last updated: 28 September 2026
+const PRIVACY_OPENING: &str = "Last updated: 30 September 2026
 
 The developer collects nothing. ResponderHTTP has no analytics, no telemetry, no crash reporting and no accounts. It does not phone home and contains no update checker.";
 
@@ -120,7 +120,7 @@ pub fn terms_text(platform: Platform) -> String {
 const TERMS_PASS_ON: &str = "{pass_on}";
 const TERMS_WEBVIEW: &str = "{webview}";
 
-const TERMS_TEMPLATE: &str = "Effective date: 28 September 2026
+const TERMS_TEMPLATE: &str = "Effective date: 30 September 2026
 
 ResponderHTTP is published by Zoran Davidović. Use it freely, for anything, at no cost, but do not distribute a modified copy.
 

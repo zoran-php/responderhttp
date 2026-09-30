@@ -4,7 +4,8 @@
 # The Linux twin of release.bat (PLAN-LINUX.md 17d): verify.sh, then the
 # release build and the RPM, the link check against the real binary, then
 # the AppImage, built in an Ubuntu 22.04 container (tools/build-appimage.sh
-# says why) and checked on its own terms. Output goes to release-log.txt in the same "=== step ===" /
+# says why) and checked on its own terms, and the Flatpak bundle, built
+# offline with Flathub's builder and linted (tools/build-flatpak.sh). Output goes to release-log.txt in the same "=== step ===" /
 # "exit=N" shape, so a run can be read off-machine.
 #
 # The link check is the step that matters (check-linux.sh): libcurl, TLS and
@@ -57,8 +58,14 @@ spikes/static-link-proof/check-appimage.sh src-tauri/target/appimage/*.AppImage 
 echo "exit=$?" >> "$LOG"
 
 echo >> "$LOG"
+echo "=== Flatpak (bundle, Flathub's linter) ===" >> "$LOG"
+tools/build-flatpak.sh >> "$LOG" 2>&1
+echo "exit=$?" >> "$LOG"
+
+echo >> "$LOG"
 echo "=== bundles ===" >> "$LOG"
-ls -l src-tauri/target/release/bundle/rpm/*.rpm src-tauri/target/appimage/*.AppImage >> "$LOG" 2>&1
+ls -l src-tauri/target/release/bundle/rpm/*.rpm src-tauri/target/appimage/*.AppImage \
+    src-tauri/target/flatpak/bundle/*.flatpak >> "$LOG" 2>&1
 for rpm in src-tauri/target/release/bundle/rpm/*.rpm; do
     [ -e "$rpm" ] || continue
     echo "--- $rpm requires:" >> "$LOG"

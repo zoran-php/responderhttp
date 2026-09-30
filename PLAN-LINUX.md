@@ -111,7 +111,7 @@ Where Linux keeps data:
 | # | Question | Recommendation |
 |---|---|---|
 | **D1** | The Linux identifier | ~~`io.github.zoran_php.responderhttp` on Linux only, through `tauri.linux.conf.json`.~~ **Revised 2026-09-30: split by package.** The Tauri CLI's bundler refuses an underscore in the identifier (17d), so the RPM, the AppImage and Windows keep `io.github.zoran-php.responderhttp`, and only the Flatpak, which Flathub requires to use the underscore spelling, is compiled with `TAURI_CONFIG='{"identifier":"io.github.zoran_php.responderhttp"}' cargo build` (17e). The data folder, the keyring item and the single-instance bus name all follow the identifier the binary was built with. |
-| **D2** | What to ship | ~~Flathub plus an `.rpm`~~ **Decided: Flathub, plus an `.rpm` and an AppImage on the GitHub release.** No `.deb`. The AppImage is for other distributions; it bundles GTK and WebKitGTK, so it is the one Linux artefact whose contents 17d must inspect beyond `NEEDED`. **Where it is built, decided 2026-09-30:** in an Ubuntu 22.04 container, because an AppImage built on Fedora 44 needs glibc 2.43 (17d). |
+| **D2** | What to ship | ~~Flathub plus an `.rpm`~~ **Decided: Flathub, plus an `.rpm` and an AppImage on the GitHub release.** No `.deb`. The AppImage is for other distributions; it bundles GTK and WebKitGTK, so it is the one Linux artefact whose contents 17d must inspect beyond `NEEDED`. **Where it is built, decided 2026-09-30:** in an Ubuntu 22.04 container, because an AppImage built on Fedora 44 needs glibc 2.43 (17d). **Revised 2026-09-30 (17f): the Flatpak is self-hosted for now**, a bundle on the GitHub release, because Flathub does not accept an AI-written manifest; a Flathub listing is left to you, with a manifest written by hand. |
 | **D3** | Where the data key lives on Linux | **Decided as recommended.** One library that uses the Secret portal inside a Flatpak and Secret Service outside it (candidate `oo7`, to be checked in 17c). No plain-text fallback, ever: without a store, secrets refuse to save, as on Windows today. |
 | **D4** | Closing the window on Linux | **Decided as recommended.** Hide to the tray only when a tray host is present; otherwise closing quits, first asking when a request, stream, WebSocket or gRPC call is live. On stock GNOME that gives normal app behaviour, and on KDE it matches Windows. |
 | **D5** | File access in the Flatpak | **Decided as recommended.** Portals only, no `--filesystem=home`. A saved multipart path from the portal keeps working while its permission stands. The request tells the user if it cannot open the file, as it already does for a moved file. |
@@ -346,6 +346,46 @@ The AppImage is covered in the next section.
 - `CLAUDE.md` (§1, §3 new files, §4 Linux engine notes, §9 the Linux commands, §10 and §11 which system libraries are allowed), the README, `store/privacy-policy.md` and `docs/`, and a `store/flathub.md` like `store/listing.md`.
 - Screenshots taken on real GNOME (D6).
 - **You:** a pull request to `flathub/flathub` with the manifest. Once merged, Flathub creates the app repository, and you verify the app ID against your GitHub account so it shows as verified.
+
+#### 17f as built — 2026-09-30
+
+- **Flathub's Generative AI policy** (docs.flathub.org, "Requirements", in its current form from 28 September 2026) changed the plan. It says:
+  - Flathub manifests must not contain AI-generated or AI-assisted content, and disclosure does not exempt them;
+  - AI-generated code, documentation or packaging in the app must be disclosed, and reviewers may reject on its extent;
+  - AI tools must not open or automate the submission pull request, or write its commits, description, review comments or replies.
+  
+  The manifest in `flatpak/` was written here with an AI assistant, so it cannot be submitted, nor anything derived from it. The Flathub copy of the manifest, the PR steps drafted for you and the PR text were therefore **not** made.
+- **Decided with you: self-host now, Flathub later.**
+  - `tools/build-flatpak.sh` now also writes **`src-tauri/target/flatpak/bundle/ResponderHTTP-<version>.flatpak`** (6.4 MB) with `flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo`, so installing it fetches the GNOME runtime from Flathub. It is attached to the GitHub release like the RPM and the AppImage, and `release.sh` builds it after them.
+  - **Tested:** the app was uninstalled and installed again from the bundle (`flatpak install --user ResponderHTTP-1.1.0.flatpak`, origin `responderhttp-origin`, runtime `org.gnome.Platform/51`), and `tools/test-flatpak-session.sh` **passed all three checks** on it.
+  - A bundle does not update itself; the runtime it runs on does, through Flatpak.
+- **`store/flathub.md`** (new): Flathub's rules as they apply here, which files are AI-written and what the disclosure has to cover, the self-hosted bundle, the technical requirements a hand-written manifest must meet (from 17e), and Flathub's submission steps. It carries no draft manifest and no PR text.
+- **`CLAUDE.md`:**
+  - §1: which system libraries Linux may link, and the Linux outputs;
+  - §3: `commands/app.rs`, the corrected `desktop/window.rs` and `tray.rs` lines (the 17b-2 note), `secrets/`, `tauri.linux.conf.json`, `flatpak/`, `tools/`, the link checks and both gates;
+  - §4: the Linux gRPC round trip, and a new **Linux** subsection covering linking, the AppImage floors, CA roots, the `CURLcode` type, the split identifier, closing without a tray, the Flatpak, and **the rule that nothing is submitted to Flathub from this repository**;
+  - §5: where the key lives on Linux;
+  - §9: the Linux commands;
+  - §10: both release gates, and regenerating the offline source lists after a lockfile change;
+  - §11 rule 2: which libraries Linux may link.
+- **README:**
+  - Windows and Linux in the introduction and install section: the three Linux packages with their minimums, and 1.0.0 corrected to 1.1.0 in the installer names;
+  - the Linux behaviour of the tray, where data lives, two Linux troubleshooting entries, the Linux build requirements (`webkit2gtk4.1-devel`, `libappindicator-gtk3-devel`, a C toolchain, as installed in 17a) and the Linux scripts;
+  - "installer or package" in the licence summary.
+- **Privacy policy and terms:** Linux text in `store/privacy-policy.md`, `docs/privacy-policy.html` and `docs/terms.html`, matching the in-app texts (17b-1):
+  - data in the home folder, left behind on uninstall;
+  - the key in the desktop keyring (GNOME Keyring or KWallet, the secret portal in a Flatpak);
+  - no file access of its own in a Flatpak;
+  - "installer or package";
+  - WebKitGTK and GTK under their own licences.
+  
+  The privacy page's "Hardware Encrypted" card became "Encrypted Secrets": the key is in the OS credential store, not in hardware. **All five dates moved to 30 September 2026**: both web pages, `store/privacy-policy.md`, and `PRIVACY_OPENING` and `TERMS_TEMPLATE` in `desktop/notices.rs`.
+- **Website:** the Linux page, the Overview and the Security page describe the self-hosted Flatpak (its install commands, updates, no file access) and say a Flathub listing is planned. The Security page's list of unsigned downloads now includes the AppImage and the Flatpak bundle.
+- **`verify.sh`: green** after the `notices.rs` change. vitest 568, 641 library tests, fmt and clippy clean.
+- **Still open:**
+  - Flathub's linter reports `appstream-missing-screenshots` until `docs/screenshots/linux-http.png` is published, so `tools/build-flatpak.sh` exits 1 and `release.sh` reports that step as failing until GitHub Pages serves the image;
+  - screenshots on real GNOME, and the other D6 checks;
+  - the Flathub submission, which is yours to write.
 
 **Sequencing:** 17a → 17b → 17c → 17d → 17e → 17f. 17c's spike can run beside 17b.
 

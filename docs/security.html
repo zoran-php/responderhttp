@@ -332,7 +332,7 @@
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Linux, Flatpak</strong> (in preparation): the key is kept in an encrypted keyring file inside the app’s sandbox, whose own key comes from the desktop through the Secret portal</span>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Linux, Flatpak</strong> : the key is kept in an encrypted keyring file inside the app’s sandbox, whose own key comes from the desktop through the Secret portal</span>
                         </li>
                     </ul>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">There is no plain-text fallback.</strong> If the credential store cannot be reached, for example on a Linux session with no keyring running, the app runs normally but refuses to save secrets for that session and says so. It never writes one unencrypted instead.</p>
@@ -538,7 +538,7 @@
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01"></path></svg>
                             </div>
-                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Unsigned direct downloads.</strong> The Windows NSIS and MSI installers and the Linux RPM are not signed yet, so Windows SmartScreen warns about the installers and <span class="font-mono text-xs">dnf</span> cannot check the RPM’s signature. Packages from the Microsoft Store and Flathub are signed by the store</span>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Unsigned direct downloads.</strong> The Windows NSIS and MSI installers and the Linux RPM, AppImage and Flatpak bundle are not signed yet, so Windows SmartScreen warns about the installers and <span class="font-mono text-xs">dnf</span> cannot check the RPM’s signature. Get them only from the project’s own release page. Packages from the Microsoft Store, and from Flathub once listed there, are signed by the store</span>
                         </li>
                     </ul>
                 </section>

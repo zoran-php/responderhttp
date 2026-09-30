@@ -2,10 +2,16 @@
 # tools/build-flatpak.sh
 #
 # Builds the Flatpak from this working tree the way Flathub does, offline,
-# installs it for the current user, and runs Flathub's linter on the manifest
-# and on the built repository (PLAN-LINUX.md 17e). Run it with:
+# installs it for the current user, runs Flathub's linter on the manifest and
+# on the built repository, and writes the single-file bundle that is attached
+# to a GitHub release (PLAN-LINUX.md 17e, 17f). Run the installed app with:
 #
 #   flatpak run io.github.zoran_php.responderhttp
+#
+# The bundle is self-hosted distribution, not a Flathub submission: Flathub
+# does not accept AI-written manifests (PLAN-LINUX.md 17f), so a Flathub
+# manifest is written separately, by hand. The bundle names Flathub only as
+# the place its GNOME runtime comes from.
 #
 # Needs flatpak, and from Flathub: org.flatpak.Builder (the builder and the
 # linter) and the GNOME 51 SDK with the rust-stable and node26 extensions for
@@ -32,8 +38,8 @@ mkdir -p "$WORK"
 # Flathub's build service produces. Only the folders differ: the wrapper
 # writes repo/ and builddir/ into the current directory, and --sandbox is
 # left out: it refuses a source outside the manifest's folder, which the
-# local manifest's `path: ..` is. The Flathub copy uses a git source, which
-# --sandbox allows, and no other option it forbids. Screenshots and
+# local manifest's `path: ..` is, and no other option it forbids is used.
+# Screenshots and
 # icons are mirrored into the repository, so the screenshot URLs must already
 # be reachable, which for docs/screenshots/ means published by GitHub Pages.
 flatpak run --filesystem="$PWD" org.flatpak.Builder \
@@ -47,5 +53,14 @@ echo "=== flatpak-builder-lint: manifest ==="
 flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest "$MANIFEST" || lint_failed=1
 echo "=== flatpak-builder-lint: repo ==="
 flatpak run --command=flatpak-builder-lint org.flatpak.Builder repo "$WORK/repo" || lint_failed=1
+
+VERSION=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' src-tauri/tauri.conf.json)
+BUNDLE="$WORK/bundle/ResponderHTTP-$VERSION.flatpak"
+mkdir -p "$WORK/bundle"
+rm -f "$WORK"/bundle/*.flatpak
+flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+    "$WORK/repo" "$BUNDLE" "$APP_ID"
+ls -l "$BUNDLE"
+
 [ -z "${lint_failed:-}" ] || { echo "the linter reported problems (above)" >&2; exit 1; }
 echo "built, installed and linted: flatpak run $APP_ID"

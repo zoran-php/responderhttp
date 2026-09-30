@@ -12,6 +12,8 @@ The app is a **UI shell over an embedded cURL engine**. It collects request para
 
 **Non-negotiable constraint:** `curl` must **not** be required on the user's machine. `libcurl` is **statically linked into the binary**. Never shell out to a `curl` process, and never assume any system library is present.
 
+On Linux the window is drawn by the system's WebKitGTK and GTK, the counterpart of WebView2 on Windows, which no Linux desktop app links statically. Those and the other desktop libraries on `spikes/static-link-proof/check-linux.sh`'s allowlist (glib, D-Bus, zlib, libc) are the only shared libraries the binary may name; libcurl, TLS and SQLite stay compiled in (PLAN-LINUX.md F1).
+
 | | |
 |---|---|
 | Shell | Tauri 2.x (Rust) |
@@ -19,7 +21,7 @@ The app is a **UI shell over an embedded cURL engine**. It collects request para
 | HTTP engine | `libcurl` via the `curl` crate, statically linked; WebSocket through libcurl's own WS API; gRPC as HTTP/2 through its multi interface |
 | gRPC schemas | `protox` (compiles `.proto` in memory, no `protoc`), `prost-reflect` (dynamic messages and the JSON mapping), `prost`, and `miette` for the line and column of a schema error — all pure Rust |
 | Persistence | SQLite via `rusqlite` (bundled, statically linked) |
-| Output | `app.exe` (Windows) / single ELF binary (Linux) / `.app` (macOS) |
+| Output | `app.exe` (Windows: NSIS, MSI, MSIX); one ELF binary (Linux), packaged as an RPM, an AppImage and a Flatpak (PLAN-LINUX.md); `.app` (macOS, not yet supported) |
 
 ---
 
@@ -87,12 +89,12 @@ Strict three-layer separation. **Business logic never lives in a React component
 │   ├── src/
 │   │   ├── main.rs               # binary entry point — calls lib::run(), nothing else
 │   │   ├── lib.rs                # bootstrap, plugin registration, DI wiring
-│   │   ├── commands/             # #[tauri::command] adapters, grouped by feature
+│   │   ├── commands/             # #[tauri::command] adapters, grouped by feature (app.rs: quit_app, the Linux close-to-quit)
 │   │   ├── desktop/              # shell only: tray, window lifecycle, single instance — no domain logic
 │   │   │   ├── menu.rs           # menu bar: File > Quit, Help > Privacy Policy / Terms / About
 │   │   │   ├── notices.rs        # About / Privacy / Terms dialog text — no links, fits a message box
-│   │   │   ├── tray.rs           # tray icon + Show/Quit menu
-│   │   │   ├── window.rs         # show/focus main window, close-to-tray
+│   │   │   ├── tray.rs           # tray icon + Show/Quit menu; on Linux only when a tray host is running
+│   │   │   ├── window.rs         # show/focus main window; close hides to the tray, or without one asks the frontend to quit
 │   │   │   └── startup_error.rs  # dialog when the database cannot be opened
 │   │   ├── domain/
 │   │   │   ├── models.rs         # HttpRequest, HttpResponse, Auth, Collection…
@@ -112,11 +114,18 @@ Strict three-layer separation. **Business logic never lives in a React component
 │   │   │   ├── curl_grpc.rs      # libcurl (Multi, HTTP/2) implementation of GrpcTransport
 │   │   │   └── curl_ws_ffi.rs    # hand-written libcurl WebSocket bindings — the ONLY unsafe
 │   │   ├── proto/                # protox + prost-reflect: compile, catalog, JSON codec, example, reflection — pure, no I/O
+│   │   ├── secrets/              # data key (keychain.rs: Credential Manager / Linux keyring via oo7) and the sealed-value envelope
 │   │   └── persistence/
 │   │       ├── migrations/       # NNNN_name.sql, append-only
 │   │       └── repositories/     # SQLite implementations of repo traits
 │   ├── Cargo.toml
-│   └── tauri.conf.json
+│   ├── tauri.conf.json
+│   └── tauri.linux.conf.json     # Linux bundle settings (RPM), merged over tauri.conf.json on Linux only
+├── flatpak/                      # Flatpak manifest for the self-hosted bundle, desktop file, metainfo, offline source lists
+├── tools/                        # Linux build and test scripts: AppImage container, Flatpak, private D-Bus sessions
+├── spikes/static-link-proof/     # check-windows.ps1, check-linux.sh, check-appimage.sh — the release link checks
+├── verify.bat / verify.sh        # the gate on Windows / Linux
+├── release.bat / release.sh      # the gate plus release build, packages and link checks
 └── CLAUDE.md
 ```
 
@@ -135,7 +144,7 @@ curl = { version = "0.4", default-features = false, features = ["static-curl", "
 
 - `static-curl` builds and links libcurl from source into the binary.
 - `rustls` avoids a system OpenSSL dependency. If a platform forces OpenSSL, use `static-ssl` — **never** dynamic linking.
-- After any change to these features, verify the binary has no unexpected dynamic deps: `ldd` (Linux) / `otool -L` (macOS) / Dependency Walker (Windows).
+- After any change to these features, verify the binary has no unexpected dynamic deps: `check-windows.ps1` (Windows, run by `release.bat`), `check-linux.sh` (Linux, run by `release.sh`), `otool -L` (macOS).
 
 ### Design
 
@@ -172,7 +181,7 @@ gRPC calls go over the **same statically linked libcurl**, as HTTP/2 through the
   - Cancel is removing the handle from the multi, which resets the stream.
   - libcurl adds `accept: */*`; an empty `Accept:` removes it. `te: trailers` and `content-type: application/grpc` come from `grpc_wire::request_headers`.
   - A non-gRPC answer (anything but HTTP 200 with `application/grpc…`) is never framed: `is_grpc_response` decides, and the status comes from the HTTP code.
-  - **On Windows, `multi.wait` sleeps its whole timeout, rounded up to the 15.6 ms timer tick.** A message's round trip is therefore about one tick (~16 ms) — accepted, since beating it would need a second `unsafe` file. Throughput is not affected. An integration test pins the round trip under 25 ms.
+  - **On Windows, `multi.wait` sleeps its whole timeout, rounded up to the 15.6 ms timer tick.** A message's round trip is therefore about one tick (~16 ms) — accepted, since beating it would need a second `unsafe` file. Throughput is not affected. An integration test pins the round trip under 25 ms. On Linux the same round trip takes about 0.1 ms.
 - **Messages cross the IPC boundary as JSON text**, never as parsed values, so a 64-bit integer is never touched by JavaScript's number type. For the same reason the frontend formats JSON with `lib/json-reformat.ts`, which re-indents without `JSON.parse`; every pretty-printer in the app uses it.
 - **Schemas.** Imported `.proto` files are read once (only the files the compiler asks for; limits on size and count) and stored with their compiled `FileDescriptorSet` in `proto_schemas` (migration 0011), so a saved request keeps working after the folder moves. A saved request refers to a library schema by id, or to reflection. A reflected schema is asked for again when the URL field is left or the method list opens, only when the server changed.
 - **Secrets.** A saved gRPC request keeps its metadata in `headers_json` and its auth in `auth_json`, sealed by the same path as HTTP. The log shows secret variables as placeholders: Rust reports sent messages re-encoded and resolved, and the store pairs each `sent` event with what was typed (`lib/grpc-log.ts`).
@@ -204,6 +213,19 @@ trait AuthStrategy { fn apply(&self, easy: &mut Easy2<C>, req: &mut HttpRequest)
 
 Adding a new auth type must mean adding one file, not editing five.
 
+### Linux
+
+The engine is the same on Linux; these are the differences the code and the release checks depend on (PLAN-LINUX.md 17a–17e).
+
+- **Linking.** `check-linux.sh` allowlists the binary's `NEEDED` entries — WebKitGTK 4.1, JavaScriptCore, libsoup 3, GTK 3 and its libraries, glib, D-Bus, zlib, libc — each with its reason, and fails libcurl, OpenSSL, SQLite, nghttp2, rustls, ssh, brotli and zstd by name. zlib is the system's: `libz-sys` links it on Linux rather than building its own. The tray library (`libappindicator`) is loaded at run time, so it is never in `NEEDED`.
+- **The AppImage** carries WebKitGTK and GTK but not glibc or libstdc++, so it is built in an Ubuntu 22.04 container (`tools/build-appimage.sh`), and `check-appimage.sh` fails any file needing more than `GLIBC_2.35` or `GLIBCXX_3.4.30`. `docs/linux.html` promises those floors to users; change the three together.
+- **CA roots** come from the system through `CURLSSLOPT_NATIVE_CA` (rustls-platform-verifier): `/etc/pki` on Fedora, `/etc/ssl/certs` on Debian and Ubuntu, the runtime's own store in the Flatpak.
+- **`CURLcode` is `i32` on MSVC and `u32` on Linux.** Compare libcurl error codes through `i64` (`http/curl_grpc.rs`), never with a cast that only compiles on one of them.
+- **The identifier is split by package** (PLAN-LINUX.md D1 as revised). RPM, AppImage and Windows use `io.github.zoran-php.responderhttp`; the Flatpak is compiled with `TAURI_CONFIG` setting `io.github.zoran_php.responderhttp`, because Flathub allows a dash only in the last component and the Tauri CLI refuses the underscore. Anything named after the identifier — data folder, keyring item, single-instance bus name — must take it from `app.config().identifier`, never from a constant.
+- **Closing the window** hides to the tray only when `org.kde.StatusNotifierWatcher` or `org.freedesktop.StatusNotifierWatcher` has an owner. Otherwise it emits `quit-requested`, and the frontend quits at once or asks first when work would be lost (`lib/quit-guard.ts`).
+- **The Flatpak is self-hosted** — a bundle attached to the GitHub release — and **never submitted to Flathub from this repository.** Flathub's policy forbids AI-written or AI-assisted manifests and AI-written submission pull requests, commits and replies (`store/flathub.md`). Do not draft a Flathub manifest, PR description or reviewer reply.
+- **The Flatpak** has no filesystem access (D5); files come through the portal, which the GTK file chooser uses by itself. Every crate and npm package is pre-listed in `flatpak/cargo-sources.json` and `node-sources.json`: **regenerate them with `tools/flatpak-sources.sh` whenever `Cargo.lock` or `pnpm-lock.yaml` changes.**
+
 ---
 
 ## 5. Persistence
@@ -216,7 +238,7 @@ SQLite through the `rusqlite` crate (`bundled` feature, so SQLite is compiled in
 - Migrations are **numbered, append-only files**. Never edit a shipped migration; add a new one.
 - Core tables: `collections`, `folders`, `requests`, `environments`, `environment_variables`, `history`, and `proto_schemas` (the gRPC schema library). `requests.kind` is `http`, `websocket` or `grpc`; each kind's own fields sit in its JSON column (`ws_json`, `grpc_json`), and an upsert refuses an id that belongs to another kind.
 - Requests store headers/params/body as JSON columns — the schema should not need a migration every time a request feature is added.
-- Secrets (tokens, passwords) are **never** written in plaintext. Since Phase 9 (PLAN.md), one data key lives in the OS credential store (`secrets/keychain.rs`) and every secret is sealed with it (`secrets/envelope.rs`) before it reaches SQLite. Which fields are secrets is decided once, in `domain/secrets.rs`. History and saved responses keep none. Never add a code path that writes a secret without going through `json::encode_auth` or the environment repository.
+- Secrets (tokens, passwords) are **never** written in plaintext. Since Phase 9 (PLAN.md), one data key lives in the OS credential store (`secrets/keychain.rs`: Windows Credential Manager; on Linux the Secret Service, or inside a Flatpak oo7's keyring file unlocked through the Secret portal) and every secret is sealed with it (`secrets/envelope.rs`) before it reaches SQLite. Which fields are secrets is decided once, in `domain/secrets.rs`. History and saved responses keep none. Never add a code path that writes a secret without going through `json::encode_auth` or the environment repository.
 - Every write path runs in a transaction. Every query is parameterised — string-concatenated SQL is a bug, always.
 
 ---
@@ -284,6 +306,19 @@ cargo clippy -- -D warnings
 cargo fmt
 ```
 
+On Linux (PLAN-LINUX.md):
+
+```bash
+./verify.sh                    # the gate, as verify.bat; log in verify-log.txt
+./release.sh                   # verify.sh, release build, RPM, link check, AppImage and its check
+tools/test-linux-session.sh    # keyring and tray-host tests in a private D-Bus session
+tools/test-rpm-install.sh      # the RPM in a clean Fedora 44 container (--gui to run it)
+tools/test-appimage.sh         # the AppImage on five distributions (--gui to run it)
+tools/flatpak-sources.sh       # regenerate flatpak/*-sources.json after a lockfile change
+tools/build-flatpak.sh         # build, install and lint the Flatpak as Flathub does; writes the release bundle
+tools/test-flatpak-session.sh  # the data key through the Secret portal, single instance
+```
+
 `cargo clippy -D warnings` and a clean `tsc --noEmit` are required before any change is considered done.
 
 ---
@@ -296,14 +331,15 @@ cargo fmt
 - [ ] No `invoke()` outside `src/services/`
 - [ ] No business logic inside React components or Tauri command handlers
 - [ ] No new runtime dependency on anything installed on the user's machine
-- [ ] Release build still produces a single self-contained binary
+- [ ] Release build still produces a single self-contained binary (`release.bat` and `release.sh` green, link checks included)
+- [ ] A changed `Cargo.lock` or `pnpm-lock.yaml` comes with regenerated `flatpak/cargo-sources.json` and `node-sources.json`
 
 ---
 
 ## 11. Hard Rules
 
 1. **Never** invoke a system `curl` binary. Never use `std::process::Command` for HTTP.
-2. **Never** dynamically link libcurl or OpenSSL. One file, no external deps.
+2. **Never** dynamically link libcurl or OpenSSL. One file, no external deps. On Linux the only shared libraries allowed are the desktop's own, listed with their reasons in `check-linux.sh`; adding one needs its reason and a clean-install check.
 3. **Never** call `invoke()` from a React component.
 4. **Never** put SQL outside `persistence/repositories/`.
 5. **Never** edit an already-committed migration file.

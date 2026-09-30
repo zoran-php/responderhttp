@@ -1,9 +1,11 @@
 # flatpak/io.github.zoran_php.responderhttp.yml
 #
 # The Flatpak manifest (PLAN-LINUX.md 17e), built from source with no network
-# access, as Flathub requires: every crate and npm package is listed in
+# access the way Flathub builds: every crate and npm package is listed in
 # cargo-sources.json and node-sources.json, which tools/flatpak-sources.sh
-# regenerates from the lockfiles.
+# regenerates from the lockfiles. It builds the self-hosted bundle
+# (tools/build-flatpak.sh). It is not a Flathub submission: Flathub accepts no
+# AI-written or AI-assisted manifest (PLAN-LINUX.md 17f).
 #
 # The ID is io.github.zoran_php.responderhttp because Flathub allows a dash
 # only in the last component. The Tauri CLI refuses the underscore, so this
@@ -69,8 +71,8 @@ modules:
       - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/${FLATPAK_ID}.png
       - install -Dm644 LICENSE -t /app/share/licenses/${FLATPAK_ID}/
     sources:
-      # This working tree for local builds. The Flathub copy of this manifest
-      # points at a tagged commit of the public repository instead.
+      # This working tree, so a release bundle is built from exactly what
+      # release.sh verified.
       - type: dir
         path: ..
         skip:
