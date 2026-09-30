@@ -18,6 +18,12 @@
 // every Windows 10 machine received it through Edge; this check is what the
 // remainder sees.
 //
+// On Linux the webview is WebKitGTK, linked as a shared library
+// (PLAN-LINUX.md F1). A missing library stops the program in the dynamic
+// loader before `main`, so this message covers what is left: a WebKitGTK that
+// loads but cannot start. The RPM and the Flatpak both bring WebKitGTK with
+// them, so the message names the package to reinstall.
+//
 // Shell only: no domain logic, no IPC. The message text is a pure function so
 // it can be tested without a display.
 
@@ -30,6 +36,9 @@ pub const UNAVAILABLE_TITLE: &str = "ResponderHTTP cannot start";
 /// choose between the per-user and per-machine installer, and a link that
 /// starts a download unasked is worse.
 pub const WEBVIEW2_DOWNLOAD_URL: &str = "https://developer.microsoft.com/microsoft-edge/webview2/";
+
+/// The Fedora package that carries the WebKitGTK the app is built against.
+pub const WEBKITGTK_FEDORA_PACKAGE: &str = "webkit2gtk4.1";
 
 /// What the user is told when no webview can be reached.
 ///
@@ -44,6 +53,14 @@ pub fn unavailable_message(details: &str) -> String {
              Install it from {WEBVIEW2_DOWNLOAD_URL} and start ResponderHTTP again. \
              It is a Microsoft component, it is free, and Windows 11 normally \
              has it already."
+        )
+    } else if cfg!(target_os = "linux") {
+        format!(
+            "ResponderHTTP draws its window with WebKitGTK, and it could not be \
+             started on this computer.\n\n\
+             If you installed the Flatpak, update it and its runtime. Otherwise \
+             reinstall WebKitGTK with your package manager (on Fedora: sudo dnf \
+             reinstall {WEBKITGTK_FEDORA_PACKAGE}) and start ResponderHTTP again."
         )
     } else {
         "ResponderHTTP draws its window with the system webview, and it could not \
@@ -97,6 +114,16 @@ mod tests {
 
         assert!(message.contains("WebView2"));
         assert!(message.contains(WEBVIEW2_DOWNLOAD_URL));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_is_told_which_package_to_reinstall() {
+        let message = unavailable_message("anything");
+
+        assert!(message.contains("WebKitGTK"));
+        assert!(message.contains(&format!("sudo dnf reinstall {WEBKITGTK_FEDORA_PACKAGE}")));
+        assert!(!message.contains("WebView2"));
     }
 
     /// The title is the dialog's main instruction, so an empty one would

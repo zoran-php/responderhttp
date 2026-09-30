@@ -45,8 +45,16 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
             let version = app.package_info().version.to_string();
             show_notice(app, notices::ABOUT_TITLE, notices::about_message(&version));
         }
-        MENU_ID_PRIVACY => show_notice(app, notices::PRIVACY_TITLE, notices::PRIVACY_TEXT),
-        MENU_ID_TERMS => show_notice(app, notices::TERMS_TITLE, notices::TERMS_TEXT),
+        MENU_ID_PRIVACY => show_notice(
+            app,
+            notices::PRIVACY_TITLE,
+            notices::privacy_text(notices::Platform::CURRENT),
+        ),
+        MENU_ID_TERMS => show_notice(
+            app,
+            notices::TERMS_TITLE,
+            notices::terms_text(notices::Platform::CURRENT),
+        ),
         // Unlike closing the window, this really exits: `exit` does not go
         // through CloseRequested, so the close-to-tray handler never sees it.
         MENU_ID_QUIT => app.exit(EXIT_CODE_SUCCESS),

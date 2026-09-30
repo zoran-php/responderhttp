@@ -133,6 +133,11 @@ oo7 = { version = "0.6", default-features = false, features = [
   "tokio",
   "native_crypto",
 ] }
+# Asks the session bus whether a tray host is running before a tray icon is
+# made (desktop/tray.rs, PLAN-LINUX.md 17b). Already linked, at this version,
+# through tauri-plugin-single-instance and oo7, so it adds no code; named here
+# only because the app now calls it directly.
+zbus = { version = "5", default-features = false, features = ["blocking-api"] }
 
 # Native message dialog for the one moment there is no app handle: the
 # missing-webview check runs before the Tauri builder (desktop/webview.rs),
