@@ -244,11 +244,14 @@ fn transport_error(error: &curl::Error) -> AppError {
 /// "if", because a real TLS or HTTP/2 fault gives the same codes.
 fn failure_text(error: &curl::Error, tls: bool) -> String {
     /// libcurl's CURLE_HTTP2. Compared by number: the `curl` crate's
-    /// predicate for it is not something this code should depend on.
-    const CURLE_HTTP2: i32 = 16;
+    /// predicate for it is not something this code should depend on. A `u8`
+    /// widened with `into()`, because `CURLcode` is `i32` on MSVC and `u32`
+    /// on Linux, and a typed constant compiles on only one of them; both
+    /// sides are compared as `i64`, which either type widens into.
+    const CURLE_HTTP2: u8 = 16;
     let hint = if tls && error.is_ssl_connect_error() {
         Some("The TLS handshake failed. If the server uses plain text (h2c), turn TLS off.")
-    } else if !tls && error.code() == CURLE_HTTP2 {
+    } else if !tls && i64::from(error.code()) == i64::from(CURLE_HTTP2) {
         Some("The server did not answer plain-text HTTP/2. If it uses TLS, turn TLS on.")
     } else {
         None
@@ -394,28 +397,29 @@ impl GrpcCall for CurlGrpcCall {
 mod tests {
     use super::*;
 
-    /// CURLE_COULDNT_CONNECT, CURLE_HTTP2 and CURLE_SSL_CONNECT_ERROR.
-    const COULDNT_CONNECT: i32 = 7;
-    const HTTP2: i32 = 16;
-    const SSL_CONNECT: i32 = 35;
+    /// CURLE_COULDNT_CONNECT, CURLE_HTTP2 and CURLE_SSL_CONNECT_ERROR, as
+    /// `u8` for the same reason as `failure_text`'s constant.
+    const COULDNT_CONNECT: u8 = 7;
+    const HTTP2: u8 = 16;
+    const SSL_CONNECT: u8 = 35;
 
     #[test]
     fn a_failed_handshake_with_tls_on_suggests_turning_it_off() {
-        let text = failure_text(&curl::Error::new(SSL_CONNECT), true);
+        let text = failure_text(&curl::Error::new(SSL_CONNECT.into()), true);
         assert!(text.starts_with("The TLS handshake failed."), "{text}");
         assert!(text.contains("turn TLS off"), "{text}");
     }
 
     #[test]
     fn a_framing_error_with_tls_off_suggests_turning_it_on() {
-        let text = failure_text(&curl::Error::new(HTTP2), false);
+        let text = failure_text(&curl::Error::new(HTTP2.into()), false);
         assert!(text.contains("turn TLS on"), "{text}");
     }
 
     #[test]
     fn other_failures_are_libcurls_own_text() {
         for (code, tls) in [(COULDNT_CONNECT, true), (SSL_CONNECT, false), (HTTP2, true)] {
-            let error = curl::Error::new(code);
+            let error = curl::Error::new(code.into());
             assert_eq!(failure_text(&error, tls), error.to_string());
         }
     }

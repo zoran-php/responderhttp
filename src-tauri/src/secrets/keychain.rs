@@ -1,10 +1,13 @@
 // http_client/src-tauri/src/secrets/keychain.rs
 //
-// The data key's home in the OS credential store. Windows only for now: on
-// Windows it is one generic credential in Credential Manager, named
-// KEYCHAIN_TARGET. macOS and Linux are deferred (PLAN.md Phase 0) and report
-// the store as unavailable until they get one, which leaves secrets
-// unsaveable there rather than silently stored in plain text.
+// The data key's home in the OS credential store. On Windows it is one
+// generic credential in Credential Manager, named KEYCHAIN_TARGET. On Linux
+// it is one item found by LINUX_ATTRIBUTES, kept by oo7 (PLAN-LINUX.md 17c):
+// in Secret Service (GNOME Keyring, KWallet) on the host, and inside a
+// Flatpak in an encrypted keyring file whose key comes from the Secret
+// portal. macOS is still deferred and reports the store as unavailable,
+// which leaves secrets unsaveable there rather than silently stored in plain
+// text.
 //
 // Decided 2026-09-16 (PLAN.md Phase 9, "Keychain entry"):
 // - persistence is the store's default, Enterprise, so the key follows a
@@ -101,10 +104,97 @@ fn describe(error: keyring_core::Error) -> AppError {
     AppError::SecretStore(message)
 }
 
-#[cfg(not(windows))]
+/// The Linux app identifier, as in tauri.linux.conf.json. It differs from
+/// KEYCHAIN_SERVICE because Flathub allows a dash only in an ID's last
+/// component (PLAN-LINUX.md, decision D1); a test keeps the two in step.
+pub const LINUX_SERVICE: &str = "io.github.zoran_php.responderhttp";
+/// How the item is found. "service" and "username" are the attribute names
+/// libsecret-based tools use, so `secret-tool lookup service <id> username
+/// data-key` finds the same item.
+pub const LINUX_ATTRIBUTES: [(&str, &str); 2] =
+    [("service", LINUX_SERVICE), ("username", KEYCHAIN_USER)];
+/// What a keyring manager such as Seahorse shows for the item.
+pub const LINUX_LABEL: &str = "ResponderHTTP data key";
+
+#[cfg(target_os = "linux")]
+pub struct KeychainDataKeyStore {
+    keyring: oo7::Keyring,
+}
+
+#[cfg(target_os = "linux")]
+impl KeychainDataKeyStore {
+    /// Fails when there is neither a Secret portal (in a Flatpak) nor a
+    /// Secret Service on the session bus: secrets are then unavailable for
+    /// the session, as when Credential Manager cannot be reached on Windows.
+    pub fn new() -> Result<Self, AppError> {
+        let keyring = block_on(oo7::Keyring::new())?.map_err(describe)?;
+        Ok(Self { keyring })
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl DataKeyStore for KeychainDataKeyStore {
+    fn load(&self) -> Result<Option<zeroize::Zeroizing<Vec<u8>>>, AppError> {
+        block_on(async {
+            // A locked collection lists its items but will not hand over a
+            // secret. Unlocking one may show the desktop's own prompt.
+            self.keyring.unlock().await.map_err(describe)?;
+            let items = self
+                .keyring
+                .search_items(&LINUX_ATTRIBUTES)
+                .await
+                .map_err(describe)?;
+            match items.as_slice() {
+                // The only answer that allows a new key to be created.
+                [] => Ok(None),
+                [item] => {
+                    let secret = item.secret().await.map_err(describe)?;
+                    Ok(Some(zeroize::Zeroizing::new(secret.to_vec())))
+                }
+                _ => Err(AppError::SecretStore(
+                    "more than one keyring item matches the data key".to_string(),
+                )),
+            }
+        })?
+    }
+
+    fn store(&self, key: &[u8]) -> Result<(), AppError> {
+        block_on(async {
+            self.keyring.unlock().await.map_err(describe)?;
+            self.keyring
+                .create_item(LINUX_LABEL, &LINUX_ATTRIBUTES, key, true)
+                .await
+                .map_err(describe)
+        })?
+    }
+}
+
+/// Runs one of oo7's futures to completion from synchronous code. It runs on
+/// a helper thread inside Tauri's tokio runtime, which oo7's zbus connection
+/// needs and keeps its background tasks on, so this works whether or not
+/// the caller is already inside a runtime (block_on there would panic).
+#[cfg(target_os = "linux")]
+fn block_on<T: Send>(future: impl std::future::Future<Output = T> + Send) -> Result<T, AppError> {
+    std::thread::scope(|scope| {
+        scope
+            .spawn(|| tauri::async_runtime::block_on(future))
+            .join()
+            .map_err(|_| AppError::SecretStore("the keyring call panicked".to_string()))
+    })
+}
+
+/// oo7's errors name the backend and the D-Bus or file failure. None of them
+/// carries secret bytes, but the text is still prefixed so a log line says
+/// which store it came from.
+#[cfg(target_os = "linux")]
+fn describe(error: oo7::Error) -> AppError {
+    AppError::SecretStore(format!("the system keyring failed: {error}"))
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 pub struct KeychainDataKeyStore;
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 impl KeychainDataKeyStore {
     pub fn new() -> Result<Self, AppError> {
         Err(AppError::SecretStore(
@@ -113,7 +203,7 @@ impl KeychainDataKeyStore {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 impl DataKeyStore for KeychainDataKeyStore {
     fn load(&self) -> Result<Option<zeroize::Zeroizing<Vec<u8>>>, AppError> {
         Self::new().map(|_| None)
@@ -154,6 +244,24 @@ mod tests {
         let config = include_str!("../../tauri.conf.json");
 
         assert!(config.contains(&format!("\"identifier\": \"{KEYCHAIN_SERVICE}\"")));
+    }
+
+    #[test]
+    fn the_linux_service_is_the_linux_app_identifier() {
+        let config = include_str!("../../tauri.linux.conf.json");
+
+        assert!(config.contains(&format!("\"identifier\": \"{LINUX_SERVICE}\"")));
+    }
+
+    /// Flathub's rule for an app ID: a dash only in the last component.
+    #[test]
+    fn the_linux_service_is_a_valid_flathub_id() {
+        let components: Vec<&str> = LINUX_SERVICE.split('.').collect();
+        let (last, rest) = components.split_last().expect("has components");
+
+        assert!(components.len() >= 4, "io.github.<user>.<repo>");
+        assert!(rest.iter().all(|part| !part.contains('-')));
+        assert!(!last.is_empty());
     }
 
     /// The store refuses a service containing the divider, so the divider

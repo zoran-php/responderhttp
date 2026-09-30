@@ -106,9 +106,9 @@ miette = { version = "7", default-features = false }
 
 # The credential store itself. keyring-core plus one explicit store, rather
 # than the `keyring` umbrella crate: a store chosen by feature flag is how a
-# build ends up on the mock store without anyone noticing. Windows only for
-# now — macOS and Linux are deferred (PLAN.md Phase 0), and until they get a
-# store of their own, secrets there report the store as unavailable. Both
+# build ends up on the mock store without anyone noticing. This block is
+# Windows; Linux has oo7 below (PLAN-LINUX.md 17c), and macOS is still
+# deferred, so secrets there report the store as unavailable. Both
 # talk to Credential Manager in advapi32, which is already on the static-link
 # allowlist.
 [target.'cfg(windows)'.dependencies]
@@ -120,6 +120,19 @@ windows-native-keyring-store = "1"
 # directly because that plugin exposes no toast buttons on Windows and this
 # notice needs two.
 tauri-winrt-notification = "0.8"
+
+# The data key's home on Linux (PLAN-LINUX.md 17c, decision D3): Secret
+# Service (GNOME Keyring, KWallet) over D-Bus on the host, and inside a
+# Flatpak an encrypted keyring file whose key comes from the Secret portal.
+# Pure Rust. It reuses the zbus, zvariant and tokio versions already linked
+# (zbus through tauri-plugin-single-instance), so there is no second D-Bus
+# stack. native_crypto, never openssl_crypto: that would link OpenSSL
+# dynamically, which CLAUDE.md section 11 rule 2 forbids.
+[target.'cfg(target_os = "linux")'.dependencies]
+oo7 = { version = "0.6", default-features = false, features = [
+  "tokio",
+  "native_crypto",
+] }
 
 # Native message dialog for the one moment there is no app handle: the
 # missing-webview check runs before the Tauri builder (desktop/webview.rs),

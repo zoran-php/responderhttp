@@ -95,6 +95,13 @@ impl GrpcServer {
 }
 
 async fn connection(socket: TcpStream, log: Log) {
+    // Real gRPC servers turn Nagle off, and without it this one delays the
+    // first DATA frame after HEADERS until the client ACKs, which Linux holds
+    // back ~40 ms. That skewed the server-streaming timing test on Linux only
+    // (PLAN-LINUX.md 17a); the client side is libcurl, which sets TCP_NODELAY.
+    if let Err(error) = socket.set_nodelay(true) {
+        log.push(format!("set_nodelay: {error}"));
+    }
     let mut connection = match server::handshake(socket).await {
         Ok(connection) => connection,
         Err(error) => {

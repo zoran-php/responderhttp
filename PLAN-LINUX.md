@@ -1,0 +1,219 @@
+# PLAN-LINUX.md — Phase 17: Fedora (Linux) build, packaging and Flathub
+
+Written 2026-09-29, from a Fedora 44 WSL2 session. **D2–D5 decided 2026-09-29; D1 and D6 stand as recommended. 17a done except the in-app checks; 17c done and verified; `oo7` 0.6 approved 2026-09-29.**
+
+Companion to `PLAN.md`, `PLAN-WEBSOCKET.md`, `PLAN-SSE.md` and `PLAN-GRPC.md`. The same rules apply: `CLAUDE.md` wins, and nothing here is done until its gate is green. On Linux that gate is a new `verify.sh` (17a), the counterpart of `verify.bat`, which stays the gate for Windows.
+
+---
+
+## 1. What you asked for
+
+> Since we are running inside Fedora 44 in WSL, modify (if needed) the Tauri app to run on Fedora and package the app on Fedora. Later publish the app on the Fedora store.
+
+Windows stays the primary platform, and nothing in this phase may change what the Windows build does. Every Linux change is behind `cfg(target_os = "linux")`, in a platform config file, or in a new script.
+
+---
+
+## 2. Where "the Fedora store" is
+
+Fedora's store is **GNOME Software** (KDE Discover on the KDE spin). It installs from three kinds of source:
+
+| Source | Who builds it | Takes this app? |
+|---|---|---|
+| Fedora repositories (RPM) and Fedora Flatpaks | Fedora packagers, from Fedora RPMs | **No.** Fedora ships free and open-source software only. |
+| Copr (community RPM repositories) | You, on Fedora's build service | **No.** The public Copr only builds FOSS, under the same licensing rules as Fedora. |
+| **Flathub** | Flathub's build service, from our source and manifest | **Yes**, with conditions (below). Fedora Workstation offers Flathub in GNOME Software once "third-party repositories" are enabled, which the first-boot setup asks about. |
+
+**Why the first two are out:** `LICENSE` forbids distributing modified versions and repackagings (section 2). That is a reasonable licence, but it is not a free-software licence, and Fedora and Copr accept nothing else. Changing the licence would be the only way in, and it was decided against on 2026-09-23 (PLAN.md Phase 10).
+
+**Flathub's conditions** (docs.flathub.org, "Requirements", read 2026-09-29):
+
+- "All content hosted on Flathub must allow legal redistribution." `LICENSE` 1(b) allows unmodified redistribution without a fee, and the submission comes from you, the licensor, so Flathub distributing your own build is your permission to give. The MetaInfo file must declare the licence as it is (`LicenseRef-proprietary=https://zoran-php.github.io/responderhttp/terms.html`), matching `LICENSE`.
+- "All source available submissions must be built entirely from source code", with **no network access during the build**. Every Cargo crate and every npm package has to be listed in the manifest in advance (17e).
+- **App ID:** "A dash `-` is only allowed in the last component." Our identifier is `io.github.zoran-php.responderhttp`, whose third component has one. The Flathub ID has to be **`io.github.zoran_php.responderhttp`**. Flathub maps the underscore back to `github.com/zoran-php/responderhttp` to check ownership. See D1.
+- "Static permissions must be kept to an absolute minimum", and a portal must be used wherever one covers the need. This shapes secrets, file access and the tray (D3–D5).
+
+**Also worth having:** an `.rpm` attached to the GitHub release, for people who do not use Flatpak. Tauri builds one itself (17d), and it costs nothing extra.
+
+---
+
+## 3. What does not carry over from Windows
+
+### F1. "One file, no system libraries" cannot be literally true on Linux
+
+On Windows the app uses WebView2, which Windows provides. On Linux, Tauri draws with **WebKitGTK 4.1** and **GTK 3**, and those, with glib, libsoup 3 and glibc, are shared libraries of the system (for the RPM) or of the GNOME runtime (for the Flatpak). No Linux desktop app ships them statically.
+
+What *does* still hold, and what `CLAUDE.md` §11 rule 2 actually requires: **libcurl, rustls and SQLite stay inside the binary**. A new `check-linux.sh` (17d) plays the part of `check-windows.ps1`. It reads the binary's `NEEDED` entries and fails on `libcurl`, `libssl`, `libcrypto`, `libsqlite3` or anything else not on a reviewed allowlist.
+
+`CLAUDE.md` §1 ("never assume any system library is present") gains a Linux sentence saying which system libraries are allowed, and why.
+
+**Open detail:** zlib. On Linux `libz-sys` may link the system `libz.so` rather than building its own (the risk PLAN.md Phase 0 wrote down). libz is on every Fedora install and in the GNOME runtime, so it is harmless either way, but the allowlist should record which it is.
+
+### F2. The credential store is Windows-only
+
+`secrets/keychain.rs` has a Windows implementation and, on every other platform, one that reports the store as unavailable. That is safe (nothing is written in plain text), but it means **no secret can be saved on Linux**: the Auth tab's tokens and every secret variable refuse to save. This has to be built before Linux is usable (17c, D3).
+
+Linux has two ways to hold the data key:
+
+- **Secret Service** over D-Bus (`org.freedesktop.secrets`): GNOME Keyring or KWallet. This is what the RPM build would use, and what a Flatpak can use with the static permission `--talk-name=org.freedesktop.secrets`.
+- **The Secret portal** (`org.freedesktop.portal.Secret`): the sandbox-friendly way. The portal hands the app a secret, and the app keeps its own encrypted keyring file inside its sandbox. Flathub prefers the portal where it works.
+
+A library that does both, choosing by whether it is sandboxed, keeps it to one code path. `oo7` (GNOME's pure-Rust Secret Service client) is the candidate to check first. It would sit behind the existing `DataKeyStore` port, as the Windows store does. The exact crate is a new dependency and needs your approval (D3), after its API and dependency tree are read.
+
+### F3. Fedora's default desktop has no tray
+
+GNOME, which Fedora Workstation uses, shows no tray icons unless an extension is installed. Fedora does not enable one by default. KDE has a tray. WSLg has none either.
+
+Today, closing the window **hides it to the tray** (PLAN.md Phase 0 and Phase 11). On stock GNOME the window would simply vanish, with nothing on screen to bring it back. Launching the app again would show it, through single-instance, but nobody would guess that. See D4.
+
+### F4. The close-to-tray toast is Windows-only
+
+`desktop/toast.rs` does nothing off Windows, so the notice that explains the tray would never appear. Whether that matters depends on D4.
+
+### F5. File access inside a Flatpak
+
+A Flatpak sees only its own files, plus what the user picks in a file chooser that goes through the **document portal**. Three features read files by path, possibly later and from somewhere else:
+
+- **multipart file parts** keep a path, which libcurl opens at send time (PLAN.md Phase 6);
+- **Send and download** and **OpenAPI import and export** read or write one chosen file (fine through the portal);
+- **.proto import** reads the chosen files *and the files they import*, from the chosen import folders (PLAN-GRPC.md 16f). A folder picked through the portal grants that folder.
+
+A path from the portal looks like `/run/user/1000/doc/<id>/name`. It keeps working across restarts while the permission stands, but it is not the path the user thinks they chose, and a saved multipart request stores it. See D5.
+
+### F6. The identifier and where data lives
+
+`tauri.conf.json`'s identifier names the app-data folder and the Credential Manager entry on Windows. If Linux needs the Flathub spelling (D1), the change goes in **`src-tauri/tauri.linux.conf.json`**, which Tauri merges over the main config on Linux builds only. Windows keeps `io.github.zoran-php.responderhttp`, and no Windows user's data or key moves.
+
+Where Linux keeps data:
+
+| Build | Database and logs |
+|---|---|
+| RPM, `tauri dev` | `~/.local/share/<identifier>/` |
+| Flatpak | `~/.var/app/io.github.zoran_php.responderhttp/data/<identifier>/` |
+
+### F7. Smaller things, each one line in a sub-phase
+
+- **The missing-WebView check** (`desktop/webview.rs`) is phrased for WebView2. On Linux WebKitGTK is linked, so a missing library stops the program before `main` runs. The check can stay; its message needs a Linux wording.
+- **The About, Privacy and Terms texts** (`desktop/notices.rs`, `store/privacy-policy.md`, `docs/`) say "Windows Credential Manager" and "your Windows user profile". They need a platform-neutral wording, or a Linux sentence.
+- **Single instance** uses D-Bus on Linux. In a Flatpak that needs the app to own a bus name under its ID. To confirm in 17e.
+- **Monospace fonts:** `index.css` falls back from `Consolas` to `monospace`, which is fine. The UI font needs one look on Fedora.
+- **The WebSocket FFI** already has its Unix `poll` branch (`curl_ws_ffi.rs`). The 13a spike's cloud run proved the same calls on Linux, but not this file. `cargo test` here is the first run.
+- **The static-link proof** was never run on Linux. The Phase 0 risk list (zlib, glibc floor, CA roots, the appindicator library) is what 17a and 17d check.
+- **CA roots:** `CURLSSLOPT_NATIVE_CA` reads the system store. On Fedora that is `/etc/pki/tls`, and the GNOME runtime has its own. An HTTPS request in each build proves it.
+- **The tray library** on Linux is `libayatana-appindicator` or `libappindicator-gtk3`. Tauri loads it at run time, so it is not in `NEEDED`, and a missing one only loses the tray.
+
+---
+
+## 4. Decisions — D2–D5 taken 2026-09-29, D1 and D6 as recommended
+
+| # | Question | Recommendation |
+|---|---|---|
+| **D1** | The Linux identifier | **`io.github.zoran_php.responderhttp` on Linux only**, through `tauri.linux.conf.json`. Flathub requires it. Windows is unchanged. |
+| **D2** | What to ship | ~~Flathub plus an `.rpm`~~ **Decided: Flathub, plus an `.rpm` and an AppImage on the GitHub release.** No `.deb`. The AppImage is for other distributions; it bundles GTK and WebKitGTK, so it is the one Linux artefact whose contents 17d must inspect beyond `NEEDED`. |
+| **D3** | Where the data key lives on Linux | **Decided as recommended.** One library that uses the Secret portal inside a Flatpak and Secret Service outside it (candidate `oo7`, to be checked in 17c). No plain-text fallback, ever: without a store, secrets refuse to save, as on Windows today. |
+| **D4** | Closing the window on Linux | **Decided as recommended.** Hide to the tray only when a tray host is present; otherwise closing quits, first asking when a request, stream, WebSocket or gRPC call is live. On stock GNOME that gives normal app behaviour, and on KDE it matches Windows. |
+| **D5** | File access in the Flatpak | **Decided as recommended.** Portals only, no `--filesystem=home`. A saved multipart path from the portal keeps working while its permission stands. The request tells the user if it cannot open the file, as it already does for a moved file. |
+| **D6** | Where Linux is tested | **Build and run the tests in this WSL session. Before submitting to Flathub, click through on a real Fedora 44 Workstation** (a VM is enough), because WSLg has no tray, no keyring and not all the portals. |
+
+### Assumptions (confirm or correct)
+
+1. **x86_64 only.** Flathub also builds aarch64 by default. An `only-arches` line keeps to x86_64 until aarch64 has been tried.
+2. **No auto-update.** Flathub and the RPM repository handle updates, as the Store does on Windows.
+3. **One version number on every platform.** Linux starts at the current 1.1.0.
+4. **The Microsoft Store listing text is not touched,** but the README and the website gain a Linux section.
+
+---
+
+## 5. Sub-phases
+
+### 17a — Build and test as-is on Fedora
+
+- Install what is missing: `cmake`, and whatever the build asks for (recorded here with the reason).
+- `pnpm install`, `pnpm run build`, `cargo build`, then `pnpm tauri dev` shown through WSLg.
+- **`verify.sh`**: a line-for-line port of `verify.bat` (install, build, lint, vitest, `cargo fmt --check`, clippy, `cargo test`), writing `verify-log.txt` in the same `exit=N` format.
+- Fix only what fails. Every fix is behind `cfg`, or proven neutral on Windows by `verify.bat`.
+
+**Done when** `verify.sh` is green here and an HTTPS request, a WebSocket echo and an SSE stream work in the running app.
+
+#### 17a first run — 2026-09-29, before any decision
+
+On Fedora 44 in WSL2: Rust 1.98.1 (Fedora's package, not rustup), Node 26, pnpm 12.6. WebKitGTK 4.1, GTK 3, libappindicator and OpenSSL headers were already installed, and nothing else had to be installed for a debug build. **`cmake` and `nasm` were not needed:** aws-lc-sys and curl-sys both built without them on Linux.
+
+- **Frontend:** `pnpm install --frozen-lockfile` and `pnpm run build` clean. eslint clean. **vitest 556 of 556**, the same count as Windows.
+- **One compile error, a real portability bug:** `curl_grpc.rs::failure_text` (the 16j hint) compared `error.code()` with an `i32` constant. `CURLcode` is `i32` on MSVC and `u32` on Linux, so it only compiled on Windows, and so did its three tests. Now a `u8` constant, with both sides compared as `i64`. Windows behaviour is unchanged.
+- **One clippy error, from the newer toolchain rather than from Linux:** clippy 1.98 adds `chunks_exact_to_as_chunks`. `commands/dto.rs::decode_hex` now uses `as_chunks::<2>()`, which is stable since 1.88, so Windows' 1.97 accepts it too. Worth a decision: pin the toolchain (`rust-toolchain.toml`, which needs rustup here) or keep the code clean on both versions, as done here.
+- `cargo fmt --check` clean.
+- **cargo test:** 635 library tests (Windows counts 636; the difference is the Windows-only webview test), 14 curl, 14 gRPC, 10 saved-gRPC-request, 9 schema-repository, 69 repository (1 ignored), 9 SSE, 19 WebSocket (1 ignored). **The WebSocket suite is the first run of `curl_ws_ffi.rs`'s Unix `poll` branch.**
+- **One test failed, and it was the test server, not the app.** `server_streaming_messages_arrive_as_they_are_sent` failed every time on Linux, with gaps of `[58, 101, 100, 101] ms` against a 70 ms floor. Only the first gap was short: message 0 arrived ~42 ms late. That is Nagle on the test server's socket (HEADERS, then a small DATA frame held until the client ACKs) meeting Linux's ~40 ms delayed ACK. libcurl sets `TCP_NODELAY` on the client socket, and real gRPC servers set it on theirs, so the app is unaffected. **Fixed in `tests/support/grpc_server.rs`** with `set_nodelay(true)` on each accepted socket, after which the test passed three runs in three.
+- **The gRPC round trip is 127 µs here** (median, p95 143 µs), against ~16 ms on Windows. On Linux `multi.wait` wakes when data arrives, which confirms that the 16 ms floor in CLAUDE.md §4 is Windows-only.
+- **`verify.sh` written and green end to end**, the same steps and log shape as `verify.bat`. `verify-log.txt` is already ignored by `*log.txt*`.
+- **`pnpm tauri dev` runs through WSLg.** The log says `webview: 2.54.0` (WebKitGTK). The database and logs are in `~/.local/share/io.github.zoran-php.responderhttp/`, beside WebKit's own `CacheStorage`, `hsts-storage.sqlite` and `WebKitCache`. As expected (F2), `secrets: no usable data key this session`, and saving a secret variable was refused with `secretStore`. Two `Gtk-CRITICAL gtk_widget_get_scale_factor` lines appear at start-up, probably from the tray's scale lookup (`desktop/tray.rs`) before the window is realised. Harmless, but 17b looks at it. The MESA/dzn lines are WSLg's GPU layer.
+- **Still to do for 17a:** an HTTPS request, a WebSocket echo and an SSE stream in the running app, which confirms the CA store on Fedora.
+- **`NEEDED` of the debug binary:** the GTK/WebKit/glib family, `libsoup-3.0`, `libjavascriptcoregtk-4.1`, **`libz.so.1`** (the system zlib: the Phase 0 risk, confirmed), **`libdbus-1.so.3`** (D-Bus, for single instance), `libgcc_s`, `libm`, `libc`, `ld-linux`. **No `libcurl`, `libssl`, `libcrypto` or `libsqlite3`.** Rule 2 holds.
+
+### 17b — Platform behaviour
+
+- `tauri.linux.conf.json`: the identifier (D1), `bundle.linux.rpm` settings and the Linux targets (D2).
+- Close behaviour (D4): detect a StatusNotifier host, and hide or quit.
+- A Linux wording for the missing-WebView message, and platform-neutral notices.
+
+### 17c — The Linux credential store (D3)
+
+**Candidate checked 2026-09-29: `oo7` 0.6.0** (MIT, `github.com/linux-credentials/oo7`, about 1.5 M recent downloads; 0.7 is in beta, so 0.6 is the line to pin).
+
+- **What it does:** on the host it talks to Secret Service (GNOME Keyring, KWallet) over D-Bus. Inside a Flatpak it keeps an encrypted keyring file in the sandbox, whose key comes from the Secret portal. One API for both: `Keyring::new()`, `create_item(label, attributes, secret, replace)`, `search_items(attributes)`, `item.secret()`. It is async-only, which is fine: Tauri already runs tokio.
+- **Features:** `default-features = false, features = ["tokio", "native_crypto"]`. `openssl_crypto` is ruled out by §11 rule 2.
+- **Measured in a scratch crate against our `Cargo.lock`:** it reuses **zbus 5.19, zvariant 5.15 and tokio 1.53, the exact versions already linked** (zbus comes with `tauri-plugin-single-instance`), so it brings no second D-Bus stack and no `libdbus` of its own. It adds about 22 crates, all pure Rust: `ashpd` (portals) and RustCrypto (`aes`, `cbc`, `cipher`, `hkdf`, `hmac`, `md-5`, `pbkdf2`, `num-bigint`/`num-bigint-dig` for the Secret Service's session key exchange, `rand`, `zeroize_derive` and similar). Linux-only, behind `[target.'cfg(target_os = "linux")'.dependencies]`, so the Windows binary does not change.
+- ~~Needs approval before it is added.~~ **Approved 2026-09-29.**
+
+#### 17c as built — 2026-09-29, `verify.sh` green
+
+- **`tauri.linux.conf.json`** (new) sets the identifier to `io.github.zoran_php.responderhttp` on Linux (D1) and the bundle targets to `rpm` and `appimage` (D2). Tauri merges it over `tauri.conf.json` on Linux only. **Tauri accepts the underscore**, though its schema's description lists only letters, digits, hyphens and periods: nothing in tauri-build, tauri-utils or tauri-codegen enforces it, and the running app used `~/.local/share/io.github.zoran_php.responderhttp/`. The bundler (17d) is the last place that could object.
+- **`Cargo.toml`**: `oo7 0.6` under `[target.'cfg(target_os = "linux")'.dependencies]`, features `tokio` and `native_crypto`. The Windows dependency comment was corrected to say Linux now has a store.
+- **`secrets/keychain.rs`**: a Linux `KeychainDataKeyStore`. `new()` opens `oo7::Keyring` (the portal file backend in a sandbox, Secret Service otherwise). `load` unlocks the collection, which may show the desktop's own prompt, then searches for `LINUX_ATTRIBUTES` (`service` = the Linux identifier, `username` = `data-key`, the libsecret convention, so `secret-tool lookup service io.github.zoran_php.responderhttp username data-key` finds it). None found is `Ok(None)`, the only case that creates a key. More than one is an error, like `Ambiguous` on Windows. `store` replaces the item. The fallback for other platforms is now `cfg(not(any(windows, target_os = "linux")))`.
+  - **The sync-to-async bridge:** `DataKeyStore` is synchronous and oo7 is async. Each call runs on a scoped helper thread through `tauri::async_runtime::block_on`, which gives oo7's zbus connection the tokio runtime it needs and keeps its background tasks running. It works whether or not the caller is already inside a runtime, where a direct `block_on` would panic.
+  - **A risk checked rather than assumed:** enabling zbus's `tokio` feature applies to the whole build, and `tauri-plugin-single-instance` uses zbus's *blocking* API. zbus 5.19's `utils::block_on` then runs on its own multi-threaded tokio runtime, whose workers keep the connection's tasks alive, so the plugin is unaffected. Confirmed with the real binary: a second launch exited at once, and the first owned `io.github.zoran_php.responderhttp.SingleInstance`.
+- **Tests:** two new unit tests (the Linux service matches `tauri.linux.conf.json`, and it is a valid Flathub ID). **`tests/linux_keyring.rs`**, one `#[ignore]`d test: the first store finds the keyring empty and creates a key, a second store (the next start) reads it back, and a secret sealed under the first opens under the second. **`tools/test-linux-keyring.sh`** runs it inside `dbus-run-session` with a temporary `XDG_DATA_HOME` and a throwaway GNOME Keyring, so neither the developer's keyring nor app data is touched. **Passed.** Installed in WSL for it: `gnome-keyring`, `dbus-daemon`.
+- **The real app, in the same kind of private session:** `secrets: no data key found, created one`.
+- **`verify.sh`: green.** vitest 556, **637 library tests** (635 + 2), 14 curl, 14 gRPC, 10, 9, 69 repository, 9 SSE, 19 WebSocket; `linux_keyring` 1 ignored. fmt and clippy clean.
+- **Not yet seen:** the Secret portal path inside a Flatpak (17e), and the unlock prompt of a locked keyring on a real GNOME desktop (D6).
+
+- A spike first: the chosen library against GNOME Keyring in WSL (`dnf install gnome-keyring`, unlocked in the session) and against the portal in a Flatpak.
+- `secrets/keychain.rs` gains a `cfg(target_os = "linux")` implementation of `DataKeyStore`, with the same rule that only "no entry" creates a key.
+- Tests: the in-memory tests stay as they are. One `#[ignore]`d test against the real store, as on Windows.
+
+### 17d — RPM and the release gate
+
+- `release.sh`: `verify.sh`, then `pnpm tauri build --bundles rpm,appimage`, then `check-linux.sh` on the binary.
+- The AppImage carries its own GTK and WebKitGTK, so its check is different: list what it bundles, and run it in a clean container with none of the `-devel` packages installed.
+- `check-linux.sh`: the `NEEDED` allowlist from F1, each entry with its reason, as in `check-windows.ps1`.
+- Install the `.rpm` in a clean Fedora 44 container (`podman`), confirm that `dnf` pulls in WebKitGTK and nothing unexpected, and send a request.
+
+### 17e — Flatpak
+
+- `flatpak/io.github.zoran_php.responderhttp.yml`: runtime `org.gnome.Platform` (which carries WebKitGTK 4.1), SDK extensions for Rust and Node, `--share=network`, the Wayland and X11 sockets, and no filesystem access (D5).
+- Offline sources: `cargo-sources.json` from `flatpak-cargo-generator`, and the npm packages from `flatpak-node-generator`. **Risk:** that tool's support for pnpm's lockfile has to be checked. If it does not read `pnpm-lock.yaml`, the fallback is to build the frontend from an npm lockfile generated for the Flatpak.
+- `io.github.zoran_php.responderhttp.metainfo.xml` (licence, description, screenshots, releases, OARS rating) and a `.desktop` file, both validated with `appstreamcli` and `desktop-file-validate`.
+- Icons from `app-icon.png`, drawn by the existing art tooling.
+- `flatpak-builder` locally, run it, and repeat the 17a checks inside the sandbox.
+
+### 17f — Docs and submission
+
+- `CLAUDE.md` (§1, §3 new files, §4 Linux engine notes, §9 the Linux commands, §10 and §11 which system libraries are allowed), the README, `store/privacy-policy.md` and `docs/`, and a `store/flathub.md` like `store/listing.md`.
+- Screenshots taken on real GNOME (D6).
+- **You:** a pull request to `flathub/flathub` with the manifest. Once merged, Flathub creates the app repository, and you verify the app ID against your GitHub account so it shows as verified.
+
+**Sequencing:** 17a → 17b → 17c → 17d → 17e → 17f. 17c's spike can run beside 17b.
+
+---
+
+## 6. Hard-rule check
+
+| Rule | How it holds |
+|---|---|
+| 1. No system `curl` | Unchanged. libcurl stays in-process. |
+| 2. No dynamic libcurl or OpenSSL | `check-linux.sh` fails on both. WebKitGTK and GTK are allowed and documented (F1). |
+| 3–5 | Untouched: no frontend `invoke` change, no SQL change, no migration. |
+| 7. TLS verification on by default | Unchanged. |
+| 10. `unsafe` only in `curl_ws_ffi.rs` | Its Unix branch already exists. The secret store is expected to need no `unsafe`, and 17c checks that. |
+| §7 no speculative traits | The Linux store implements the existing `DataKeyStore` port. No new trait. |

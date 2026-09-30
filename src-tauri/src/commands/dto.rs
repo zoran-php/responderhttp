@@ -1005,9 +1005,12 @@ fn decode_hex(hex: &str) -> Result<Vec<u8>, String> {
     if !hex.len().is_multiple_of(2) {
         return Err("hex payload has an odd number of digits".into());
     }
+    // The odd-length check above leaves `as_chunks` no remainder to drop.
     hex.as_bytes()
-        .chunks_exact(2)
-        .map(|pair| match (hex_digit(pair[0]), hex_digit(pair[1])) {
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|&[high, low]| match (hex_digit(high), hex_digit(low)) {
             (Some(high), Some(low)) => Ok(high << 4 | low),
             _ => Err("hex payload contains a character that is not a hex digit".into()),
         })
