@@ -71,3 +71,6 @@ desktop.ini
 
 # Development certificate
 devcert.pfx
+
+# Flatpak: Flathub shared modules, fetched by tools/build-flatpak.sh
+flatpak/shared-modules/

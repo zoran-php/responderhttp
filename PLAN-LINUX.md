@@ -284,6 +284,63 @@ The AppImage is covered in the next section.
 - Icons from `app-icon.png`, drawn by the existing art tooling.
 - `flatpak-builder` locally, run it, and repeat the 17a checks inside the sandbox.
 
+#### 17e as built — 2026-09-30, built offline and tested; one linter error left, waiting on the screenshot's publication
+
+- **Tools installed in WSL:** `flatpak` 1.18.2, `flatpak-builder` 1.4.12, `appstream` 1.1.3 (`appstreamcli`), and from Flathub, per user: `org.gnome.Sdk//51` and `org.gnome.Platform//51` (Freedesktop SDK 26.08), `rust-stable//26.08` (Rust 1.98.0), `node26//26.08` (Node 26.10.0, the host's version) and `org.flatpak.Builder` (Flathub's builder and linter). GNOME 51 is the newest runtime on Flathub.
+- **`flatpak/io.github.zoran_php.responderhttp.yml`** (new), with runtime GNOME 51.
+  - **Permissions:** `--share=network`, `--share=ipc`, `--socket=wayland`, `--socket=fallback-x11`, `--device=dri` and `--talk-name=org.kde.StatusNotifierWatcher`. **No filesystem access** (D5).
+  - **Tray:** Flathub's shared `libayatana-appindicator` module is bundled, because the GNOME runtime lacks it and `libappindicator-sys` **panics** when it cannot load the library. It is only loaded when a tray host exists (desktop/tray.rs asks first).
+  - **The build**, in the order `pnpm tauri build` would run it but without the CLI, which refuses the underscore ID:
+    1. `pnpm install --offline --frozen-lockfile --trust-lockfile`;
+    2. `tsc --noEmit` and `vite build`;
+    3. `cargo --offline build --release --bins --features tauri/custom-protocol`, with `TAURI_CONFIG` setting the identifier (D1 as revised);
+    4. install the binary, the desktop file, the metainfo, the 128/256/512 px icons and `LICENSE`.
+  - **The local manifest builds from the working tree** (`type: dir, path: ..`, skipping `.git`, `node_modules`, `dist`, `src-tauri/target`, `spikes`). The copy for Flathub must use a `git` source pinned to the release tag and commit (17f).
+- **Offline sources:**
+  - **`tools/flatpak-sources.sh`** (new) regenerates **`flatpak/cargo-sources.json`** (644 crates) and **`flatpak/node-sources.json`** (422 npm packages, store format v11, the one pnpm 12 uses). It pins `flatpak-builder-tools` at commit `74697c7` and runs it in a virtualenv under `src-tauri/target/flatpak/`. **Run it whenever `Cargo.lock` or `pnpm-lock.yaml` changes**, and commit the two files with that change.
+  - **The plan's pnpm risk did not materialise:** the node generator supports pnpm lockfile v9, including the v11 store.
+- **Three pnpm 12 problems, each solved in the manifest:**
+  1. **The `pnpm` npm package is a launcher** that downloads its native binary on first use. The manifest also fetches `@pnpm/exe.linux-x64` 12.6.0 (sha256-pinned) and installs it as `pnpm/pnpm-native`, where the launcher looks first.
+  2. **pnpm 12's supply-chain check needs registry metadata** and fails offline (`ERR_PNPM_NO_OFFLINE_META`). Hence `--trust-lockfile`: the lockfile is the project's own and frozen, flatpak-builder checks every tarball against its sha512, and the check still runs wherever the lockfile is written.
+  3. **The generator's v11 store records no `bin` entries**, so pnpm links every package but creates no `node_modules/.bin`. The manifest runs `node node_modules/typescript/bin/tsc` and `node node_modules/vite/bin/vite.js` directly. This is an upstream gap, worth reporting to flatpak-builder-tools.
+- **`flatpak/io.github.zoran_php.responderhttp.desktop`** and **`.metainfo.xml`** (new): both pass `desktop-file-validate` and `appstreamcli validate`.
+  - Categories `Development;WebDevelopment;`, since two main categories list an app twice.
+  - `StartupWMClass=responderhttp`, the X11 class the window really has.
+  - The licence is declared as `LicenseRef-proprietary=https://zoran-php.github.io/responderhttp/terms.html` (§2).
+  - OARS 1.1 with nothing to declare, and one release, 1.1.0 of 2026-09-29.
+  - One screenshot, **`docs/screenshots/linux-http.png`**, taken from this Flatpak: an HTTPS GET with its JSON response and timing, the window content without decorations. It should be replaced by real GNOME screenshots (D6).
+- **`flatpak/flathub.json`** (new), `only-arches: x86_64`, for the Flathub repository (assumption 1). The pnpm binary source is x86_64-only too.
+- **`tools/build-flatpak.sh`** (new):
+  - fetches Flathub's `shared-modules` at a pinned commit into `flatpak/shared-modules/` (git-ignored; on Flathub it is a submodule);
+  - builds with `org.flatpak.Builder` and the flags of Flathub's `flathub-build` wrapper, among them `--mirror-screenshots-url=https://dl.flathub.org/media`, `--compose-url-policy=full` and a fixed source date;
+  - installs the result for the user and runs `flatpak-builder-lint` on the manifest and on the repository.
+  
+  Two lessons from getting it right:
+  - Without `--compose-url-policy=full`, the icons are "not mirrored" (`appstream-remote-icon-not-mirrored`, never excepted).
+  - `--sandbox` has to be left out locally, because it refuses the `path: ..` source. The Flathub copy's git source is allowed.
+- **Build:** fully offline, **18.1 MB installed**. The Rust release build takes about 3 min 50 s; the tray modules come from the cache after the first run.
+- **Linter:**
+  - **The manifest is clean.**
+  - **The repository has one error left, `appstream-missing-screenshots`**, because `https://zoran-php.github.io/responderhttp/screenshots/linux-http.png` is 404 until the image is committed and GitHub Pages publishes it. **Re-run `tools/build-flatpak.sh` after publishing; it should then pass.** Flathub never grants an exception for this one.
+- **Tested in WSL:**
+  - **Start:** WebKitGTK **2.54.0** from the runtime. Data in `~/.var/app/io.github.zoran_php.responderhttp/data/io.github.zoran_php.responderhttp/`, as in F6. Without a tray host it runs without an icon.
+  - **HTTPS:** a GET to `https://jsonplaceholder.typicode.com/users/1` returned **200 in 108 ms, TLS verified**, with `Loaded 121 CA root certificates` from the runtime's own store.
+  - **`tools/test-flatpak-session.sh`** (new) runs the app in a private D-Bus session with `xdg-desktop-portal`, its GTK backend and a throwaway GNOME Keyring, with a temporary `HOME` so no real data is touched. **All three checks passed:**
+    - the first start **created the data key through the Secret portal**: oo7's encrypted keyring file is in the sandbox (`data/keyrings/default.keyring`), and its secret is in the host keyring;
+    - a second launch **handed over and exited in about 250–400 ms**, the running app owning `io.github.zoran_php.responderhttp.SingleInstance`, which Flatpak grants under the app ID;
+    - the next start **loaded the same key**.
+    
+    This closes the gap 17c left open, the Secret portal path.
+  - **File access through the portal (D5):** in the same kind of session, Import Collection opened the portal's **Open File** dialog, which runs outside the sandbox. A file chosen from outside was read by the app, which has no filesystem permission: `openapi import: loaded JSON 3.1 with 1 operations`, and the preview showed it valid.
+  - **Test-only overrides:** WSLg offers Wayland, and the app used it. For screenshots and `xdotool` the runs added `--socket=x11 --nosocket=wayland`, and the portal session set `GDK_BACKEND=x11` so its dialog was visible to X11 tools.
+- **Not yet seen:**
+  - the tray on KDE with the bundled library;
+  - the unlock prompt of a locked keyring;
+  - Wayland with real window decorations;
+  - running on older distributions' Flatpak versions (Debian 10 and 11, Ubuntu 20.04), which `docs/linux.html` promises to test. The app declares no minimum Flatpak version.
+  
+  All four belong to D6, on real desktops or VMs.
+
 ### 17f — Docs and submission
 
 - `CLAUDE.md` (§1, §3 new files, §4 Linux engine notes, §9 the Linux commands, §10 and §11 which system libraries are allowed), the README, `store/privacy-policy.md` and `docs/`, and a `store/flathub.md` like `store/listing.md`.
