@@ -382,6 +382,12 @@ The AppImage is covered in the next section.
   The privacy page's "Hardware Encrypted" card became "Encrypted Secrets": the key is in the OS credential store, not in hardware. **All five dates moved to 30 September 2026**: both web pages, `store/privacy-policy.md`, and `PRIVACY_OPENING` and `TERMS_TEMPLATE` in `desktop/notices.rs`.
 - **Website:** the Linux page, the Overview and the Security page describe the self-hosted Flatpak (its install commands, updates, no file access) and say a Flathub listing is planned. The Security page's list of unsigned downloads now includes the AppImage and the Flatpak bundle.
 - **`verify.sh`: green** after the `notices.rs` change. vitest 568, 641 library tests, fmt and clippy clean.
+- **`verify.bat` and `release.bat` on Windows, 2026-09-30: green.**
+  - vitest 568, 640 library tests and every integration suite.
+  - The 1.1.0 release build produced `ResponderHTTP_1.1.0_x64-setup.exe` and `ResponderHTTP_1.1.0_x64_en-US.msi`.
+  - The link check passed: 29 imports, all Windows system DLLs.
+  
+  The Windows build is ready for `pack-store.bat` and the Store update.
 - **Still open:**
   - Flathub's linter reports `appstream-missing-screenshots` until `docs/screenshots/linux-http.png` is published, so `tools/build-flatpak.sh` exits 1 and `release.sh` reports that step as failing until GitHub Pages serves the image;
   - screenshots on real GNOME, and the other D6 checks;
