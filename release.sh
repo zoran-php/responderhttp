@@ -2,8 +2,9 @@
 # release.sh
 #
 # The Linux twin of release.bat (PLAN-LINUX.md 17d): verify.sh, then the
-# release build and its bundles, then the link check against the real
-# binary. Output goes to release-log.txt in the same "=== step ===" /
+# release build and the RPM, the link check against the real binary, then
+# the AppImage, built in an Ubuntu 22.04 container (tools/build-appimage.sh
+# says why) and checked on its own terms. Output goes to release-log.txt in the same "=== step ===" /
 # "exit=N" shape, so a run can be read off-machine.
 #
 # The link check is the step that matters (check-linux.sh): libcurl, TLS and
@@ -44,9 +45,20 @@ spikes/static-link-proof/check-linux.sh "$BINARY" >> "$LOG" 2>&1
 echo "exit=$?" >> "$LOG"
 
 echo >> "$LOG"
+echo "=== AppImage (Ubuntu 22.04 container) ===" >> "$LOG"
+tools/build-appimage.sh >> "$LOG" 2>&1
+appimage_exit=$?
+echo "exit=$appimage_exit" >> "$LOG"
+[ "$appimage_exit" -eq 0 ] || stop "APPIMAGE BUILD FAILED"
+
+echo >> "$LOG"
+echo "=== AppImage check ===" >> "$LOG"
+spikes/static-link-proof/check-appimage.sh src-tauri/target/appimage/*.AppImage >> "$LOG" 2>&1
+echo "exit=$?" >> "$LOG"
+
+echo >> "$LOG"
 echo "=== bundles ===" >> "$LOG"
-find src-tauri/target/release/bundle -maxdepth 2 -type f \( -name '*.rpm' -o -name '*.AppImage' \) \
-    -exec ls -l {} \; >> "$LOG" 2>&1
+ls -l src-tauri/target/release/bundle/rpm/*.rpm src-tauri/target/appimage/*.AppImage >> "$LOG" 2>&1
 for rpm in src-tauri/target/release/bundle/rpm/*.rpm; do
     [ -e "$rpm" ] || continue
     echo "--- $rpm requires:" >> "$LOG"

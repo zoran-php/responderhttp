@@ -1,0 +1,41 @@
+# tools/appimage/Containerfile
+#
+# The AppImage builder (PLAN-LINUX.md 17d, D2 as decided 2026-09-30).
+#
+# An AppImage carries its own GTK and WebKitGTK but not glibc, so it runs
+# only where glibc is at least as new as on the machine that built it. Built
+# on Fedora 44 it needed glibc 2.43 and failed on Ubuntu 24.04. Ubuntu 22.04
+# has glibc 2.35, which covers Ubuntu 22.04+, Debian 12+, Mint 21+, Fedora 36+
+# and Arch, and still gets WebKitGTK security updates.
+#
+# The toolchain versions match the Fedora machine the RPM is built on, so the
+# two Linux artefacts come from the same compiler and the same frontend
+# tools. Change them together with that machine.
+FROM docker.io/library/ubuntu:22.04
+
+ARG RUST_VERSION=1.98.1
+ARG NODE_VERSION=26.10.0
+ARG PNPM_VERSION=12.6.0
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential pkg-config curl ca-certificates file xz-utils perl cmake \
+      libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+      librsvg2-dev libdbus-1-dev zlib1g-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init -o /tmp/rustup-init \
+ && chmod +x /tmp/rustup-init \
+ && /tmp/rustup-init -y --no-modify-path --profile minimal --default-toolchain "$RUST_VERSION" \
+ && rm /tmp/rustup-init
+
+RUN curl -fsSL "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz" \
+      | tar -xJ -C /opt \
+ && ln -s "/opt/node-v$NODE_VERSION-linux-x64" /opt/node
+
+ENV PATH=/root/.cargo/bin:/opt/node/bin:$PATH
+RUN npm install -g "pnpm@$PNPM_VERSION"
+
+# linuxdeploy is itself an AppImage, and a container has no FUSE to mount it.
+ENV APPIMAGE_EXTRACT_AND_RUN=1

@@ -130,10 +130,11 @@
 
             <!-- Page links -->
             <nav class="flex items-center space-x-1 sm:space-x-2">
-                    <a href="index.html" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">Overview</a>
-                    <a href="security.html" class="px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Security</a>
-                    <a href="privacy-policy.html" class="px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Privacy</a>
-                    <a href="terms.html" class="px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Terms</a>
+                    <a href="index.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">Overview</a>
+                    <a href="linux.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Linux</a>
+                    <a href="security.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Security</a>
+                    <a href="privacy-policy.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Privacy</a>
+                    <a href="terms.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Terms</a>
             </nav>
         </div>
     </header>
@@ -331,7 +332,7 @@
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">Windows 10 or 11, 64-bit.</strong> A release build produces two installers — an NSIS setup program and an MSI for deployment tooling. Both install the same single executable. A Microsoft Store listing is prepared but not published yet.</p>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">The app draws its interface with the Microsoft Edge WebView2 Runtime, which is part of Windows 11 and already present on most Windows 10 machines. If it is missing, Windows Update or Microsoft’s standalone installer adds it.</p>
-                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">Linux, 64-bit (x86_64).</strong> A release build produces an RPM for Fedora, tested on Fedora 44. Install it with <span class="font-mono text-xs">sudo dnf install ./ResponderHTTP-1.1.0-1.x86_64.rpm</span>, which brings in WebKitGTK and GTK from Fedora’s own repositories. Those draw the window, the way WebView2 does on Windows, and they are the only system libraries the app uses: libcurl, TLS and SQLite are still compiled into the binary. A Flathub listing and an AppImage for other distributions are in progress.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">Linux, 64-bit (x86_64).</strong> A release build produces an RPM for Fedora, tested on Fedora 44. Install it with <span class="font-mono text-xs">sudo dnf install ./ResponderHTTP-1.1.0-1.x86_64.rpm</span>, which brings in WebKitGTK and GTK from Fedora’s own repositories. Those draw the window, the way WebView2 does on Windows, and they are the only system libraries the app uses: libcurl, TLS and SQLite are still compiled into the binary. An AppImage for other distributions is built and tested too, and a Flathub listing is in progress. The <a href="linux.html" class="text-brandAccent hover:underline">Linux page</a> lists the minimum distribution for each package and how to install it.</p>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark ">macOS is not supported today.</p>
                 </section>
 
@@ -878,6 +879,8 @@
             </div>
             <div class="flex items-center space-x-4 font-mono text-[11px]">
                 <a href="index.html" class="hover:text-brandAccent transition-colors">Overview</a>
+                <span>&bull;</span>
+                <a href="linux.html" class="hover:text-brandAccent transition-colors">Linux</a>
                 <span>&bull;</span>
                 <a href="security.html" class="hover:text-brandAccent transition-colors">Security</a>
                 <span>&bull;</span>
