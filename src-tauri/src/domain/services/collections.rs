@@ -4,12 +4,12 @@ use std::sync::Arc;
 use crate::domain::error::AppError;
 use crate::domain::ids::new_id;
 use crate::domain::models::{
-    Collection, Example, ExampleSummary, Folder, HttpRequest, KeyValue, NewExample, SavedRequest,
-    SavedWebSocket, WebSocketRequest, WsDraft,
+    Collection, Example, ExampleSummary, Folder, GrpcRequestDraft, HttpRequest, KeyValue,
+    NewExample, SavedGrpcRequest, SavedRequest, SavedWebSocket, WebSocketRequest, WsDraft,
 };
 use crate::domain::ports::{
-    CollectionRepository, ExampleRepository, FolderRepository, SavedRequestRepository,
-    WebSocketRepository,
+    CollectionRepository, ExampleRepository, FolderRepository, GrpcRequestRepository,
+    SavedRequestRepository, WebSocketRepository,
 };
 use crate::domain::secrets::{request_without_literal_secrets, SecretState};
 use crate::domain::services::validation::validated_name;
@@ -31,6 +31,8 @@ pub struct CollectionContents {
     /// Beside `requests` rather than mixed into it: they are separate types
     /// (see `SavedWebSocket`), and the tree interleaves them by name.
     pub web_sockets: Vec<SavedWebSocket>,
+    /// Beside the others for the same reason.
+    pub grpc_requests: Vec<SavedGrpcRequest>,
 }
 
 /// Use-cases over the storage aggregates of a collection. Cheap to clone
@@ -42,6 +44,7 @@ pub struct Collections {
     requests: Arc<dyn SavedRequestRepository>,
     examples: Arc<dyn ExampleRepository>,
     web_sockets: Arc<dyn WebSocketRepository>,
+    grpc_requests: Arc<dyn GrpcRequestRepository>,
 }
 
 impl Collections {
@@ -51,6 +54,7 @@ impl Collections {
         requests: Arc<dyn SavedRequestRepository>,
         examples: Arc<dyn ExampleRepository>,
         web_sockets: Arc<dyn WebSocketRepository>,
+        grpc_requests: Arc<dyn GrpcRequestRepository>,
     ) -> Self {
         Self {
             collections,
@@ -58,6 +62,7 @@ impl Collections {
             requests,
             examples,
             web_sockets,
+            grpc_requests,
         }
     }
 
@@ -71,6 +76,7 @@ impl Collections {
             requests: self.requests.list_by_collection(collection_id)?,
             examples: self.examples.list_summaries_by_collection(collection_id)?,
             web_sockets: self.web_sockets.list_by_collection(collection_id)?,
+            grpc_requests: self.grpc_requests.list_by_collection(collection_id)?,
         })
     }
 
@@ -174,6 +180,35 @@ impl Collections {
         self.web_sockets.get(id)
     }
 
+    /// The gRPC counterpart of `save_request`, with the same id rules as
+    /// `save_web_socket`. No check of the URL, method or message: a half-typed
+    /// draft is worth saving, and those are checked when invoking. A library
+    /// schema must already be in the library (the repository checks it in
+    /// the same transaction as the write).
+    pub fn save_grpc_request(
+        &self,
+        id: Option<String>,
+        collection_id: &str,
+        folder_id: Option<&str>,
+        name: &str,
+        request: GrpcRequestDraft,
+    ) -> Result<SavedGrpcRequest, AppError> {
+        let saved = SavedGrpcRequest {
+            id: id.unwrap_or_else(|| new_id("req")),
+            collection_id: collection_id.to_string(),
+            folder_id: folder_id.map(str::to_string),
+            name: validated_name(name)?.to_string(),
+            request,
+            secret_state: SecretState::Ok,
+        };
+        self.grpc_requests.save(&saved)?;
+        Ok(saved)
+    }
+
+    pub fn load_grpc_request(&self, id: &str) -> Result<SavedGrpcRequest, AppError> {
+        self.grpc_requests.get(id)
+    }
+
     /// An example always hangs off a stored request, so the caller must save
     /// the request first — there is no place to put one otherwise.
     pub fn save_example(
@@ -225,7 +260,8 @@ impl Collections {
 mod tests {
     use super::*;
     use crate::domain::models::{
-        Auth, HttpMethod, RequestBody, RequestSettings, WebSocketSettings, WsMessageFormat,
+        Auth, GrpcSchemaRef, GrpcSettings, HttpMethod, RequestBody, RequestSettings,
+        WebSocketSettings, WsMessageFormat,
     };
     use std::sync::Mutex;
 
@@ -397,6 +433,32 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct SpyGrpcRequests {
+        saved: Mutex<Vec<SavedGrpcRequest>>,
+    }
+
+    impl GrpcRequestRepository for SpyGrpcRequests {
+        fn list_by_collection(
+            &self,
+            _collection_id: &str,
+        ) -> Result<Vec<SavedGrpcRequest>, AppError> {
+            Ok(self.saved.lock().expect("spy lock poisoned").clone())
+        }
+        fn get(&self, id: &str) -> Result<SavedGrpcRequest, AppError> {
+            Err(AppError::NotFound(format!(
+                "gRPC request {id} does not exist"
+            )))
+        }
+        fn save(&self, saved: &SavedGrpcRequest) -> Result<(), AppError> {
+            self.saved
+                .lock()
+                .expect("spy lock poisoned")
+                .push(saved.clone());
+            Ok(())
+        }
+    }
+
     fn service(collections: Arc<SpyCollections>, requests: Arc<SpyRequests>) -> Collections {
         Collections::new(
             collections,
@@ -404,6 +466,7 @@ mod tests {
             requests,
             Arc::new(SpyExamples::default()),
             Arc::new(SpyWebSockets::default()),
+            Arc::new(SpyGrpcRequests::default()),
         )
     }
 
@@ -414,6 +477,7 @@ mod tests {
             Arc::new(SpyRequests::default()),
             examples,
             Arc::new(SpyWebSockets::default()),
+            Arc::new(SpyGrpcRequests::default()),
         )
     }
 
@@ -424,7 +488,88 @@ mod tests {
             Arc::new(SpyRequests::default()),
             Arc::new(SpyExamples::default()),
             web_sockets,
+            Arc::new(SpyGrpcRequests::default()),
         )
+    }
+
+    fn grpc_service(grpc_requests: Arc<SpyGrpcRequests>) -> Collections {
+        Collections::new(
+            Arc::new(SpyCollections::default()),
+            Arc::new(StubFolders),
+            Arc::new(SpyRequests::default()),
+            Arc::new(SpyExamples::default()),
+            Arc::new(SpyWebSockets::default()),
+            grpc_requests,
+        )
+    }
+
+    fn grpc_draft() -> GrpcRequestDraft {
+        GrpcRequestDraft {
+            url: "localhost:50051".into(),
+            tls: false,
+            method_path: "/shop.v1.Shop/GetOrder".into(),
+            schema: GrpcSchemaRef::Reflection,
+            metadata: vec![KeyValue::new("x-tenant", "acme")],
+            auth: Auth::None,
+            message: "{}".into(),
+            settings: GrpcSettings::default(),
+        }
+    }
+
+    #[test]
+    fn a_grpc_request_gets_a_request_id_keeps_it_on_re_save_and_has_its_name_trimmed() {
+        let grpc_requests = Arc::new(SpyGrpcRequests::default());
+        let service = grpc_service(grpc_requests.clone());
+
+        let first = service
+            .save_grpc_request(None, "col_1", Some("fld_1"), "  Get order  ", grpc_draft())
+            .expect("should save");
+        service
+            .save_grpc_request(
+                Some(first.id.clone()),
+                "col_1",
+                None,
+                "Get order",
+                grpc_draft(),
+            )
+            .expect("should re-save");
+
+        let saved = grpc_requests.saved.lock().expect("spy lock poisoned");
+        assert!(saved[0].id.starts_with("req_"));
+        assert_eq!(saved[0].id, saved[1].id);
+        assert_eq!(saved[0].name, "Get order");
+        assert_eq!(saved[0].folder_id.as_deref(), Some("fld_1"));
+        assert_eq!(saved[0].request, grpc_draft());
+    }
+
+    #[test]
+    fn a_grpc_request_name_goes_through_the_same_validation_as_every_other_name() {
+        let grpc_requests = Arc::new(SpyGrpcRequests::default());
+        let service = grpc_service(grpc_requests.clone());
+
+        let error = service
+            .save_grpc_request(None, "col_1", None, "   ", grpc_draft())
+            .expect_err("should reject");
+
+        assert!(matches!(error, AppError::InvalidRequest(_)));
+        assert!(grpc_requests
+            .saved
+            .lock()
+            .expect("spy lock poisoned")
+            .is_empty());
+    }
+
+    #[test]
+    fn contents_carry_grpc_requests_beside_the_other_kinds() {
+        let service = grpc_service(Arc::new(SpyGrpcRequests::default()));
+        service
+            .save_grpc_request(None, "col_1", None, "Get order", grpc_draft())
+            .expect("should save");
+
+        let contents = service.contents("col_1").expect("should list");
+
+        assert_eq!(contents.grpc_requests.len(), 1);
+        assert_eq!(contents.grpc_requests[0].name, "Get order");
     }
 
     fn web_socket_request() -> WebSocketRequest {

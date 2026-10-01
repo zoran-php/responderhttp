@@ -7,12 +7,11 @@ use tauri::{
     App, AppHandle, Runtime,
 };
 
-use super::window::{report_window_error, show_main_window};
+use super::window::{report_window_error, show_main_window, EXIT_CODE_SUCCESS};
 
 const TRAY_ID: &str = "main-tray";
 const MENU_ID_SHOW: &str = "show";
 const MENU_ID_QUIT: &str = "quit";
-const EXIT_CODE_SUCCESS: i32 = 0;
 
 /// The notification area draws icons at 16 px times the display scale. The
 /// bundle icon is drawn for large sizes, where a gradient and soft corners
@@ -31,7 +30,32 @@ static TRAY_ICONS: [(u32, Image<'static>); 6] = [
 /// Assumed when the primary monitor cannot be read.
 const DEFAULT_SCALE: f64 = 1.0;
 
-pub fn build_tray<R: Runtime>(app: &App<R>) -> tauri::Result<()> {
+/// The bus names a StatusNotifier tray host owns: KDE Plasma, and GNOME with
+/// the AppIndicator extension, own the first; the second is the newer
+/// freedesktop spelling of the same service.
+#[cfg(target_os = "linux")]
+const TRAY_HOST_NAMES: [&str; 2] = [
+    "org.kde.StatusNotifierWatcher",
+    "org.freedesktop.StatusNotifierWatcher",
+];
+
+/// Makes the tray icon, if this desktop can show one.
+///
+/// Stock GNOME, which Fedora Workstation uses, has no tray (PLAN-LINUX.md
+/// F3). libappindicator then falls back to GTK's old GtkStatusIcon, which has
+/// nowhere to draw either and logs `gtk_widget_get_scale_factor` criticals at
+/// startup (found in 17a, traced with G_DEBUG=fatal-criticals). So on Linux
+/// the icon is made only when a tray host is running. A host that starts
+/// later is picked up on the next launch.
+///
+/// Returns whether there is a tray, which decides what the close button does
+/// (desktop/window.rs).
+pub fn build_tray<R: Runtime>(app: &App<R>) -> tauri::Result<bool> {
+    if !tray_host_available() {
+        log::info!("tray: this desktop has no tray host; running without a tray icon");
+        return Ok(false);
+    }
+
     let show = MenuItem::with_id(app, MENU_ID_SHOW, "Show", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, MENU_ID_QUIT, "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;
@@ -52,7 +76,39 @@ pub fn build_tray<R: Runtime>(app: &App<R>) -> tauri::Result<()> {
     builder = builder.icon(tray_icon(scale).clone());
 
     builder.build(app)?;
-    Ok(())
+    Ok(true)
+}
+
+/// Windows always has a notification area.
+#[cfg(not(target_os = "linux"))]
+fn tray_host_available() -> bool {
+    true
+}
+
+/// Whether a StatusNotifier host owns its name on the session bus. A bus that
+/// cannot be asked is logged and counts as no host: libappindicator would
+/// find nothing to show the icon on either.
+#[cfg(target_os = "linux")]
+fn tray_host_available() -> bool {
+    match linux_tray_host() {
+        Ok(found) => found,
+        Err(error) => {
+            log::warn!("tray: could not ask the session bus for a tray host: {error}");
+            false
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn linux_tray_host() -> zbus::Result<bool> {
+    let connection = zbus::blocking::Connection::session()?;
+    let bus = zbus::blocking::fdo::DBusProxy::new(&connection)?;
+    for name in TRAY_HOST_NAMES {
+        if bus.name_has_owner(zbus::names::BusName::try_from(name)?)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// The smallest drawn size that is at least as large as the shell will show,
@@ -120,6 +176,34 @@ mod tests {
         for (size, image) in &TRAY_ICONS {
             assert_eq!((image.width(), image.height()), (*size, *size));
             assert_eq!(image.rgba().len(), (*size * *size * 4) as usize);
+        }
+    }
+
+    /// Claims the tray-host name itself, so it needs a bus of its own: on a
+    /// desktop with a real tray the name is taken, and on one without it the
+    /// test would briefly pretend to be a tray. Run by
+    /// tools/test-linux-session.sh inside `dbus-run-session`.
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[ignore = "claims a session bus name: run tools/test-linux-session.sh"]
+    fn a_tray_host_is_seen_only_while_its_name_is_owned() {
+        assert!(!linux_tray_host().expect("the bus answers"));
+
+        let host = zbus::blocking::connection::Builder::session()
+            .and_then(|builder| builder.name(TRAY_HOST_NAMES[0]))
+            .and_then(|builder| builder.build())
+            .expect("the name can be claimed on a private bus");
+        assert!(linux_tray_host().expect("the bus answers"));
+
+        drop(host);
+        assert!(!linux_tray_host().expect("the bus answers"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn every_tray_host_name_is_a_valid_bus_name() {
+        for name in TRAY_HOST_NAMES {
+            assert!(zbus::names::BusName::try_from(name).is_ok(), "{name}");
         }
     }
 

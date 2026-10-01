@@ -11,6 +11,7 @@ import type {
   SavedRequest,
   SavedWebSocket,
 } from "@/types/collections";
+import type { SavedGrpcRequest } from "@/types/grpc";
 
 export interface FolderNode {
   folder: Folder;
@@ -19,6 +20,8 @@ export interface FolderNode {
   /** Beside `requests` rather than mixed into it: the node renders a method
    * for one and a WebSocket icon for the other. */
   webSockets: SavedWebSocket[];
+  /** The same, for gRPC requests. */
+  grpcRequests: SavedGrpcRequest[];
 }
 
 export interface FolderTree {
@@ -26,6 +29,8 @@ export interface FolderTree {
   rootRequests: SavedRequest[];
   /** WebSocket requests saved directly in the collection. */
   rootWebSockets: SavedWebSocket[];
+  /** gRPC requests saved directly in the collection. */
+  rootGrpcRequests: SavedGrpcRequest[];
   rootFolders: FolderNode[];
   /**
    * Examples grouped by the request they hang under, in the order storage
@@ -39,7 +44,13 @@ export interface FolderTree {
 export function buildFolderTree(contents: CollectionContents): FolderTree {
   const nodesById = new Map<string, FolderNode>();
   for (const folder of contents.folders) {
-    nodesById.set(folder.id, { folder, children: [], requests: [], webSockets: [] });
+    nodesById.set(folder.id, {
+      folder,
+      children: [],
+      requests: [],
+      webSockets: [],
+      grpcRequests: [],
+    });
   }
 
   const rootFolders: FolderNode[] = [];
@@ -75,13 +86,25 @@ export function buildFolderTree(contents: CollectionContents): FolderTree {
     }
   }
 
+  const rootGrpcRequests: SavedGrpcRequest[] = [];
+  for (const grpcRequest of contents.grpcRequests) {
+    const node = grpcRequest.folderId ? nodesById.get(grpcRequest.folderId) : undefined;
+    if (node) {
+      node.grpcRequests.push(grpcRequest);
+    } else {
+      rootGrpcRequests.push(grpcRequest);
+    }
+  }
+
   sortTree(rootFolders);
   rootRequests.sort(byName);
   rootWebSockets.sort(byName);
+  rootGrpcRequests.sort(byName);
 
   return {
     rootRequests,
     rootWebSockets,
+    rootGrpcRequests,
     rootFolders,
     examplesByRequestId: groupExamples(contents.examples),
   };
@@ -121,6 +144,7 @@ function sortTree(nodes: FolderNode[]): void {
   for (const node of nodes) {
     node.requests.sort(byName);
     node.webSockets.sort(byName);
+    node.grpcRequests.sort(byName);
     sortTree(node.children);
   }
 }

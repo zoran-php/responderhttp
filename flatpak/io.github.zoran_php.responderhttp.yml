@@ -1,0 +1,96 @@
+# flatpak/io.github.zoran_php.responderhttp.yml
+#
+# The Flatpak manifest (PLAN-LINUX.md 17e), built from source with no network
+# access the way Flathub builds: every crate and npm package is listed in
+# cargo-sources.json and node-sources.json, which tools/flatpak-sources.sh
+# regenerates from the lockfiles. It builds the self-hosted bundle
+# (tools/build-flatpak.sh). It is not a Flathub submission: Flathub accepts no
+# AI-written or AI-assisted manifest (PLAN-LINUX.md 17f).
+#
+# The ID is io.github.zoran_php.responderhttp because Flathub allows a dash
+# only in the last component. The Tauri CLI refuses the underscore, so this
+# build calls cargo directly and passes the ID through TAURI_CONFIG; the data
+# folder, the keyring item and the single-instance bus name all follow it
+# (PLAN-LINUX.md D1 as revised).
+#
+# Permissions (D5): network, the display, the GPU for WebKit, and the KDE tray
+# watcher. No filesystem access: files are chosen through the portal, and the
+# data key lives in the sandbox's keyring file, unlocked by the Secret portal.
+id: io.github.zoran_php.responderhttp
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.node26
+command: responderhttp
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # The tray: the app asks whether a tray host is running before it builds
+  # an icon (desktop/tray.rs), and registers the icon with it.
+  - --talk-name=org.kde.StatusNotifierWatcher
+
+modules:
+  # Loaded at run time for the tray icon; the GNOME runtime does not have it.
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
+
+  - name: responderhttp
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node26/bin
+      env:
+        CARGO_HOME: /run/build/responderhttp/cargo
+        CARGO_NET_OFFLINE: 'true'
+        XDG_CACHE_HOME: /run/build/responderhttp/flatpak-node/cache
+        TAURI_CONFIG: '{"identifier":"io.github.zoran_php.responderhttp"}'
+    build-commands:
+      # pnpm 12's npm package is a launcher for a native binary, which it
+      # would download on first use; it takes one already in place instead.
+      - install -m755 pnpm-exe/pnpm pnpm/pnpm-native
+      # The supply-chain check needs registry metadata that an offline build
+      # has not got. It already ran where the lockfile was written, and every
+      # tarball here is checked against the lockfile's sha512 on download.
+      - node pnpm/bin/pnpm.mjs install --offline --frozen-lockfile --trust-lockfile
+      # `pnpm run build` (tsc --noEmit && vite build), with the two tools
+      # named by path: the offline store the node generator writes records no
+      # `bin` entries, so pnpm links every package but no node_modules/.bin.
+      - node node_modules/typescript/bin/tsc --noEmit
+      - node node_modules/vite/bin/vite.js build
+      # What `pnpm tauri build` runs, without its bundling step.
+      - cargo --offline build --release --bins --features tauri/custom-protocol
+        --manifest-path src-tauri/Cargo.toml
+      - install -Dm755 src-tauri/target/release/responderhttp -t /app/bin/
+      - install -Dm644 flatpak/${FLATPAK_ID}.desktop -t /app/share/applications/
+      - install -Dm644 flatpak/${FLATPAK_ID}.metainfo.xml -t /app/share/metainfo/
+      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/${FLATPAK_ID}.png
+      - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/${FLATPAK_ID}.png
+      - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/${FLATPAK_ID}.png
+      - install -Dm644 LICENSE -t /app/share/licenses/${FLATPAK_ID}/
+    sources:
+      # This working tree, so a release bundle is built from exactly what
+      # release.sh verified.
+      - type: dir
+        path: ..
+        skip:
+          - .git
+          - node_modules
+          - dist
+          - src-tauri/target
+          - spikes
+          - flatpak/shared-modules
+      - type: archive
+        url: https://registry.npmjs.org/pnpm/-/pnpm-12.6.0.tgz
+        sha256: 05b7b921fbb31564505c967eabf825895a1cc18f50935c00be98815272cc9d56
+        dest: pnpm
+      - type: archive
+        url: https://registry.npmjs.org/@pnpm/exe.linux-x64/-/exe.linux-x64-12.6.0.tgz
+        sha256: 2b5f62986b14f2891fb78e5b554e60e38f25987217fed578f0303bbfda5e124a
+        dest: pnpm-exe
+        only-arches:
+          - x86_64
+      - cargo-sources.json
+      - node-sources.json

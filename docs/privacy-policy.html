@@ -120,7 +120,7 @@
                         <path d="M36 28h32c13.2 0 22 7.8 22 19.5C90 59 81.5 66.5 68 66.5 L88 100 H69.5 L53 70 H53 V100 H36 V28 Z M53 42 v16 h14 c4.5 0 8-3 8-8 s-3.5-8-8-8 H53 Z" fill="url(#rGrad)"/>
                     </svg>
                 </div>
-                <div class="flex flex-col">
+                <div class="hidden sm:flex flex-col">
                     <span class="font-extrabold text-textPrimary tracking-tight text-lg group-hover:text-brandAccent transition-colors">
                         ResponderHTTP
                     </span>
@@ -130,9 +130,11 @@
 
             <!-- Page links -->
             <nav class="flex items-center space-x-1 sm:space-x-2">
-                    <a href="index.html" class="px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Overview</a>
-                    <a href="privacy-policy.html" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">Privacy</a>
-                    <a href="terms.html" class="px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Terms</a>
+                    <a href="index.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Overview</a>
+                    <a href="linux.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Linux</a>
+                    <a href="security.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Security</a>
+                    <a href="privacy-policy.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">Privacy</a>
+                    <a href="terms.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Terms</a>
                     <button onclick="window.print()" class="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary bg-themeCard hover:bg-themeCardHover border border-themeBorder transition-all duration-150">
                         <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                         <span>Print</span>
@@ -147,7 +149,7 @@
             <div class="max-w-3xl">
                 <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-themeCard border border-themeBorder text-xs text-textMuted font-mono mb-4">
                     <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    <span>Effective Date: 23 September 2026</span>
+                    <span>Effective Date: 30 September 2026</span>
                 </div>
                 <h1 class="text-3xl sm:text-5xl font-extrabold text-textPrimary tracking-tight print-text-dark">
                     Privacy Policy
@@ -181,7 +183,7 @@
                 </div>
                 <div>
                     <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">100% Local Storage</h2>
-                    <p class="text-xs text-textSecondary mt-1 leading-snug">Data stays inside your local Windows profile SQLite database.</p>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">Data stays in a local SQLite database in your user profile or home folder.</p>
                 </div>
             </div>
 
@@ -190,8 +192,8 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                 </div>
                 <div>
-                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">Hardware Encrypted</h2>
-                    <p class="text-xs text-textSecondary mt-1 leading-snug">Secrets protected via Windows Credential Manager keys.</p>
+                    <h2 class="text-xs font-bold text-textPrimary uppercase tracking-wider">Encrypted Secrets</h2>
+                    <p class="text-xs text-textSecondary mt-1 leading-snug">Secrets encrypted with a key in your system's credential store.</p>
                 </div>
             </div>
 
@@ -230,20 +232,23 @@
                         <a href="#network-requests" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
                             <span class="font-mono text-xs text-brandAccent mr-2.5">04</span> Network requests
                         </a>
+                        <a href="#grpc" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">05</span> gRPC calls
+                        </a>
                         <a href="#logs" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">05</span> Logs
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">06</span> Logs
                         </a>
                         <a href="#files-open-save" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">06</span> Files you open or save
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">07</span> Files you open or save
                         </a>
                         <a href="#children" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">07</span> Children
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">08</span> Children
                         </a>
                         <a href="#policy-changes" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">08</span> Changes to this policy
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">09</span> Changes to this policy
                         </a>
                         <a href="#contact" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
-                            <span class="font-mono text-xs text-brandAccent mr-2.5">09</span> Contact
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">10</span> Contact
                         </a>
                     </nav>
                 </div>
@@ -278,7 +283,7 @@
                         </h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed mb-4 print-text-dark">
-                        The app keeps its data in a SQLite database in your Windows user profile, inside the app's own storage. That database holds:
+                        The app keeps its data in a SQLite database inside the app's own storage: in your Windows user profile on Windows, and in your home folder on Linux. That database holds:
                     </p>
                     
                     <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
@@ -286,7 +291,13 @@
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="print-text-dark">The HTTP and WebSocket requests and collections you save</span>
+                            <span class="print-text-dark">The HTTP, WebSocket and gRPC requests and collections you save</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">The gRPC schemas you import or save to the schema library: the text of the .proto files and the compiled schema</span>
                         </li>
                         <li class="flex items-start">
                             <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
@@ -322,7 +333,7 @@
 
                     <div class="mt-6 pt-4 border-t border-themeBorder/80 flex items-center text-xs text-textMuted font-mono">
                         <svg class="w-4 h-4 text-brandAccent mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        <span>Uninstalling the app removes this data.</span>
+                        <span>On Windows, uninstalling the app removes this data. On Linux, uninstalling leaves it in your home folder; delete the app's data folder to remove it.</span>
                     </div>
                 </section>
 
@@ -337,7 +348,7 @@
                         </h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        Values the app treats as secrets — passwords, bearer tokens, API keys, and environment variables marked secret — are never written to the database in plain text. They are encrypted with a key held in <strong class="text-textPrimary font-semibold print-text-dark">Windows Credential Manager</strong>, which only your Windows account can read. The key never leaves your computer.
+                        Values the app treats as secrets — passwords, bearer tokens, API keys, and environment variables marked secret — are never written to the database in plain text. They are encrypted with a key held in the operating system&rsquo;s credential store, which only your user account can read: <strong class="text-textPrimary font-semibold print-text-dark">Windows Credential Manager</strong> on Windows, and your desktop&rsquo;s <strong class="text-textPrimary font-semibold print-text-dark">keyring</strong> on Linux (GNOME Keyring or KWallet, reached through the secret portal when the app runs as a Flatpak). The key never leaves your computer.
                     </p>
                 </section>
 
@@ -352,45 +363,98 @@
                         </h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        ResponderHTTP sends HTTP requests, and opens WebSocket connections, <strong class="text-brandAccent font-medium underline decoration-brandAccent/40 underline-offset-4 print-text-dark">only to the addresses you enter</strong>. It is a tool for making those requests, so the destination, the headers and the body are entirely under your control. They go directly from your computer to the server you named; they do not pass through any service operated by the developer.
+                        ResponderHTTP sends HTTP requests and gRPC calls, and opens WebSocket connections, <strong class="text-brandAccent font-medium underline decoration-brandAccent/40 underline-offset-4 print-text-dark">only to the addresses you enter</strong>. It is a tool for making those requests, so the destination, the headers and the body are entirely under your control. They go directly from your computer to the server you named; they do not pass through any service operated by the developer. Loading a gRPC schema by server reflection asks the server you entered, and no one else.
                     </p>
                 </section>
 
                 <!-- Section 05 -->
-                <section id="logs" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                <section id="grpc" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
                             05
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            gRPC calls
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed mb-4 print-text-dark">
+                        gRPC follows the same rules as the rest of the app. In particular:
+                    </p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Calls go directly from your computer to the address you enter, in plain text or over TLS as the lock beside the address shows. Over TLS, the server&rsquo;s certificate is verified by default.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Server reflection asks the server you entered, and no one else, for its services and message types. It happens when you ask for it, and when you leave the address field or open the method list of a request that does not use a schema from the library. Opening a saved request sends nothing.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Imported .proto files are compiled inside the app and never uploaded. Only the files you chose, and the files they import, are read, looked up in their own folders and the import folders you chose.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Saved gRPC requests (address, method, message, metadata and settings) and the schema library stay in the local database. Authorization credentials are encrypted as described under Credentials. Metadata is stored as you type it, so keep a token in a secret variable or on the Authorization tab: a secret variable is stored as its <code class="font-mono text-textPrimary">{{name}}</code> placeholder, and its value is filled in only when the call is sent.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">The messages you send and receive and the metadata of a call are never written to the log. A log line names the address, the method and the status only.</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Copy as grpcurl</strong> puts a command on your clipboard and sends nothing. It contains the values of secret variables when an environment holding them is selected, so treat the copied text as you would the secrets themselves.</span>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- Section 06 -->
+                <section id="logs" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            06
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             Logs
                         </h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        The app writes a local log file to help diagnose problems. Request bodies, authentication headers, tokens and cookies are deliberately kept out of it, as are the WebSocket messages you send and receive and the events of a streamed response; a redaction step strips credentials that would otherwise ride along inside an error message. The log stays on your computer and is never uploaded.
+                        The app writes a local log file to help diagnose problems. Request bodies, authentication headers, tokens and cookies are deliberately kept out of it, as are the WebSocket and gRPC messages you send and receive, gRPC metadata, and the events of a streamed response; a redaction step strips credentials that would otherwise ride along inside an error message. The log stays on your computer and is never uploaded.
                     </p>
                 </section>
 
-                <!-- Section 06 -->
+                <!-- Section 07 -->
                 <section id="files-open-save" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                            06
+                            07
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             Files you open or save
                         </h2>
                     </div>
                     <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark">
-                        Importing an OpenAPI document, or saving a response to disk, reads and writes only the file you chose in the system dialog.
+                        Importing an OpenAPI document, or saving a response to disk, reads and writes only the file you chose in the system dialog. Importing .proto files reads the files you chose and the files they import, looked up only in their own folders and the import folders you chose. When the app runs as a Flatpak, it has no access to your files of its own: the system dialog grants it the files you choose, and nothing else.
                     </p>
                 </section>
 
-                <!-- Section 07 -->
+                <!-- Section 08 -->
                 <section id="children" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                            07
+                            08
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             Children
@@ -401,11 +465,11 @@
                     </p>
                 </section>
 
-                <!-- Section 08 -->
+                <!-- Section 09 -->
                 <section id="policy-changes" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                            08
+                            09
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             Changes to this policy
@@ -416,13 +480,13 @@
                     </p>
                 </section>
 
-                <!-- Section 09: Contact Card -->
+                <!-- Section 10: Contact Card -->
                 <section id="contact" class="scroll-mt-24 print-card bg-gradient-to-br from-themeCard to-themeBgAlt border border-brandAccentBorder rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
                     <div class="absolute -right-10 -bottom-10 w-40 h-40 rounded-full bg-brandAccent/5 blur-2xl pointer-events-none"></div>
                     
                     <div class="flex items-center space-x-3 mb-4">
                         <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
-                            09
+                            10
                         </span>
                         <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
                             Contact
@@ -468,6 +532,10 @@
             </div>
             <div class="flex items-center space-x-4 font-mono text-[11px]">
                 <a href="index.html" class="hover:text-brandAccent transition-colors">Overview</a>
+                <span>&bull;</span>
+                <a href="linux.html" class="hover:text-brandAccent transition-colors">Linux</a>
+                <span>&bull;</span>
+                <a href="security.html" class="hover:text-brandAccent transition-colors">Security</a>
                 <span>&bull;</span>
                 <a href="privacy-policy.html" class="hover:text-brandAccent transition-colors">Privacy</a>
                 <span>&bull;</span>

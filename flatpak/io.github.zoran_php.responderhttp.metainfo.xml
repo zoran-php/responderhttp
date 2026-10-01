@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- flatpak/io.github.zoran_php.responderhttp.metainfo.xml
+
+     What GNOME Software, KDE Discover and flathub.org show (PLAN-LINUX.md 17e).
+     The licence is declared as it is: LICENSE allows unmodified redistribution
+     and nothing else, so it is proprietary, with the terms page as its URL.
+     Screenshot URLs point at the website (docs/screenshots/), which GitHub
+     Pages serves once they are committed. -->
+<component type="desktop-application">
+  <id>io.github.zoran_php.responderhttp</id>
+  <name>ResponderHTTP</name>
+  <summary>Send HTTP, WebSocket, gRPC and event-stream requests</summary>
+  <developer id="io.github.zoran_php">
+    <name>Zoran Davidović</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary=https://zoran-php.github.io/responderhttp/terms.html</project_license>
+
+  <description>
+    <p>
+      ResponderHTTP is a desktop API client. Type a URL, choose a method, add headers,
+      parameters, a body and authentication, and send. You get the status code, the
+      response headers, the body with syntax highlighting, and a timing breakdown
+      showing where the time went: DNS, connect, TLS, first byte and total.
+    </p>
+    <ul>
+      <li>HTTP requests with every common method, form and raw bodies, and per-request redirects, timeouts, TLS verification and proxies</li>
+      <li>Basic, Bearer, API key and custom authentication</li>
+      <li>WebSocket connections with a composer and a searchable message log</li>
+      <li>gRPC calls, unary and streaming, with the schema from server reflection or imported .proto files</li>
+      <li>Server-sent events shown one by one as they arrive</li>
+      <li>Collections, environments, history and Markdown documentation</li>
+      <li>OpenAPI 3.0, 3.1 and 3.2 import and export, in JSON or YAML</li>
+      <li>Copy any request as a curl command</li>
+    </ul>
+    <p>
+      Requests run through libcurl, compiled into the app. Everything you create stays
+      on your computer in a local database, and tokens and passwords are encrypted
+      with a key kept in your desktop keyring. There are no accounts, no telemetry and
+      no analytics.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.zoran_php.responderhttp.desktop</launchable>
+  <provides>
+    <binary>responderhttp</binary>
+  </provides>
+
+  <url type="homepage">https://zoran-php.github.io/responderhttp/</url>
+  <url type="bugtracker">https://github.com/zoran-php/responderhttp/issues</url>
+  <url type="vcs-browser">https://github.com/zoran-php/responderhttp</url>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#73b0c2</color>
+    <color type="primary" scheme_preference="dark">#1f252e</color>
+  </branding>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>An HTTP request with its response, headers and timing</caption>
+      <image>https://zoran-php.github.io/responderhttp/screenshots/linux-http.png</image>
+    </screenshot>
+  </screenshots>
+
+  <requires>
+    <display_length compare="ge">1000</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+
+  <categories>
+    <category>Development</category>
+    <category>WebDevelopment</category>
+  </categories>
+  <keywords>
+    <keyword>HTTP</keyword>
+    <keyword>API</keyword>
+    <keyword>REST</keyword>
+    <keyword>WebSocket</keyword>
+    <keyword>gRPC</keyword>
+    <keyword>curl</keyword>
+    <keyword>OpenAPI</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="1.1.0" date="2026-09-29">
+      <description>
+        <p>First release for Linux.</p>
+        <ul>
+          <li>gRPC calls, unary and streaming, with server reflection or imported .proto files</li>
+          <li>Secrets are kept with a key in the desktop keyring</li>
+          <li>Without a tray, closing the window quits, asking first if work would be lost</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

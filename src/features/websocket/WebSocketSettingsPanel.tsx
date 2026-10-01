@@ -6,6 +6,7 @@
 // different set of settings, not a subset of the same one.
 import { ShieldAlert } from "lucide-react";
 
+import { clampInt } from "@/lib/number-input";
 import type { WebSocketSettings } from "@/types/websocket";
 
 const KIB = 1024;
@@ -103,12 +104,4 @@ export function WebSocketSettingsPanel({ settings, onChange }: WebSocketSettings
       </div>
     </div>
   );
-}
-
-function clampInt(raw: string, min: number, max: number): number {
-  const parsed = Number.parseInt(raw, 10);
-  if (Number.isNaN(parsed)) {
-    return min;
-  }
-  return Math.min(max, Math.max(min, parsed));
 }

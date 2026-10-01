@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResponderHTTP — Linux</title>
+    <meta name="description" content="ResponderHTTP on Linux: which package to use, the minimum distribution for each, how to install, update and remove it, and how it behaves on a Linux desktop.">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        themeBg: '#181D24',
+                        themeBgAlt: '#1F252E',
+                        themeCard: '#262E37',
+                        themeCardHover: '#2D3742',
+                        themeBorder: '#353F4B',
+                        themeBorderLight: '#435060',
+                        brandAccent: '#73B0C2',
+                        brandAccentHover: '#86C1D3',
+                        brandAccentMuted: 'rgba(115, 176, 194, 0.12)',
+                        brandAccentBorder: 'rgba(115, 176, 194, 0.25)',
+                        textPrimary: '#F1F5F9',
+                        textSecondary: '#94A3B8',
+                        textMuted: '#64748B'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #181D24;
+            color: #F1F5F9;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-image: radial-gradient(circle at 50% 0%, #222B36 0%, #181D24 70%);
+            background-attachment: fixed;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #181D24;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #353F4B;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #73B0C2;
+        }
+
+        .active-toc-item {
+            color: #73B0C2 !important;
+            border-left-color: #73B0C2 !important;
+            background-color: rgba(115, 176, 194, 0.08);
+            font-weight: 600;
+        }
+
+        /* Print styling rules */
+        @media print {
+            .no-print { display: none !important; }
+            body { 
+                background: #ffffff !important; 
+                color: #0f172a !important; 
+                background-image: none !important;
+            }
+            .print-card { 
+                background: #ffffff !important; 
+                border: 1px solid #cbd5e1 !important; 
+                color: #0f172a !important;
+                box-shadow: none !important;
+            }
+            .print-text-dark { color: #0f172a !important; }
+            .print-text-muted { color: #475569 !important; }
+            .print-accent { color: #0891b2 !important; }
+            a { text-decoration: underline !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-brandAccent selection:text-themeBg">
+
+    <!-- Navigation Bar -->
+    <header class="sticky top-0 z-50 bg-themeBg/90 backdrop-blur-md border-b border-themeBorder/80 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            
+            <!-- Brand & App Logo -->
+            <a href="index.html" class="flex items-center space-x-3.5 group transition-transform duration-200 hover:scale-[1.01]">
+                <div class="relative w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-black/40 border border-themeBorderLight shrink-0 flex items-center justify-center">
+                    <!-- SVG Logo matching StoreLogo image -->
+                    <svg class="w-full h-full" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="logoBg" x1="0" y1="0" x2="0" y2="128" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#3A4452"/>
+                                <stop offset="100%" stop-color="#1E242D"/>
+                            </linearGradient>
+                            <linearGradient id="rGrad" x1="0" y1="0" x2="0" y2="128" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#80BDCF"/>
+                                <stop offset="100%" stop-color="#67A3B5"/>
+                            </linearGradient>
+                        </defs>
+                        <rect width="128" height="128" rx="28" fill="url(#logoBg)"/>
+                        <rect x="1" y="1" width="126" height="126" rx="27" stroke="#4A5667" stroke-width="2" stroke-opacity="0.6"/>
+                        <path d="M36 28h32c13.2 0 22 7.8 22 19.5C90 59 81.5 66.5 68 66.5 L88 100 H69.5 L53 70 H53 V100 H36 V28 Z M53 42 v16 h14 c4.5 0 8-3 8-8 s-3.5-8-8-8 H53 Z" fill="url(#rGrad)"/>
+                    </svg>
+                </div>
+                <div class="hidden sm:flex flex-col">
+                    <span class="font-extrabold text-textPrimary tracking-tight text-lg group-hover:text-brandAccent transition-colors">
+                        ResponderHTTP
+                    </span>
+                    <span class="text-[10px] font-mono tracking-widest text-textMuted uppercase -mt-0.5">Desktop API Client</span>
+                </div>
+            </a>
+
+            <!-- Page links -->
+            <nav class="flex items-center space-x-1 sm:space-x-2">
+                    <a href="index.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Overview</a>
+                    <a href="linux.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">Linux</a>
+                    <a href="security.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Security</a>
+                    <a href="privacy-policy.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Privacy</a>
+                    <a href="terms.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Terms</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <div class="border-b border-themeBorder/60 bg-themeBgAlt/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+            <div class="max-w-3xl">
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-themeCard border border-themeBorder text-xs text-textMuted font-mono mb-4">
+                    <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    <span>Version 1.1.0 &bull; Linux, 64-bit</span>
+                </div>
+                <h1 class="text-3xl sm:text-5xl font-extrabold text-textPrimary tracking-tight print-text-dark">
+                    ResponderHTTP on Linux
+                </h1>
+                <p class="mt-4 text-base sm:text-lg text-textSecondary leading-relaxed print-text-muted">
+                    Which package to use, the oldest distribution each one runs on, and how to install, update and remove the app.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-grow w-full">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+            <aside class="hidden lg:block lg:col-span-4 sticky top-24 no-print">
+                <div class="bg-themeCard/80 border border-themeBorder rounded-2xl p-5 backdrop-blur-sm">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-textMuted mb-3 px-2 flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+                        <span>Contents</span>
+                    </h2>
+                    <nav class="space-y-1 text-sm font-medium">
+                        <a href="#packages" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">01</span> Which package to use
+                        </a>
+                        <a href="#requirements" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">02</span> System requirements
+                        </a>
+                        <a href="#install" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">03</span> Install
+                        </a>
+                        <a href="#behaviour" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">04</span> How it behaves on Linux
+                        </a>
+                        <a href="#remove" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">05</span> Update and remove
+                        </a>
+                        <a href="#troubleshooting" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">06</span> Troubleshooting
+                        </a>
+                    </nav>
+                </div>
+            </aside>
+
+            <div class="lg:col-span-8 space-y-6 sm:space-y-8">
+
+                <section id="packages" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            01
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Which package to use
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">ResponderHTTP comes in three Linux packages. They contain the same app; they differ in how it is installed, what it takes from your system and how it is kept up to date.</p>
+                    <div class="overflow-x-auto rounded-xl border border-themeBorder mb-4">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="bg-themeBgAlt/60 text-textMuted uppercase tracking-wider text-[11px]">
+                                <tr>
+                                    <th class="px-4 py-2.5 font-semibold">Package</th>
+                                    <th class="px-4 py-2.5 font-semibold">Best for</th>
+                                    <th class="px-4 py-2.5 font-semibold">Updates</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-themeBorder/70">
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">RPM</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Fedora</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Install the newer RPM. WebKitGTK and GTK are updated by Fedora</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">AppImage</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Ubuntu, Debian, Mint, Arch and most other distributions from 2022 on</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Download the newer AppImage. It carries its own WebKitGTK, which is only updated with it</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Flatpak</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Any distribution with Flatpak, including older ones</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Install the newer bundle. Its GNOME runtime, with WebKitGTK, is updated by Flatpak on its own</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">Status:</strong> all three packages are built and tested for version 1.1.0, but none is published yet; they will be attached to the release on the project’s GitHub page. A Flathub listing is planned.</p>
+                </section>
+                <section id="requirements" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            02
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            System requirements
+                        </h2>
+                    </div>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">A 64-bit PC</strong> (x86_64). ARM computers are not supported yet</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">A graphical desktop</strong> with GTK 3, such as GNOME, KDE Plasma, Xfce or Cinnamon</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">A desktop keyring</strong> for saving secrets: GNOME Keyring or KWallet, which the usual desktops start for you. Without one the app runs, but tokens and passwords cannot be saved (see Security)</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Optional: a tray.</strong> KDE Plasma shows the app’s tray icon. GNOME shows it only with an AppIndicator extension; without one, closing the window quits the app</span>
+                        </li>
+                    </ul>
+                    <h3 class="text-sm font-bold text-textPrimary uppercase tracking-wider mt-6 mb-3 print-text-dark">Minimum distribution for each package</h3>
+                    <div class="overflow-x-auto rounded-xl border border-themeBorder mb-4">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="bg-themeBgAlt/60 text-textMuted uppercase tracking-wider text-[11px]">
+                                <tr>
+                                    <th class="px-4 py-2.5 font-semibold">Package</th>
+                                    <th class="px-4 py-2.5 font-semibold">Needs</th>
+                                    <th class="px-4 py-2.5 font-semibold">In practice</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-themeBorder/70">
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">RPM</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Fedora’s <span class="font-mono text-xs">webkit2gtk4.1</span>, <span class="font-mono text-xs">gtk3</span> and <span class="font-mono text-xs">libappindicator-gtk3</span>, which <span class="font-mono text-xs">dnf</span> installs with it</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Fedora 44. Older Fedora releases are not tested</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">AppImage</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">glibc 2.35 or newer, the C++ runtime of GCC 12 or newer, and <span class="font-mono text-xs">fuse3</span></td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Ubuntu 22.04, Debian 12, Linux Mint 21, Fedora 36 and newer, and Arch</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Flatpak</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Flatpak itself; the GNOME runtime brings its own libraries</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">Expected to run on older distributions too; not yet tried on them</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">The AppImage carries WebKitGTK and GTK but uses your system’s C library (glibc) and C++ runtime, as every AppImage does. Those have to be at least as new as the Ubuntu 22.04 system it is built on, which is the oldest release that has the WebKitGTK version the app needs. On an older system it stops at once with a <span class="font-mono text-xs">version `GLIBC_2.xx' not found</span> message.</p>
+                    <h3 class="text-sm font-bold text-textPrimary uppercase tracking-wider mt-6 mb-3 print-text-dark">Tested</h3>
+                    <div class="overflow-x-auto rounded-xl border border-themeBorder mb-4">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="bg-themeBgAlt/60 text-textMuted uppercase tracking-wider text-[11px]">
+                                <tr>
+                                    <th class="px-4 py-2.5 font-semibold">Distribution</th>
+                                    <th class="px-4 py-2.5 font-semibold">glibc</th>
+                                    <th class="px-4 py-2.5 font-semibold">AppImage</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-themeBorder/70">
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Arch Linux</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">2.44</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark"><span class="text-emerald-400 font-semibold">Runs</span></td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Fedora 44</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">2.43</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark"><span class="text-emerald-400 font-semibold">Runs</span> (the RPM also installs and runs)</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Ubuntu 24.04 LTS</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">2.39</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark"><span class="text-emerald-400 font-semibold">Runs</span></td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Debian 12</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">2.36</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark"><span class="text-emerald-400 font-semibold">Runs</span></td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Ubuntu 22.04 LTS</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">2.35</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark"><span class="text-emerald-400 font-semibold">Runs</span></td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Ubuntu 20.04 LTS</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">2.31</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark"><span class="text-rose-400 font-semibold">Does not start</span>, glibc and C++ runtime too old</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Debian 11</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">2.31</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark"><span class="text-rose-400 font-semibold">Does not start</span>, glibc and C++ runtime too old</td>
+                                </tr>
+                                <tr class="hover:bg-themeCardHover/40 transition-colors">
+                                    <td class="px-4 py-2.5 text-textPrimary font-medium print-text-dark">Debian 10</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark">2.28</td>
+                                    <td class="px-4 py-2.5 text-textSecondary print-text-dark"><span class="text-rose-400 font-semibold">Does not start</span>, glibc too old</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Each test started the app on a clean installation with only a desktop’s base libraries, under X11, and checked that its window came up. An HTTPS request was sent on Fedora 44 and Ubuntu 22.04, verified against each system’s own certificate store. For Debian 10 and 11 and Ubuntu 20.04, the Flatpak is the way to run ResponderHTTP; it has not yet been tried on them.</p>
+                </section>
+                <section id="install" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            03
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Install
+                        </h2>
+                    </div>
+                    <h3 class="text-sm font-bold text-textPrimary uppercase tracking-wider mt-6 mb-3 print-text-dark">RPM (Fedora)</h3>
+                    <pre class="mb-4 overflow-x-auto rounded-xl border border-themeBorder bg-themeBg/80 p-4 font-mono text-xs text-textSecondary leading-relaxed print-text-dark">sudo dnf install ./ResponderHTTP-1.1.0-1.x86_64.rpm</pre>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><span class="font-mono text-xs">dnf</span> installs WebKitGTK, GTK and the tray library from Fedora’s own repositories if they are not there already. The app then appears in the applications menu. The RPM is not signed yet, so <span class="font-mono text-xs">dnf</span> cannot check its signature; get it only from the project’s own release page.</p>
+                    <h3 class="text-sm font-bold text-textPrimary uppercase tracking-wider mt-6 mb-3 print-text-dark">AppImage (other distributions)</h3>
+                    <pre class="mb-4 overflow-x-auto rounded-xl border border-themeBorder bg-themeBg/80 p-4 font-mono text-xs text-textSecondary leading-relaxed print-text-dark">chmod +x ResponderHTTP_1.1.0_amd64.AppImage
+./ResponderHTTP_1.1.0_amd64.AppImage</pre>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">An AppImage is one file you run directly, with nothing to install. It needs <span class="font-mono text-xs">fuse3</span> to open itself, which most desktops already have. If it says <span class="font-mono text-xs">No suitable fusermount binary found</span>, install it (<span class="font-mono text-xs">sudo apt install fuse3</span> on Ubuntu and Debian), or start the AppImage with <span class="font-mono text-xs">--appimage-extract-and-run</span>. It does not add itself to the applications menu; a tool such as Gear Lever or AppImageLauncher can do that.</p>
+                    <h3 class="text-sm font-bold text-textPrimary uppercase tracking-wider mt-6 mb-3 print-text-dark">Flatpak (any distribution)</h3>
+                    <pre class="mb-4 overflow-x-auto rounded-xl border border-themeBorder bg-themeBg/80 p-4 font-mono text-xs text-textSecondary leading-relaxed print-text-dark">flatpak install --user ResponderHTTP-1.1.0.flatpak
+flatpak run io.github.zoran_php.responderhttp</pre>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">The Flatpak comes as one file from the project’s release page. Installing it also fetches the GNOME runtime it runs on from Flathub, if that is not there already, and adds the app to the applications menu. It runs in Flatpak’s sandbox with no access to your files: you choose files through the system dialog, which hands over only those. Its ID has an underscore where the other packages use a hyphen, because Flathub’s naming rules require it. A listing on Flathub itself, where GNOME Software and KDE Discover would find it, is planned.</p>
+                </section>
+                <section id="behaviour" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            04
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            How it behaves on Linux
+                        </h2>
+                    </div>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Closing the window.</strong> With a tray, the window hides to it, as on Windows, and the tray menu has Show and Quit. Without a tray, as on a stock Fedora Workstation, closing quits the app, and first asks if a tab has unsaved changes or a request, stream, WebSocket connection or gRPC call is still running</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">One copy at a time.</strong> Starting the app while it is running brings the open window to the front instead of opening a second one</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Secrets</strong> are encrypted with a key kept in your desktop keyring, in an item labelled “ResponderHTTP data key”. A locked keyring asks to be unlocked the first time the app needs it</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Certificates</strong> come from your system’s trust store, such as <span class="font-mono text-xs">/etc/pki</span> on Fedora or <span class="font-mono text-xs">/etc/ssl/certs</span> on Ubuntu and Debian, so a root your organisation installs there is trusted</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Your data</strong> is one SQLite database and a log folder in <span class="font-mono text-xs">~/.local/share/io.github.zoran-php.responderhttp/</span>, the same for the RPM and the AppImage</span>
+                        </li>
+                    </ul>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">libcurl, TLS and SQLite are compiled into the app on Linux as on Windows. The RPM depends only on WebKitGTK, GTK and the tray library, which draw the window; the AppImage brings those with it.</p>
+                </section>
+                <section id="remove" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            05
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Update and remove
+                        </h2>
+                    </div>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Update the RPM</strong> by installing the newer file the same way; your data and key stay</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Update the AppImage</strong> by replacing the file. Replacing it is also how its WebKitGTK gets security fixes, so keep it current</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Remove the RPM</strong> with <span class="font-mono text-xs">sudo dnf remove responder-http</span>; remove the AppImage by deleting the file</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Remove your data</strong> as well by deleting <span class="font-mono text-xs">~/.local/share/io.github.zoran-php.responderhttp/</span> and the key with <span class="font-mono text-xs">secret-tool clear service io.github.zoran-php.responderhttp username data-key</span>. Uninstalling leaves both behind, so that reinstalling keeps your collections</span>
+                        </li>
+                    </ul>
+                </section>
+                <section id="troubleshooting" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            06
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Troubleshooting
+                        </h2>
+                    </div>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The AppImage stops with “version `GLIBC_2.xx' not found” or “GLIBCXX_3.4.xx not found”.</strong> Your distribution is older than the AppImage supports; see the requirements above. Use the Flatpak instead</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">“No suitable fusermount binary found”.</strong> Install <span class="font-mono text-xs">fuse3</span>, or run the AppImage with <span class="font-mono text-xs">--appimage-extract-and-run</span></span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The RPM’s app says WebKitGTK is missing or broken.</strong> Run <span class="font-mono text-xs">sudo dnf reinstall webkit2gtk4.1</span> and start it again</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Secrets cannot be saved.</strong> No keyring is running in your session, or it stayed locked. Check that GNOME Keyring or KWallet runs and unlock it when asked. The app never falls back to storing them unencrypted</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">There is no tray icon on GNOME.</strong> GNOME hides tray icons unless the “AppIndicator and KStatusNotifierItem Support” extension is installed (<span class="font-mono text-xs">gnome-shell-extension-appindicator</span> on Fedora). Without it the app simply quits when its window is closed</span>
+                        </li>
+                    </ul>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Page Footer -->
+    <footer class="border-t border-themeBorder/80 bg-themeBg/95 text-xs text-textMuted py-8 mt-12 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-6 h-6 rounded-md bg-themeCard border border-themeBorder flex items-center justify-center font-mono text-[10px] text-brandAccent font-bold">
+                    R
+                </div>
+                <span>&copy; 2026 Zoran Davidović. All rights reserved.</span>
+            </div>
+            <div class="flex items-center space-x-4 font-mono text-[11px]">
+                <a href="index.html" class="hover:text-brandAccent transition-colors">Overview</a>
+                <span>&bull;</span>
+                <a href="linux.html" class="hover:text-brandAccent transition-colors">Linux</a>
+                <span>&bull;</span>
+                <a href="security.html" class="hover:text-brandAccent transition-colors">Security</a>
+                <span>&bull;</span>
+                <a href="privacy-policy.html" class="hover:text-brandAccent transition-colors">Privacy</a>
+                <span>&bull;</span>
+                <a href="terms.html" class="hover:text-brandAccent transition-colors">Terms</a>
+                <span>&bull;</span>
+                <a href="https://github.com/zoran-php/responderhttp" class="hover:text-brandAccent transition-colors">GitHub</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Highlights the section the reader is in, as on the other pages.
+        document.addEventListener('DOMContentLoaded', () => {
+            const sections = document.querySelectorAll('section[id]');
+            const navLinks = document.querySelectorAll('.toc-item');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.getAttribute('id');
+                        navLinks.forEach(link => {
+                            if (link.getAttribute('href') === `#${id}`) {
+                                link.classList.add('active-toc-item');
+                            } else {
+                                link.classList.remove('active-toc-item');
+                            }
+                        });
+                    }
+                });
+            }, { rootMargin: '-10% 0px -70% 0px' });
+            sections.forEach(section => observer.observe(section));
+        });
+    </script>
+</body>
+</html>

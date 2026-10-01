@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { docsTabLabel, docsTargetName, UNNAMED_DOCS_ITEM } from "@/lib/docs-title";
+import { emptyGrpcDraft } from "@/lib/grpc-request";
 import type { Collection, CollectionContents } from "@/types/collections";
 import { AUTH_NONE, DEFAULT_SETTINGS } from "@/types/http";
 import { DEFAULT_WS_SETTINGS, EMPTY_WS_DRAFT } from "@/types/websocket";
@@ -12,7 +13,14 @@ const collections: Collection[] = [
 ];
 
 function contents(overrides: Partial<CollectionContents> = {}): CollectionContents {
-  return { folders: [], requests: [], examples: [], webSockets: [], ...overrides };
+  return {
+    folders: [],
+    requests: [],
+    examples: [],
+    webSockets: [],
+    grpcRequests: [],
+    ...overrides,
+  };
 }
 
 const contentsById: Record<string, CollectionContents> = {
@@ -63,6 +71,28 @@ describe("docsTargetName", () => {
    * decides which list is searched either way. */
   it("does not find a request when asked for a folder", () => {
     expect(docsTargetName({ kind: "folder", id: "req_1" }, collections, contentsById)).toBeNull();
+  });
+
+  /** Without this a gRPC request's Docs tab is titled "Docs: Untitled". */
+  it("finds a gRPC request as a request", () => {
+    const withGrpc = {
+      col_3: contents({
+        grpcRequests: [
+          {
+            id: "req_grpc",
+            collectionId: "col_3",
+            folderId: null,
+            name: "Get order",
+            request: emptyGrpcDraft(),
+            secretState: "ok",
+          },
+        ],
+      }),
+    };
+
+    expect(docsTargetName({ kind: "request", id: "req_grpc" }, collections, withGrpc)).toBe(
+      "Get order",
+    );
   });
 
   /** Without this a WebSocket's Docs tab is titled "Docs: Untitled". */

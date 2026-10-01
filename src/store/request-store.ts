@@ -38,10 +38,32 @@ import {
 import { foldLegacyParams, queryPairs, withQueryPairs } from "@/lib/query-sync";
 import { emptyRequestInput, requestInputsEqual } from "@/lib/request-defaults";
 import {
+  substituteGrpcDraft,
   substituteMessage,
   substituteRequestInput,
   substituteWebSocketRequest,
 } from "@/lib/variables";
+import {
+  appendCapped as appendGrpcLog,
+  applyPendingSends,
+  clearAll as clearGrpcLog,
+  EMPTY_GRPC_LOG,
+  logEntries as grpcLogEntries,
+  type GrpcLog,
+  type GrpcLogFilter,
+  type PendingSend as GrpcPendingSend,
+} from "@/lib/grpc-log";
+import {
+  clientStreams,
+  emptyGrpcDraft,
+  findMethod,
+  grpcDraftsEqual,
+  schemaRefFor,
+} from "@/lib/grpc-request";
+import type { GrpcCallState } from "@/lib/grpc-status";
+import { grpcTarget, splitGrpcScheme } from "@/lib/grpc-url";
+import { buildGrpcurlCommand } from "@/lib/grpcurl-string-builder";
+import { reformatJson } from "@/lib/json-reformat";
 import {
   appendCapped,
   clearAll,
@@ -55,6 +77,7 @@ import {
 import { beautify, isBeautifiable } from "@/lib/beautify";
 import { applyStreamEvents, EMPTY_STREAM, type ResponseStream } from "@/lib/sse-log";
 import { encodeOutgoing } from "@/lib/ws-payload";
+import { quitSummary, type QuitSummary } from "@/lib/quit-guard";
 import type { WsConnectionState } from "@/lib/ws-status";
 import { webSocketShapesEqual, type WebSocketShape } from "@/lib/ws-request";
 // Reading the active environment here, rather than threading it through
@@ -64,8 +87,20 @@ import { useHistoryStore } from "@/store/history-store";
 import { itemDocs, setItemDocs } from "@/services/docs";
 import { cancelRequest, sendAndDownload, sendRequest } from "@/services/http-client";
 import { connectWebSocket, disconnectWebSocket, sendWebSocketMessage } from "@/services/websocket";
+import * as grpcService from "@/services/grpc";
 import type { SavedRequest, SavedWebSocket } from "@/types/collections";
+import type {
+  GrpcCallOutcome,
+  GrpcEvent,
+  GrpcRequestDraft,
+  GrpcRequestInput,
+  GrpcSchemaRef,
+  GrpcSettings,
+  ProtoSchema,
+  SavedGrpcRequest,
+} from "@/types/grpc";
 import { sameDocsTarget, type DocsTarget } from "@/types/docs";
+import type { Result } from "@/types/result";
 import {
   AUTH_NONE,
   DEFAULT_SETTINGS,
@@ -75,6 +110,7 @@ import {
   type HttpMethod,
   type HttpResponse,
   type HttpStreamEvent,
+  type KeyValue,
   type RequestBody,
   type RequestSettings,
   type SecretState,
@@ -236,7 +272,75 @@ export interface WebSocketTab {
   savedSnapshot: WebSocketShape;
 }
 
-export type Tab = RequestTab | EnvironmentTab | ExampleTab | DocsTab | WebSocketTab;
+/** Where a gRPC call is. `cancelling` lasts until the call's end arrives. */
+export type { GrpcCallState } from "@/lib/grpc-status";
+
+/** Where the tab's schema is: none chosen, being fetched, or loaded. */
+export type GrpcSchemaStatus = "none" | "loading" | "loaded" | "error";
+
+/** What the response pane shows for the current (or last) call. */
+export interface GrpcResponse {
+  callId: string;
+  metadata: KeyValue[];
+  /** The last message received, as JSON text: a unary call's body. */
+  lastMessage: string | null;
+  receivedCount: number;
+  /** The protobuf size of everything received, as Rust measured it. */
+  receivedBytes: number;
+  /** Status, trailers and time, once the call has ended. */
+  outcome: GrpcCallOutcome | null;
+}
+
+/**
+ * A gRPC request (PLAN-GRPC.md 16h). Like a WebSocket tab, the store owns
+ * the call's lifetime: closing the tab cancels it.
+ */
+export interface GrpcTab {
+  kind: "grpc";
+  id: string;
+
+  /** host:port as typed, `{{variables}}` and all (D6). */
+  url: string;
+  tls: boolean;
+  /** `/package.Service/Method`; empty until one is picked. */
+  methodPath: string;
+  metadataRows: KeyValueRow[];
+  auth: Auth;
+  /** As on a request tab: whether the auth secret loaded from storage. */
+  secretState: SecretState;
+  /** The Message tab's JSON text. */
+  message: string;
+  settings: GrpcSettings;
+
+  /** What Save records for the schema. */
+  schemaRef: GrpcSchemaRef;
+  /** The loaded schema, for the method picker; null until one is loaded. */
+  schema: ProtoSchema | null;
+  schemaStatus: GrpcSchemaStatus;
+  schemaError: string | null;
+  /** The target the last reflection asked (`authority|tls`), so leaving the
+   * URL field reflects again only when the server changed. */
+  reflectedFor: string | null;
+
+  call: GrpcCallState;
+  /** The running call, or the most recent one. */
+  callId: string | null;
+  /** End Streaming took effect: the client sends nothing more. */
+  streamEnded: boolean;
+  response: GrpcResponse | null;
+  /** Why the last Invoke did not start: no method, a bad target, a refusal. */
+  callError: string | null;
+  log: GrpcLog;
+  logFilter: GrpcLogFilter;
+  logQuery: string;
+  /** Why the last Send, Beautify or example did not work. */
+  composerError: string | null;
+
+  loadedRequest: LoadedRequestRef | null;
+  savedSnapshot: GrpcRequestDraft;
+}
+
+export type Tab = RequestTab | EnvironmentTab | ExampleTab | DocsTab | WebSocketTab | GrpcTab;
 
 interface TabsState {
   tabs: Tab[];
@@ -246,6 +350,11 @@ interface TabsState {
   /** Null while an environment tab is in front — the builder is not rendered then. */
   activeRequestTab: () => RequestTab | null;
   isDirty: (tabId: string) => boolean;
+  /** What quitting now would throw away: unsaved tabs and running work
+   * (PLAN-LINUX.md 17b-2). */
+  quitSummary: () => QuitSummary;
+  /** Writes every Docs tab's pending autosave, so quitting loses no prose. */
+  saveAllDocs: () => Promise<void>;
 
   openBlankTab: () => string;
   /** Focuses the tab already open for this saved request, if there is one;
@@ -323,6 +432,65 @@ interface TabsState {
   setLogFilter: (filter: WsLogFilter) => void;
   setLogQuery: (query: string) => void;
   markWebSocketSaved: (loaded: LoadedRequestRef) => void;
+
+  // gRPC tabs. Like the others, these act on the active tab and do nothing
+  // while it is not a gRPC tab.
+  activeGrpcTab: () => GrpcTab | null;
+  openBlankGrpcTab: () => string;
+  /** Focuses the tab already open for this saved request, if there is one;
+   * otherwise opens one and, for a library schema, fetches it. */
+  openSavedGrpcRequest: (saved: SavedGrpcRequest) => void;
+  setGrpcUrl: (url: string) => void;
+  /** Called when the URL field loses focus or text is pasted: a typed
+   * scheme is taken off and moves the lock (D6). */
+  normalizeGrpcUrl: () => void;
+  setGrpcTls: (tls: boolean) => void;
+  setGrpcMetadataRows: (rows: KeyValueRow[]) => void;
+  setGrpcAuth: (auth: Auth) => void;
+  setGrpcSettings: (patch: Partial<GrpcSettings>) => void;
+  setGrpcMessage: (message: string) => void;
+  /** Re-indents the message without touching a number in it. */
+  beautifyGrpcMessage: () => void;
+  selectGrpcMethod: (methodPath: string) => void;
+  /** Asks the server for its schema, with the tab's metadata and auth. The
+   * Refresh button. */
+  reflectGrpcSchema: () => Promise<void>;
+  /**
+   * Reflection when the URL field loses focus or the method list opens
+   * (assumption 6): only for a tab not using a library schema, and only
+   * when the server differs from the one last asked. Refresh forces it.
+   */
+  reflectGrpcSchemaIfStale: () => Promise<void>;
+  /** Compiles the chosen files; the schema is loaded for the session. */
+  importGrpcSchema: (roots: string[], importPaths: string[]) => Promise<void>;
+  /** Puts a schema in front, e.g. the one saving to the library returned. */
+  setGrpcSchema: (schema: ProtoSchema) => void;
+  /**
+   * Before a request is saved: a schema imported this session exists only
+   * in memory, and a saved request needs it in the library (16g), so it is
+   * saved there first under `name`. Anything else needs nothing. Resolves
+   * with why not, or null.
+   */
+  ensureGrpcSchemaSaved: (name: string) => Promise<string | null>;
+  /** "Use Example Message" for the picked method. */
+  fillExampleGrpcMessage: () => Promise<void>;
+  /** What Save writes: the template, `{{placeholders}}` intact. */
+  currentGrpcDraft: () => GrpcRequestDraft;
+  /**
+   * The Code snippet: the equivalent grpcurl command, resolved like the
+   * call itself (secrets included, as Copy as cURL does). Null, with the
+   * reason on the tab, when there is no method or the target does not parse.
+   */
+  grpcurlCommand: () => string | null;
+  invokeGrpc: () => Promise<void>;
+  /** One message of a client-streaming or bidirectional call. */
+  sendGrpcMessage: () => Promise<void>;
+  endGrpcStream: () => Promise<void>;
+  cancelGrpc: () => void;
+  clearGrpcMessages: () => void;
+  setGrpcLogFilter: (filter: GrpcLogFilter) => void;
+  setGrpcLogQuery: (query: string) => void;
+  markGrpcSaved: (loaded: LoadedRequestRef) => void;
 }
 
 let nextRequestId = 0;
@@ -340,6 +508,14 @@ let nextConnectionId = 0;
 function newConnectionId(): string {
   nextConnectionId += 1;
   return `ws-${nextConnectionId}`;
+}
+
+let nextGrpcCallId = 0;
+
+/** Minted before Invoke, so Cancel can reach a call that has not ended. */
+function newGrpcCallId(): string {
+  nextGrpcCallId += 1;
+  return `grpc-${nextGrpcCallId}`;
 }
 
 let nextTabId = 0;
@@ -506,6 +682,75 @@ function buildWebSocketTabFromSaved(saved: SavedWebSocket): WebSocketTab {
   };
 }
 
+function buildBlankGrpcTab(): GrpcTab {
+  const draft = emptyGrpcDraft();
+  return {
+    kind: "grpc",
+    id: newTabId(),
+    url: draft.url,
+    tls: draft.tls,
+    methodPath: draft.methodPath,
+    metadataRows: [emptyRow()],
+    auth: draft.auth,
+    secretState: "ok",
+    message: draft.message,
+    settings: draft.settings,
+    schemaRef: draft.schema,
+    schema: null,
+    schemaStatus: "none",
+    schemaError: null,
+    reflectedFor: null,
+    call: "idle",
+    callId: null,
+    streamEnded: false,
+    response: null,
+    callError: null,
+    log: EMPTY_GRPC_LOG,
+    logFilter: "all",
+    logQuery: "",
+    composerError: null,
+    loadedRequest: null,
+    savedSnapshot: draft,
+  };
+}
+
+function buildGrpcTabFromSaved(saved: SavedGrpcRequest): GrpcTab {
+  const { request } = saved;
+  return {
+    ...buildBlankGrpcTab(),
+    url: request.url,
+    tls: request.tls,
+    methodPath: request.methodPath,
+    metadataRows: rowsFromKeyValues(request.metadata),
+    auth: request.auth,
+    secretState: saved.secretState,
+    message: request.message,
+    settings: request.settings,
+    schemaRef: request.schema,
+    schemaStatus: request.schema.kind === "library" ? "loading" : "none",
+    loadedRequest: {
+      id: saved.id,
+      collectionId: saved.collectionId,
+      folderId: saved.folderId,
+      name: saved.name,
+    },
+    savedSnapshot: request,
+  };
+}
+
+function grpcDraftFromTab(tab: GrpcTab): GrpcRequestDraft {
+  return {
+    url: tab.url.trim(),
+    tls: tab.tls,
+    methodPath: tab.methodPath,
+    schema: tab.schemaRef,
+    metadata: toKeyValues(tab.metadataRows),
+    auth: tab.auth,
+    message: tab.message,
+    settings: tab.settings,
+  };
+}
+
 function shapeFromTabFields(
   url: string,
   headers: WebSocketShape["request"]["headers"],
@@ -544,6 +789,23 @@ function findActiveRequest(state: Pick<TabsState, "tabs" | "activeTabId">): Requ
 function findActiveWebSocket(state: Pick<TabsState, "tabs" | "activeTabId">): WebSocketTab | null {
   const found = state.tabs.find((tab) => tab.id === state.activeTabId);
   return found !== undefined && found.kind === "websocket" ? found : null;
+}
+
+function findActiveGrpc(state: Pick<TabsState, "tabs" | "activeTabId">): GrpcTab | null {
+  const found = state.tabs.find((tab) => tab.id === state.activeTabId);
+  return found !== undefined && found.kind === "grpc" ? found : null;
+}
+
+/** Patches one gRPC tab, by id: a call's events and a schema fetch land
+ * whether or not the tab is in front. */
+function updateGrpcTab(
+  tabs: Tab[],
+  tabId: string,
+  update: (tab: GrpcTab) => Partial<GrpcTab>,
+): Tab[] {
+  return tabs.map((tab) =>
+    tab.id === tabId && tab.kind === "grpc" ? { ...tab, ...update(tab) } : tab,
+  );
 }
 
 /** Patches one WebSocket tab, by id. Events arrive for a tab whether or not
@@ -609,11 +871,31 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (tab.kind === "websocket") {
       return !webSocketShapesEqual(webSocketShapeFromTab(tab), tab.savedSnapshot);
     }
+    if (tab.kind === "grpc") {
+      return !grpcDraftsEqual(grpcDraftFromTab(tab), tab.savedSnapshot);
+    }
     // An environment tab saves explicitly, so it is never "unsaved".
     if (tab.kind !== "request") {
       return false;
     }
     return !requestInputsEqual(inputFromTab(tab), tab.savedSnapshot);
+  },
+
+  quitSummary: () =>
+    quitSummary(
+      get().tabs.map((tab) => ({
+        kind: tab.kind,
+        dirty: get().isDirty(tab.id),
+        running:
+          (tab.kind === "request" && tab.status === "sending") ||
+          (tab.kind === "websocket" && tab.connection !== "idle") ||
+          (tab.kind === "grpc" && tab.call !== "idle"),
+      })),
+    ),
+
+  saveAllDocs: async () => {
+    const docsTabs = get().tabs.filter((tab) => tab.kind === "docs");
+    await Promise.all(docsTabs.map((tab) => get().saveDocs(tab.id)));
   },
 
   openBlankTab: () => {
@@ -789,6 +1071,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       closingTab.connectionId !== null
     ) {
       void disconnectWebSocket(closingTab.connectionId);
+    }
+    if (closingTab?.kind === "grpc" && closingTab.call !== "idle" && closingTab.callId !== null) {
+      void grpcService.cancelGrpc(closingTab.callId);
     }
 
     set((state) => {
@@ -1310,7 +1595,535 @@ export const useTabsStore = create<TabsState>((set, get) => ({
             })),
           };
     }),
+
+  activeGrpcTab: () => findActiveGrpc(get()),
+
+  openBlankGrpcTab: () => {
+    const tab = buildBlankGrpcTab();
+    set((state) => ({ tabs: [...state.tabs, tab], activeTabId: tab.id }));
+    return tab.id;
+  },
+
+  openSavedGrpcRequest: (saved) => {
+    const existing = get().tabs.find(
+      (tab) => tab.kind === "grpc" && tab.loadedRequest?.id === saved.id,
+    );
+    if (existing) {
+      set({ activeTabId: existing.id });
+      return;
+    }
+    const tab = buildGrpcTabFromSaved(saved);
+    set((state) => ({ tabs: [...state.tabs, tab], activeTabId: tab.id }));
+    // A reflected schema is asked for when the URL field or the method list
+    // is used (assumption 6), not on open: opening a tab sends nothing.
+    const ref = saved.request.schema;
+    if (ref.kind !== "library") {
+      return;
+    }
+    void grpcService.getProtoSchema(ref.schemaId).then((result) => {
+      set((state) => ({
+        tabs: updateGrpcTab(state.tabs, tab.id, (current) => {
+          // The user may have loaded another schema while this was in flight.
+          if (current.schemaStatus !== "loading") {
+            return {};
+          }
+          return result.ok
+            ? { schema: result.value, schemaStatus: "loaded", schemaError: null }
+            : { schemaStatus: "error", schemaError: result.error.message };
+        }),
+      }));
+    });
+  },
+
+  setGrpcUrl: (url) => set((state) => patchActiveGrpc(state, () => ({ url }))),
+
+  normalizeGrpcUrl: () =>
+    set((state) =>
+      patchActiveGrpc(state, (tab) => {
+        const { rest, tls } = splitGrpcScheme(tab.url);
+        return tls === null ? {} : { url: rest, tls };
+      }),
+    ),
+
+  setGrpcTls: (tls) => set((state) => patchActiveGrpc(state, () => ({ tls }))),
+
+  setGrpcMetadataRows: (rows) =>
+    set((state) => patchActiveGrpc(state, () => ({ metadataRows: withTrailingBlank(rows) }))),
+
+  setGrpcAuth: (auth) =>
+    set((state) =>
+      patchActiveGrpc(state, (tab) => ({
+        auth,
+        // As on a request tab: typing a replacement answers "needs
+        // re-entering"; "unavailable" stays until the store can be reached.
+        secretState: tab.secretState === "needsReentry" ? "ok" : tab.secretState,
+      })),
+    ),
+
+  setGrpcSettings: (patch) =>
+    set((state) => patchActiveGrpc(state, (tab) => ({ settings: { ...tab.settings, ...patch } }))),
+
+  setGrpcMessage: (message) =>
+    set((state) => patchActiveGrpc(state, () => ({ message, composerError: null }))),
+
+  beautifyGrpcMessage: () =>
+    set((state) =>
+      patchActiveGrpc(state, (tab) => {
+        const result = reformatJson(tab.message);
+        return result.ok
+          ? { message: result.text, composerError: null }
+          : { composerError: result.reason };
+      }),
+    ),
+
+  selectGrpcMethod: (methodPath) =>
+    set((state) => patchActiveGrpc(state, () => ({ methodPath, callError: null }))),
+
+  reflectGrpcSchema: async () => {
+    const active = findActiveGrpc(get());
+    if (active === null || active.schemaStatus === "loading") {
+      return;
+    }
+    const prepared = prepareGrpcRequest(active);
+    if (!prepared.ok) {
+      set((state) => ({
+        tabs: updateGrpcTab(state.tabs, active.id, () => ({
+          schemaStatus: "error",
+          schemaError: prepared.error,
+        })),
+      }));
+      return;
+    }
+    const reflectedFor = targetKey(prepared.value.request);
+    set((state) => ({ tabs: updateGrpcTab(state.tabs, active.id, () => ({ reflectedFor })) }));
+    await loadGrpcSchema(set, active.id, () => grpcService.reflectGrpc(prepared.value.request));
+  },
+
+  reflectGrpcSchemaIfStale: async () => {
+    const active = findActiveGrpc(get());
+    if (
+      active === null ||
+      active.schemaRef.kind === "library" ||
+      active.schemaStatus === "loading" ||
+      active.url.trim() === ""
+    ) {
+      return;
+    }
+    const prepared = prepareGrpcRequest(active);
+    // A URL that does not parse is reported when Invoke is pressed, not on
+    // every blur.
+    if (!prepared.ok || targetKey(prepared.value.request) === active.reflectedFor) {
+      return;
+    }
+    await get().reflectGrpcSchema();
+  },
+
+  importGrpcSchema: async (roots, importPaths) => {
+    const active = findActiveGrpc(get());
+    if (active === null || active.schemaStatus === "loading" || roots.length === 0) {
+      return;
+    }
+    await loadGrpcSchema(set, active.id, () => grpcService.importProto(roots, importPaths));
+  },
+
+  setGrpcSchema: (schema) =>
+    set((state) =>
+      patchActiveGrpc(state, () => ({
+        schema,
+        schemaRef: schemaRefFor(schema),
+        schemaStatus: "loaded",
+        schemaError: null,
+      })),
+    ),
+
+  ensureGrpcSchemaSaved: async (name) => {
+    const active = findActiveGrpc(get());
+    const schema = active?.schema ?? null;
+    if (active === null || schema === null || schema.name !== null || schema.origin !== "import") {
+      return null;
+    }
+    const result = await grpcService.saveProtoSchema(schema.id, name);
+    if (!result.ok) {
+      return `The schema could not be saved to the library: ${result.error.message}`;
+    }
+    set((state) => ({
+      tabs: updateGrpcTab(state.tabs, active.id, () => ({
+        schema: result.value,
+        schemaRef: schemaRefFor(result.value),
+      })),
+    }));
+    return null;
+  },
+
+  fillExampleGrpcMessage: async () => {
+    const active = findActiveGrpc(get());
+    const method = active === null ? null : findMethod(active.schema, active.methodPath);
+    if (active === null || active.schema === null || method === null) {
+      return;
+    }
+    const result = await grpcService.exampleMessage(active.schema.id, method.path);
+    set((state) => ({
+      tabs: updateGrpcTab(state.tabs, active.id, () =>
+        result.ok
+          ? { message: result.value, composerError: null }
+          : { composerError: result.error.message },
+      ),
+    }));
+  },
+
+  currentGrpcDraft: () => {
+    const active = findActiveGrpc(get());
+    return active === null ? emptyGrpcDraft() : grpcDraftFromTab(active);
+  },
+
+  grpcurlCommand: () => {
+    const active = findActiveGrpc(get());
+    if (active === null) {
+      return null;
+    }
+    const method = findMethod(active.schema, active.methodPath);
+    const prepared = prepareGrpcRequest(active);
+    if (method === null || !prepared.ok) {
+      const callError =
+        method === null ? "Pick a method to call." : prepared.ok ? null : prepared.error;
+      set((state) => ({ tabs: updateGrpcTab(state.tabs, active.id, () => ({ callError })) }));
+      return null;
+    }
+    return buildGrpcurlCommand({
+      request: { ...prepared.value.request, methodPath: method.path },
+      message: prepared.value.message,
+      // A reflected schema needs no files: grpcurl asks the server itself.
+      protoFiles: active.schema?.origin === "import" ? active.schema.files : [],
+    });
+  },
+
+  invokeGrpc: async () => {
+    const active = findActiveGrpc(get());
+    if (active === null || active.call !== "idle") {
+      return;
+    }
+    const tabId = active.id;
+    const method = findMethod(active.schema, active.methodPath);
+    const refusal =
+      active.schema === null
+        ? "Load a schema first: use server reflection or import .proto files."
+        : method === null
+          ? "Pick a method to call."
+          : null;
+    const prepared = prepareGrpcRequest(active);
+    if (refusal !== null || method === null || active.schema === null || !prepared.ok) {
+      const callError = refusal ?? (prepared.ok ? null : prepared.error);
+      set((state) => ({ tabs: updateGrpcTab(state.tabs, tabId, () => ({ callError })) }));
+      return;
+    }
+
+    const { request, message, displayMessage, displayTarget } = prepared.value;
+    const callId = newGrpcCallId();
+    // A unary or server-streaming call carries its one message; the
+    // client-streaming kinds send theirs with Send once the call is open.
+    const streaming = clientStreams(method.kind);
+    if (!streaming) {
+      pendingSendsByCall.set(callId, [{ resolved: message, display: displayMessage }]);
+    }
+    set((state) => ({
+      tabs: updateGrpcTab(state.tabs, tabId, () => ({
+        call: "running",
+        callId,
+        streamEnded: false,
+        callError: null,
+        composerError: null,
+        response: emptyGrpcResponse(callId),
+      })),
+    }));
+
+    const result = await grpcService.invokeGrpc(
+      callId,
+      active.schema.id,
+      { ...request, methodPath: method.path },
+      streaming ? "" : message,
+      displayTarget,
+      (events) => {
+        const { events: shown, rest } = applyPendingSends(
+          pendingSendsByCall.get(callId) ?? [],
+          events,
+        );
+        pendingSendsByCall.set(callId, rest);
+        set((state) => ({
+          tabs: updateGrpcTab(state.tabs, tabId, (tab) => applyGrpcEvents(tab, callId, shown)),
+        }));
+      },
+    );
+    pendingSendsByCall.delete(callId);
+
+    set((state) => ({
+      tabs: updateGrpcTab(state.tabs, tabId, (tab) => {
+        if (tab.callId !== callId) {
+          return {};
+        }
+        if (!result.ok) {
+          return { call: "idle", response: null, callError: result.error.message };
+        }
+        // The outcome may arrive before the `ended` event: they travel on
+        // different paths. Whichever comes first ends the call.
+        const response = tab.response ?? emptyGrpcResponse(callId);
+        return {
+          call: "idle",
+          response: { ...response, outcome: response.outcome ?? result.value },
+        };
+      }),
+    }));
+  },
+
+  sendGrpcMessage: async () => {
+    const active = findActiveGrpc(get());
+    const method = active === null ? null : findMethod(active.schema, active.methodPath);
+    if (
+      active === null ||
+      method === null ||
+      !clientStreams(method.kind) ||
+      active.call !== "running" ||
+      active.streamEnded ||
+      active.callId === null
+    ) {
+      return;
+    }
+    const { callId } = active;
+    const variables = useEnvironmentsStore.getState().activeVariables();
+    const pending: GrpcPendingSend = {
+      resolved: orEmptyMessage(substituteMessage(active.message, variables)),
+      display: orEmptyMessage(substituteMessage(active.message, variables, { leaveSecrets: true })),
+    };
+    pendingSendsByCall.set(callId, [...(pendingSendsByCall.get(callId) ?? []), pending]);
+    set((state) => ({
+      tabs: updateGrpcTab(state.tabs, active.id, () => ({ composerError: null })),
+    }));
+
+    const result = await grpcService.sendGrpcMessage(callId, pending.resolved);
+    if (!result.ok) {
+      const queued = pendingSendsByCall.get(callId);
+      if (queued !== undefined) {
+        pendingSendsByCall.set(
+          callId,
+          queued.filter((entry) => entry !== pending),
+        );
+      }
+      set((state) => ({
+        tabs: updateGrpcTab(state.tabs, active.id, () => ({
+          composerError: result.error.message,
+        })),
+      }));
+    }
+  },
+
+  endGrpcStream: async () => {
+    const active = findActiveGrpc(get());
+    const method = active === null ? null : findMethod(active.schema, active.methodPath);
+    if (
+      active === null ||
+      method === null ||
+      !clientStreams(method.kind) ||
+      active.call !== "running" ||
+      active.streamEnded ||
+      active.callId === null
+    ) {
+      return;
+    }
+    const { callId } = active;
+    const result = await grpcService.endGrpcStream(callId);
+    set((state) => ({
+      tabs: updateGrpcTab(state.tabs, active.id, (tab) =>
+        tab.callId !== callId
+          ? {}
+          : result.ok
+            ? { streamEnded: true }
+            : { composerError: result.error.message },
+      ),
+    }));
+  },
+
+  cancelGrpc: () => {
+    const active = findActiveGrpc(get());
+    if (active === null || active.call !== "running" || active.callId === null) {
+      return;
+    }
+    const { callId } = active;
+    set((state) => ({
+      tabs: updateGrpcTab(state.tabs, active.id, () => ({ call: "cancelling" })),
+    }));
+    void grpcService.cancelGrpc(callId);
+  },
+
+  clearGrpcMessages: () => set((state) => patchActiveGrpc(state, () => ({ log: clearGrpcLog() }))),
+
+  setGrpcLogFilter: (logFilter) => set((state) => patchActiveGrpc(state, () => ({ logFilter }))),
+
+  setGrpcLogQuery: (logQuery) => set((state) => patchActiveGrpc(state, () => ({ logQuery }))),
+
+  markGrpcSaved: (loaded) =>
+    set((state) =>
+      patchActiveGrpc(state, (tab) => ({
+        loadedRequest: loaded,
+        savedSnapshot: grpcDraftFromTab(tab),
+        secretState: "ok",
+      })),
+    ),
 }));
+
+/**
+ * Messages sent on a call whose `sent` event has not arrived, so the log can
+ * show them with secret variables as placeholders (lib/grpc-log.ts). Outside
+ * the store, like `pendingSendsByConnection`: nothing renders it. Dropped
+ * when `invokeGrpc` resolves, which is after the call's last event.
+ */
+const pendingSendsByCall = new Map<string, GrpcPendingSend[]>();
+
+/** The active tab's patch, or no change while it is not a gRPC tab. */
+function patchActiveGrpc(
+  state: Pick<TabsState, "tabs" | "activeTabId">,
+  update: (tab: GrpcTab) => Partial<GrpcTab>,
+): Partial<TabsState> {
+  const active = findActiveGrpc(state);
+  return active === null ? {} : { tabs: updateGrpcTab(state.tabs, active.id, update) };
+}
+
+function emptyGrpcResponse(callId: string): GrpcResponse {
+  return {
+    callId,
+    metadata: [],
+    lastMessage: null,
+    receivedCount: 0,
+    receivedBytes: 0,
+    outcome: null,
+  };
+}
+
+/** Which server a reflection asked: the resolved authority and TLS. */
+function targetKey(request: GrpcRequestInput): string {
+  return `${request.target.authority}|${request.target.tls}`;
+}
+
+/** An empty editor sends an empty message, which is `{}` in JSON. */
+function orEmptyMessage(text: string): string {
+  return text.trim() === "" ? "{}" : text;
+}
+
+interface PreparedGrpcRequest {
+  /** Resolved, for Rust. `methodPath` is the tab's, which reflection ignores. */
+  request: GrpcRequestInput;
+  message: string;
+  /** The message with secret variables as placeholders, for the log. */
+  displayMessage: string;
+  /** The authority with secret variables as placeholders, for the log file. */
+  displayTarget: string;
+}
+
+/**
+ * The tab's fields with variables substituted and the URL turned into a
+ * target. Secrets are resolved only in what goes to Rust.
+ */
+function prepareGrpcRequest(tab: GrpcTab): Result<PreparedGrpcRequest, string> {
+  const draft = grpcDraftFromTab(tab);
+  const variables = useEnvironmentsStore.getState().activeVariables();
+  const resolved = substituteGrpcDraft(draft, variables);
+  const display = substituteGrpcDraft(draft, variables, { leaveSecrets: true });
+  const target = grpcTarget(resolved.url, resolved.tls);
+  if (!target.ok) {
+    return target;
+  }
+  const displayTarget = grpcTarget(display.url, display.tls);
+  return {
+    ok: true,
+    value: {
+      request: {
+        target: target.value,
+        methodPath: resolved.methodPath,
+        metadata: resolved.metadata,
+        auth: resolved.auth,
+        settings: resolved.settings,
+      },
+      message: orEmptyMessage(resolved.message),
+      displayMessage: orEmptyMessage(display.message),
+      displayTarget: displayTarget.ok ? displayTarget.value.authority : display.url,
+    },
+  };
+}
+
+type SetTabs = (update: (state: TabsState) => Partial<TabsState>) => void;
+
+/** Runs a schema fetch for a tab and puts the result, or why not, in it. */
+async function loadGrpcSchema(
+  set: SetTabs,
+  tabId: string,
+  fetch: () => Promise<Result<ProtoSchema, ApiError>>,
+): Promise<void> {
+  set((state) => ({
+    tabs: updateGrpcTab(state.tabs, tabId, () => ({ schemaStatus: "loading", schemaError: null })),
+  }));
+  const result = await fetch();
+  set((state) => ({
+    tabs: updateGrpcTab(state.tabs, tabId, () =>
+      result.ok
+        ? {
+            schema: result.value,
+            schemaRef: schemaRefFor(result.value),
+            schemaStatus: "loaded",
+            schemaError: null,
+          }
+        : { schemaStatus: "error", schemaError: result.error.message },
+    ),
+  }));
+}
+
+/**
+ * Appends a batch to the log and updates the response pane. Events of an
+ * earlier call still join the log, but only the tab's current call moves
+ * the response and the call state.
+ */
+function applyGrpcEvents(
+  tab: GrpcTab,
+  callId: string,
+  events: readonly GrpcEvent[],
+): Partial<GrpcTab> {
+  const log = appendGrpcLog(tab.log, grpcLogEntries(callId, events));
+  if (tab.callId !== callId || tab.response === null) {
+    return { log };
+  }
+  let { call, streamEnded } = tab;
+  let response = tab.response;
+  for (const event of events) {
+    switch (event.type) {
+      case "responseMetadata":
+        response = { ...response, metadata: event.metadata };
+        break;
+      case "received":
+        response = {
+          ...response,
+          lastMessage: event.json,
+          receivedCount: response.receivedCount + 1,
+          receivedBytes: response.receivedBytes + event.bytes,
+        };
+        break;
+      case "streamEnded":
+        streamEnded = true;
+        break;
+      case "ended":
+        call = "idle";
+        response = {
+          ...response,
+          outcome: {
+            status: event.status,
+            by: event.by,
+            trailers: event.trailers,
+            totalMs: event.totalMs,
+          },
+        };
+        break;
+      case "sent":
+        break;
+    }
+  }
+  return { log, call, streamEnded, response };
+}
 
 /**
  * Per-connection bookkeeping, outside the store for the same reason as

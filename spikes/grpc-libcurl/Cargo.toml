@@ -1,0 +1,43 @@
+[package]
+name = "grpc-libcurl"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# PLAN-GRPC.md 16a. Standalone, not part of src-tauri, for the same reason as
+# spikes/ws-libcurl: Tauri and WebView2 would crowd the import table and blur
+# what the gRPC path itself needs.
+#
+# Cargo.lock starts as a copy of src-tauri's, so curl, curl-sys, rustls-ffi,
+# nghttp2 and the libcurl snapshot resolve to exactly what the app ships.
+# Cargo adds the server-only crates below on the first build.
+
+[dependencies]
+# Must stay identical to the curl line in src-tauri/Cargo.toml.
+curl = { version = "0.4", default-features = false, features = [
+  "static-curl",
+  "rustls",
+  "http2",
+] }
+
+# The local test server only. A raw HTTP/2 server rather than tonic, because
+# the spike has to misbehave on purpose (trailers-only answers, a plain 404,
+# a stream that never ends) and has to see exactly which headers libcurl put
+# on the wire. None of this reaches the app: 16d's integration tests use the
+# tonic dev-dependency from D7.
+h2 = "0.4"
+http = "1"
+bytes = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time"] }
+
+# Gate 12: the whole client has to fit the safe curl crate API.
+[lints.rust]
+unsafe_code = "forbid"
+
+# Same as src-tauri's release profile, so the spike links the way the app does.
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

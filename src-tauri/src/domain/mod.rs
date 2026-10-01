@@ -3,6 +3,7 @@ pub mod cancellation;
 pub mod clock;
 pub mod cookies;
 pub mod error;
+pub mod grpc_wire;
 pub mod ids;
 pub mod import_plan;
 pub mod mime;

@@ -9,7 +9,14 @@ import { create } from "zustand";
 import { emptyRequestInput } from "@/lib/request-defaults";
 import { emptyWebSocketShape } from "@/lib/ws-request";
 import * as collectionsService from "@/services/collections";
-import type { SaveExampleArgs, SaveRequestArgs, SaveWebSocketArgs } from "@/services/collections";
+import type {
+  SaveExampleArgs,
+  SaveGrpcRequestArgs,
+  SaveRequestArgs,
+  SaveWebSocketArgs,
+} from "@/services/collections";
+import { emptyGrpcDraft } from "@/lib/grpc-request";
+import type { SavedGrpcRequest } from "@/types/grpc";
 import type {
   Collection,
   CollectionContents,
@@ -69,6 +76,15 @@ interface CollectionsState {
     name: string,
   ) => Promise<SavedWebSocket | null>;
   loadWebSocket: (id: string) => Promise<SavedWebSocket | null>;
+  /** As for WebSocket. A library schema must be in the library already. */
+  saveGrpcRequest: (args: SaveGrpcRequestArgs) => Promise<SavedGrpcRequest | null>;
+  /** Right-click "New gRPC request": an empty one, saved at once. */
+  createGrpcRequest: (
+    collectionId: string,
+    folderId: string | null,
+    name: string,
+  ) => Promise<SavedGrpcRequest | null>;
+  loadGrpcRequest: (id: string) => Promise<SavedGrpcRequest | null>;
   /** Right-click "New HTTP request" on a collection or folder: the same
    * save_request command as any new save, starting from a blank body. */
   createRequest: (
@@ -283,6 +299,28 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
 
   loadWebSocket: async (id) => {
     const result = await collectionsService.loadWebSocket(id);
+    if (!result.ok) {
+      set({ error: result.error });
+      return null;
+    }
+    return result.value;
+  },
+
+  saveGrpcRequest: async (args) => {
+    const result = await collectionsService.saveGrpcRequest(args);
+    if (!result.ok) {
+      set({ error: result.error });
+      return null;
+    }
+    await get().refreshContents(args.collectionId);
+    return result.value;
+  },
+
+  createGrpcRequest: async (collectionId, folderId, name) =>
+    get().saveGrpcRequest({ id: null, collectionId, folderId, name, request: emptyGrpcDraft() }),
+
+  loadGrpcRequest: async (id) => {
+    const result = await collectionsService.loadGrpcRequest(id);
     if (!result.ok) {
       set({ error: result.error });
       return null;

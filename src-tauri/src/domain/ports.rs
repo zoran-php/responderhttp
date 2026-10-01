@@ -7,7 +7,10 @@ use std::time::Duration;
 
 use crate::domain::cancellation::CancellationToken;
 use crate::domain::error::AppError;
-use crate::domain::models::{HttpRequest, HttpResponse, KeyValue, WebSocketRequest, WsHandshake};
+use crate::domain::models::{
+    GrpcCallRequest, HttpRequest, HttpResponse, KeyValue, ProtoSchemaSummary, StoredProtoSchema,
+    WebSocketRequest, WsHandshake,
+};
 use crate::domain::sse::SseBlock;
 use crate::domain::ws_frames::{FrameChunk, FrameKind};
 
@@ -117,10 +120,74 @@ pub trait WebSocketConnection: Send {
     fn send(&mut self, kind: FrameKind, payload: &[u8]) -> Result<(), AppError>;
 }
 
+/// What moving a gRPC call along turned up, in the order it happened.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GrpcWireEvent {
+    /// The response's HTTP status and headers. For a trailers-only response
+    /// the `grpc-status` is among them (PLAN-GRPC.md 16a, gate G03).
+    Headers { status: u16, headers: Vec<KeyValue> },
+    /// Response body bytes, split wherever the transport split them. Framing
+    /// is the caller's job (`grpc_wire::FrameDecoder`).
+    Data(Vec<u8>),
+    /// Sent once, when the call has ended, if the server sent any.
+    Trailers(Vec<KeyValue>),
+    /// The transfer finished. Nothing follows.
+    Ended,
+    /// The transfer failed: unreachable, TLS refused, connection reset...
+    /// Nothing follows. Whatever arrived before it has already been reported.
+    Failed(String),
+}
+
+/// Starts gRPC calls. The port that keeps `GrpcCalls` (16e) testable against
+/// a scripted call with no network, as `WebSocketSessions` is against
+/// `WebSocketConnector`.
+pub trait GrpcTransport: Send + Sync {
+    /// Returns at once. Connecting happens while the call is polled, and a
+    /// failure to connect arrives as `GrpcWireEvent::Failed`. An error here
+    /// means the request itself was refused before anything was sent: bad
+    /// metadata, an API key in the query string.
+    ///
+    /// **Call it on the thread that will own the call.** libcurl's multi
+    /// handle is neither `Send` nor `Sync` (curl crate 0.4.50), so the call
+    /// it returns cannot move between threads.
+    fn open(&self, request: &GrpcCallRequest) -> Result<Box<dyn GrpcCall>, AppError>;
+}
+
+/// One call in flight. No `Send` bound, on purpose: see `GrpcTransport::open`.
+pub trait GrpcCall {
+    /// Queues one framed message (`grpc_wire::frame`) and starts sending it.
+    fn send(&mut self, framed: Vec<u8>) -> Result<(), AppError>;
+    /// Ends the request stream once everything queued has gone: End
+    /// Streaming, or straight after the only message of a unary call.
+    fn end_stream(&mut self) -> Result<(), AppError>;
+    /// Moves the call along for at most `timeout`. Returns at once when
+    /// something has already happened, so arriving data is never held back
+    /// for the full wait.
+    fn poll(&mut self, timeout: Duration) -> Result<Vec<GrpcWireEvent>, AppError>;
+    /// Stops the call. The server sees the stream reset. Polling afterwards
+    /// returns nothing.
+    fn cancel(&mut self);
+}
+
+/// The schema library (PLAN-GRPC.md D3, 16g).
+pub trait ProtoSchemaRepository: Send + Sync {
+    /// Sorted by name.
+    fn list(&self) -> Result<Vec<ProtoSchemaSummary>, AppError>;
+    /// `NotFound` for an unknown id.
+    fn get(&self, id: &str) -> Result<StoredProtoSchema, AppError>;
+    /// Inserts, or replaces the content of the schema with the same id.
+    fn save(&self, schema: &StoredProtoSchema) -> Result<(), AppError>;
+    fn rename(&self, id: &str, name: &str) -> Result<(), AppError>;
+    fn delete(&self, id: &str) -> Result<(), AppError>;
+    /// The names of the saved requests that use the schema. A schema in use
+    /// is not deleted.
+    fn users(&self, id: &str) -> Result<Vec<String>, AppError>;
+}
+
 use crate::domain::import_plan::{ImportPlan, ImportedIds};
 use crate::domain::models::{
     Collection, Cookie, Environment, EnvironmentVariable, Example, ExampleSummary, Folder,
-    HistoryEntry, NewExample, NewHistoryEntry, SavedRequest, SavedWebSocket,
+    HistoryEntry, NewExample, NewHistoryEntry, SavedGrpcRequest, SavedRequest, SavedWebSocket,
 };
 use crate::domain::secrets::SecretState;
 
@@ -219,6 +286,19 @@ pub trait WebSocketRepository: Send + Sync {
     /// Inserts when the id is new, replaces the stored row when it is a
     /// WebSocket. Refuses an id that belongs to an HTTP request.
     fn save(&self, saved: &SavedWebSocket) -> Result<(), AppError>;
+}
+
+/// Saved gRPC requests (PLAN-GRPC.md 16g-2): listing, loading and saving
+/// their own shape. Rename, move, delete and docs stay on
+/// `SavedRequestRepository`, as for WebSockets.
+pub trait GrpcRequestRepository: Send + Sync {
+    fn list_by_collection(&self, collection_id: &str) -> Result<Vec<SavedGrpcRequest>, AppError>;
+    /// `NotFound` for an unknown id and for the id of another kind alike.
+    fn get(&self, id: &str) -> Result<SavedGrpcRequest, AppError>;
+    /// Inserts when the id is new, replaces the stored row when it is a gRPC
+    /// request. Refuses an id of another kind, and a library schema id that
+    /// is not in the library.
+    fn save(&self, saved: &SavedGrpcRequest) -> Result<(), AppError>;
 }
 
 /// Sent-request history. The repository owns trimming so the table stays

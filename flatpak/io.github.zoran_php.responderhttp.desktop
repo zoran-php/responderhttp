@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=ResponderHTTP
+GenericName=API Client
+Comment=Send HTTP, WebSocket, gRPC and server-sent event requests
+Exec=responderhttp
+Icon=io.github.zoran_php.responderhttp
+Terminal=false
+Categories=Development;WebDevelopment;
+Keywords=http;api;rest;websocket;grpc;sse;curl;openapi;
+StartupNotify=true
+StartupWMClass=responderhttp

@@ -10,6 +10,8 @@ import { ExportOpenApiDialog } from "@/features/collections/ExportOpenApiDialog"
 import { useCollectionsStore } from "@/store/collections-store";
 import type { CollectionContents, SavedWebSocket } from "@/types/collections";
 import { DEFAULT_WS_SETTINGS, EMPTY_WS_DRAFT } from "@/types/websocket";
+import { emptyGrpcDraft } from "@/lib/grpc-request";
+import type { SavedGrpcRequest } from "@/types/grpc";
 
 const collections = vi.hoisted(() => ({ collectionContents: vi.fn() }));
 vi.mock("@/services/collections", () => collections);
@@ -26,8 +28,11 @@ function webSocket(id: string): SavedWebSocket {
   };
 }
 
-function contents(webSockets: SavedWebSocket[]): CollectionContents {
-  return { folders: [], requests: [], examples: [], webSockets };
+function contents(
+  webSockets: SavedWebSocket[],
+  grpcRequests: SavedGrpcRequest[] = [],
+): CollectionContents {
+  return { folders: [], requests: [], examples: [], webSockets, grpcRequests };
 }
 
 beforeEach(() => {
@@ -50,6 +55,24 @@ describe("ExportOpenApiDialog", () => {
     const note = await screen.findByRole("note");
     expect(note.textContent).toMatch(/^2 WebSocket requests will not be exported/);
     expect(collections.collectionContents).toHaveBeenCalledWith("col_1");
+  });
+
+  /** D8: a gRPC request is left out of the export, and the dialog says so. */
+  it("counts the gRPC requests it will leave out", async () => {
+    const grpc: SavedGrpcRequest = {
+      id: "req_g",
+      collectionId: "col_1",
+      folderId: null,
+      name: "Get order",
+      request: emptyGrpcDraft(),
+      secretState: "ok",
+    };
+    collections.collectionContents.mockResolvedValue({ ok: true, value: contents([], [grpc]) });
+
+    render(<ExportOpenApiDialog collectionId="col_1" collectionName="Mixed" onClose={vi.fn()} />);
+
+    const note = await screen.findByRole("note");
+    expect(note.textContent).toMatch(/^1 gRPC request will not be exported/);
   });
 
   it("says nothing about WebSocket requests when there are none", async () => {

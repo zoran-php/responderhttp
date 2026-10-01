@@ -6,6 +6,7 @@
 import type { MouseEvent } from "react";
 
 import type { ExampleSummary, SavedRequest, SavedWebSocket } from "@/types/collections";
+import type { SavedGrpcRequest } from "@/types/grpc";
 
 export type TreeTarget =
   | { kind: "collection"; id: string; name: string }
@@ -13,7 +14,7 @@ export type TreeTarget =
   | { kind: "request"; id: string; collectionId: string; folderId: string | null; name: string }
   | { kind: "example"; id: string; collectionId: string; name: string }
   | {
-      kind: "websocket";
+      kind: "websocket" | "grpc";
       id: string;
       collectionId: string;
       folderId: string | null;
@@ -21,7 +22,7 @@ export type TreeTarget =
     };
 
 /** Which kind of request a "New … request" inline input creates. */
-export type NewRequestProtocol = "http" | "websocket";
+export type NewRequestProtocol = "http" | "websocket" | "grpc";
 
 export type TreeKind = TreeTarget["kind"];
 
@@ -32,6 +33,7 @@ export interface TreeContext {
   onToggleFolder: (id: string) => void;
   onOpenRequest: (request: SavedRequest) => void;
   onOpenWebSocket: (webSocket: SavedWebSocket) => void;
+  onOpenGrpc: (grpcRequest: SavedGrpcRequest) => void;
   loadedRequestId: string | null;
   /** Keyed by request id; a request with no entry here renders as a leaf. */
   examplesByRequestId: Map<string, ExampleSummary[]>;
@@ -40,7 +42,7 @@ export interface TreeContext {
   onOpenExample: (id: string) => void;
   renaming: RenamingTarget;
   onCommitRename: (
-    kind: "folder" | "request" | "example" | "websocket",
+    kind: "folder" | "request" | "example" | "websocket" | "grpc",
     id: string,
     name: string,
   ) => void;

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["rpm"],
+    "license": "LicenseRef-Proprietary",
+    "homepage": "https://zoran-php.github.io/responderhttp/",
+    "longDescription": "ResponderHTTP is a desktop API client for HTTP, WebSocket, gRPC and\nserver-sent events. Requests run through libcurl, statically linked into\nthe binary, so no curl installation and no system SSL library are needed.\nCollections, environments, history and cookies are stored locally in\nSQLite, and secrets are encrypted with a key held in the desktop keyring.",
+    "linux": {
+      "rpm": {
+        "files": {
+          "/usr/share/licenses/responder-http/LICENSE": "../LICENSE"
+        }
+      }
+    }
+  }
+}

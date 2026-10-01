@@ -24,6 +24,14 @@ describe("beautify JSON", () => {
     expect(result.ok).toBe(false);
     expect(result.ok ? "" : result.reason).toMatch(/^Not valid JSON: /);
   });
+
+  /** JSON.parse would print 9007199254740992 and 1e+400 as null. */
+  it("keeps every number exactly as typed, integers above 2^53 included", () => {
+    expect(beautify("json", '{"id":9007199254740993,"big":1e400,"f":1.50}')).toEqual({
+      ok: true,
+      text: '{\n  "id": 9007199254740993,\n  "big": 1e400,\n  "f": 1.50\n}',
+    });
+  });
 });
 
 describe("beautify XML", () => {

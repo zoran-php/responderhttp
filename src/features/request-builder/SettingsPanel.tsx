@@ -1,6 +1,7 @@
 // http_client/src/features/request-builder/SettingsPanel.tsx
 import { ShieldAlert } from "lucide-react";
 
+import { clampInt } from "@/lib/number-input";
 import type { HttpVersionPreference, RequestSettings, TlsMinimum } from "@/types/http";
 
 /** Labelled for what this app actually does:
@@ -141,8 +142,8 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
           </label>
           {settings.keepAuthOnRedirect && (
             <p className="flex items-center gap-2 text-xs text-warning">
-              <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden />
-              A redirect can now hand your credentials to a different server.
+              <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden />A redirect can now hand your
+              credentials to a different server.
             </p>
           )}
         </div>
@@ -195,12 +196,4 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
       </div>
     </div>
   );
-}
-
-function clampInt(raw: string, min: number, max: number): number {
-  const parsed = Number.parseInt(raw, 10);
-  if (Number.isNaN(parsed)) {
-    return min;
-  }
-  return Math.min(max, Math.max(min, parsed));
 }

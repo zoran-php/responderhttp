@@ -15,13 +15,12 @@ use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use crate::desktop::notices;
-use crate::desktop::window::MAIN_WINDOW_LABEL;
+use crate::desktop::window::{EXIT_CODE_SUCCESS, MAIN_WINDOW_LABEL};
 
 const MENU_ID_ABOUT: &str = "app-menu:about";
 const MENU_ID_PRIVACY: &str = "app-menu:privacy";
 const MENU_ID_TERMS: &str = "app-menu:terms";
 const MENU_ID_QUIT: &str = "app-menu:quit";
-const EXIT_CODE_SUCCESS: i32 = 0;
 
 /// Handed to `tauri::Builder::menu`, so the menu exists before Tauri creates
 /// the window from tauri.conf.json and that window gets it from the start.
@@ -45,8 +44,16 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
             let version = app.package_info().version.to_string();
             show_notice(app, notices::ABOUT_TITLE, notices::about_message(&version));
         }
-        MENU_ID_PRIVACY => show_notice(app, notices::PRIVACY_TITLE, notices::PRIVACY_TEXT),
-        MENU_ID_TERMS => show_notice(app, notices::TERMS_TITLE, notices::TERMS_TEXT),
+        MENU_ID_PRIVACY => show_notice(
+            app,
+            notices::PRIVACY_TITLE,
+            notices::privacy_text(notices::Platform::CURRENT),
+        ),
+        MENU_ID_TERMS => show_notice(
+            app,
+            notices::TERMS_TITLE,
+            notices::terms_text(notices::Platform::CURRENT),
+        ),
         // Unlike closing the window, this really exits: `exit` does not go
         // through CloseRequested, so the close-to-tray handler never sees it.
         MENU_ID_QUIT => app.exit(EXIT_CODE_SUCCESS),

@@ -1,7 +1,7 @@
 # ResponderHTTP
 
-An API client for Windows that ships as **one executable with nothing to install
-alongside it**. Send HTTP requests, open WebSocket connections, watch a
+An API client for Windows and Linux that ships as **one executable with nothing
+to install alongside it**. Send HTTP requests, open WebSocket connections, watch a
 server-sent event stream arrive live — and keep every collection, environment
 and cookie on your own machine.
 
@@ -11,8 +11,9 @@ curl to install, no runtime to add, and no system SSL library to keep patched.
 - **No accounts, no telemetry, no analytics, no crash reporting.** The app has
   no server to talk to. See the
   [privacy policy](https://zoran-php.github.io/responderhttp/privacy-policy.html).
-- **One file.** A release build imports only Windows system DLLs — that is
-  checked on every release.
+- **One file.** A release build imports only Windows system DLLs on Windows, and
+  only the desktop's own libraries (WebKitGTK, GTK, glib, D-Bus, zlib, libc) on
+  Linux — both are checked on every release.
 - **Your data stays put.** A single SQLite database in your user profile.
 
 ---
@@ -48,12 +49,14 @@ curl to install, no runtime to add, and no system SSL library to keep patched.
 
 ## Install
 
+### Windows
+
 **Windows 10 or 11, 64-bit.** A release build produces two installers:
 
 | File                                | What it is                        |
 | ----------------------------------- | --------------------------------- |
-| `ResponderHTTP_1.0.0_x64-setup.exe` | NSIS installer — the usual choice |
-| `ResponderHTTP_1.0.0_x64_en-US.msi` | MSI, for deployment tooling       |
+| `ResponderHTTP_1.1.0_x64-setup.exe` | NSIS installer — the usual choice |
+| `ResponderHTTP_1.1.0_x64_en-US.msi` | MSI, for deployment tooling       |
 
 Both install the same single executable. A Microsoft Store listing is prepared
 but not published yet.
@@ -63,8 +66,26 @@ Runtime, which is part of Windows 11 and already present on most Windows 10
 machines. If it is missing, Windows Update or Microsoft's standalone
 installer adds it.
 
-macOS and Linux are not supported today. The engine is portable, but secret
-storage is written against Windows Credential Manager.
+### Linux
+
+**64-bit (x86_64).** Three packages, the same app in each:
+
+| Package                              | For                                                   | Minimum                                                          |
+| ------------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------- |
+| `ResponderHTTP-1.1.0-1.x86_64.rpm`   | Fedora — `sudo dnf install ./ResponderHTTP-…rpm`      | Fedora 44 (tested)                                               |
+| `ResponderHTTP_1.1.0_amd64.AppImage` | other distributions — `chmod +x`, then run it         | glibc 2.35, the C++ runtime of GCC 12 and `fuse3`: Ubuntu 22.04, Debian 12 and newer |
+| `ResponderHTTP-1.1.0.flatpak`        | any distribution — `flatpak install --user ResponderHTTP-1.1.0.flatpak` | Flatpak itself                                  |
+
+The RPM uses the system's WebKitGTK and GTK, which `dnf` installs with it. The
+AppImage carries its own, built on Ubuntu 22.04. The Flatpak runs on the GNOME
+runtime, which it fetches from Flathub on install, and needs no file access:
+files are chosen through the system dialog. None of the three is published
+yet; they will be attached to the GitHub release, and a Flathub listing is
+planned. Which one to pick, what each was tested on
+and how to remove them: the
+[Linux page](https://zoran-php.github.io/responderhttp/linux.html).
+
+macOS is not supported today.
 
 ---
 
@@ -349,6 +370,11 @@ it, so requests in flight and open WebSocket connections survive. The first few
 closes say so in a toast with a **Don't show this again** button. The tray icon's
 menu has Show and Quit.
 
+On Linux the window hides to the tray only when the desktop shows one — KDE
+Plasma does, GNOME only with an AppIndicator extension — and there is no toast.
+Without a tray, closing the window quits, and first asks if a tab has unsaved
+changes or a request, stream, WebSocket connection or gRPC call is running.
+
 ---
 
 ## Where your data lives
@@ -365,9 +391,14 @@ Installed from the Microsoft Store the same files live under
 `%LOCALAPPDATA%\Packages\<package>\LocalCache\`, which Windows removes when the
 app is uninstalled.
 
+On Linux they are in `~/.local/share/io.github.zoran-php.responderhttp/` (RPM,
+AppImage) or `~/.var/app/io.github.zoran_php.responderhttp/data/io.github.zoran_php.responderhttp/`
+(Flatpak). Uninstalling leaves them there.
+
 **Back up** by copying `responderhttp.sqlite3` while the app is closed. Note that
-secrets in it are encrypted with a key in _your_ Windows Credential Manager — the
-database alone will not carry them to another machine or account.
+secrets in it are encrypted with a key in _your_ Windows Credential Manager or
+Linux desktop keyring — the database alone will not carry them to another
+machine or account.
 
 **Start over** by closing the app and deleting the database; it is recreated
 empty on the next start.
@@ -401,14 +432,24 @@ response is probably not sending that content type.
 be read — usually a different Windows account, or a restored profile. The stored
 values cannot be recovered; type them again.
 
+**Secrets cannot be saved on Linux.** No keyring (GNOME Keyring or KWallet) is
+running in the session, or it stayed locked. The app never falls back to storing
+them unencrypted.
+
+**The AppImage stops with `GLIBC_2.xx not found`.** The distribution is older
+than the AppImage supports; use the Flatpak.
+
 **The window does not appear.** The app may be in the notification area. Click
-its tray icon, or use Show from the icon's menu.
+its tray icon, or use Show from the icon's menu. Starting the app again also
+brings the running window back.
 
 ---
 
 ## Building from source
 
-Requires Rust (stable), Node with pnpm, and on Windows the MSVC build tools.
+Requires Rust (stable), Node with pnpm, and on Windows the MSVC build tools. On
+Linux (Fedora) also `webkit2gtk4.1-devel`, `libappindicator-gtk3-devel` and a C
+toolchain; `PLAN-LINUX.md` lists what was installed.
 
 ```bash
 pnpm install
@@ -420,6 +461,10 @@ pnpm tauri build    # single-file release plus installers
 clippy and the Rust test suites. `release.bat` adds the release build and checks
 the binary imports nothing but Windows system DLLs.
 
+On Linux, `verify.sh` is the same gate, and `release.sh` builds the RPM and the
+AppImage (in an Ubuntu 22.04 container) and checks both. `tools/build-flatpak.sh`
+builds the Flatpak offline, the way Flathub does.
+
 Architecture, conventions and the rules the code is held to are in
 [`CLAUDE.md`](CLAUDE.md); the phased build log is in [`PLAN.md`](PLAN.md).
 
@@ -428,8 +473,8 @@ Architecture, conventions and the rules the code is held to are in
 ## Licence
 
 ResponderHTTP is **free to use** — any person, any organisation, commercial work
-included, on as many machines as you like — and the installer may be passed on
-unchanged. What is reserved is **distributing a modified version**: no forks, no
+included, on as many machines as you like — and the installer or package may be
+passed on unchanged. What is reserved is **distributing a modified version**: no forks, no
 rebuilt or rebranded copies. Changing your own copy for your own use is fine;
 handing that copy to someone else is not.
 

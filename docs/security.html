@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResponderHTTP — Security</title>
+    <meta name="description" content="How ResponderHTTP protects your secrets, your traffic and your machine: encryption at rest, TLS defaults, what the app never stores or logs, and its known limits.">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        themeBg: '#181D24',
+                        themeBgAlt: '#1F252E',
+                        themeCard: '#262E37',
+                        themeCardHover: '#2D3742',
+                        themeBorder: '#353F4B',
+                        themeBorderLight: '#435060',
+                        brandAccent: '#73B0C2',
+                        brandAccentHover: '#86C1D3',
+                        brandAccentMuted: 'rgba(115, 176, 194, 0.12)',
+                        brandAccentBorder: 'rgba(115, 176, 194, 0.25)',
+                        textPrimary: '#F1F5F9',
+                        textSecondary: '#94A3B8',
+                        textMuted: '#64748B'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #181D24;
+            color: #F1F5F9;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-image: radial-gradient(circle at 50% 0%, #222B36 0%, #181D24 70%);
+            background-attachment: fixed;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #181D24;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #353F4B;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #73B0C2;
+        }
+
+        .active-toc-item {
+            color: #73B0C2 !important;
+            border-left-color: #73B0C2 !important;
+            background-color: rgba(115, 176, 194, 0.08);
+            font-weight: 600;
+        }
+
+        /* Print styling rules */
+        @media print {
+            .no-print { display: none !important; }
+            body { 
+                background: #ffffff !important; 
+                color: #0f172a !important; 
+                background-image: none !important;
+            }
+            .print-card { 
+                background: #ffffff !important; 
+                border: 1px solid #cbd5e1 !important; 
+                color: #0f172a !important;
+                box-shadow: none !important;
+            }
+            .print-text-dark { color: #0f172a !important; }
+            .print-text-muted { color: #475569 !important; }
+            .print-accent { color: #0891b2 !important; }
+            a { text-decoration: underline !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-brandAccent selection:text-themeBg">
+
+    <!-- Navigation Bar -->
+    <header class="sticky top-0 z-50 bg-themeBg/90 backdrop-blur-md border-b border-themeBorder/80 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            
+            <!-- Brand & App Logo -->
+            <a href="index.html" class="flex items-center space-x-3.5 group transition-transform duration-200 hover:scale-[1.01]">
+                <div class="relative w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-black/40 border border-themeBorderLight shrink-0 flex items-center justify-center">
+                    <!-- SVG Logo matching StoreLogo image -->
+                    <svg class="w-full h-full" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="logoBg" x1="0" y1="0" x2="0" y2="128" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#3A4452"/>
+                                <stop offset="100%" stop-color="#1E242D"/>
+                            </linearGradient>
+                            <linearGradient id="rGrad" x1="0" y1="0" x2="0" y2="128" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#80BDCF"/>
+                                <stop offset="100%" stop-color="#67A3B5"/>
+                            </linearGradient>
+                        </defs>
+                        <rect width="128" height="128" rx="28" fill="url(#logoBg)"/>
+                        <rect x="1" y="1" width="126" height="126" rx="27" stroke="#4A5667" stroke-width="2" stroke-opacity="0.6"/>
+                        <path d="M36 28h32c13.2 0 22 7.8 22 19.5C90 59 81.5 66.5 68 66.5 L88 100 H69.5 L53 70 H53 V100 H36 V28 Z M53 42 v16 h14 c4.5 0 8-3 8-8 s-3.5-8-8-8 H53 Z" fill="url(#rGrad)"/>
+                    </svg>
+                </div>
+                <div class="hidden sm:flex flex-col">
+                    <span class="font-extrabold text-textPrimary tracking-tight text-lg group-hover:text-brandAccent transition-colors">
+                        ResponderHTTP
+                    </span>
+                    <span class="text-[10px] font-mono tracking-widest text-textMuted uppercase -mt-0.5">Desktop API Client</span>
+                </div>
+            </a>
+
+            <!-- Page links -->
+            <nav class="flex items-center space-x-1 sm:space-x-2">
+                    <a href="index.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Overview</a>
+                    <a href="linux.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Linux</a>
+                    <a href="security.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">Security</a>
+                    <a href="privacy-policy.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Privacy</a>
+                    <a href="terms.html" class="px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-textSecondary hover:text-textPrimary hover:bg-themeCardHover border border-transparent transition-all duration-150">Terms</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <div class="border-b border-themeBorder/60 bg-themeBgAlt/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+            <div class="max-w-3xl">
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-themeCard border border-themeBorder text-xs text-textMuted font-mono mb-4">
+                    <svg class="w-3.5 h-3.5 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    <span>Version 1.1.0 &bull; Windows and Linux</span>
+                </div>
+                <h1 class="text-3xl sm:text-5xl font-extrabold text-textPrimary tracking-tight print-text-dark">
+                    Security
+                </h1>
+                <p class="mt-4 text-base sm:text-lg text-textSecondary leading-relaxed print-text-muted">
+                    How ResponderHTTP keeps your tokens and passwords safe on disk, what it checks on the network, what it never stores or logs, and where its protection ends.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-grow w-full">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+            <aside class="hidden lg:block lg:col-span-4 sticky top-24 no-print">
+                <div class="bg-themeCard/80 border border-themeBorder rounded-2xl p-5 backdrop-blur-sm">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-textMuted mb-3 px-2 flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+                        <span>Contents</span>
+                    </h2>
+                    <nav class="space-y-1 text-sm font-medium">
+                        <a href="#summary" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">01</span> In short
+                        </a>
+                        <a href="#secrets" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">02</span> Secrets at rest
+                        </a>
+                        <a href="#key-store" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">03</span> Where the key lives
+                        </a>
+                        <a href="#never-stored" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">04</span> What never keeps a secret
+                        </a>
+                        <a href="#network" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">05</span> TLS and the network
+                        </a>
+                        <a href="#app" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">06</span> The app itself
+                        </a>
+                        <a href="#limits" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">07</span> What it does not protect against
+                        </a>
+                        <a href="#removing" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">08</span> Removing everything
+                        </a>
+                        <a href="#report" class="toc-item flex items-center px-3 py-2 rounded-lg text-textSecondary hover:text-textPrimary hover:bg-themeCardHover transition-all border-l-2 border-transparent">
+                            <span class="font-mono text-xs text-brandAccent mr-2.5">09</span> Reporting a vulnerability
+                        </a>
+                    </nav>
+                </div>
+            </aside>
+
+            <div class="lg:col-span-8 space-y-6 sm:space-y-8">
+
+                <section id="summary" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            01
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            In short
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">ResponderHTTP is a local desktop app. It has no account, no server and no telemetry, so there is nothing of yours held anywhere but your own machine. The security work goes into three places: what is written to disk, what goes over the network, and what the app’s own window is allowed to do.</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Secrets are encrypted at rest</strong> with AES-256-GCM, under a key kept in the operating system’s credential store, never in the database beside them</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">TLS certificates are verified by default</strong> against the operating system’s trusted roots. Turning verification off is a visible setting on one request, never a global switch</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">History, saved responses, logs and exports keep no secrets</strong>. The rules are enforced in the Rust core, not only in the interface</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Only the requests you send leave the machine</strong>. The app makes no update checks, no analytics calls and no crash reports</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The engine is memory-safe Rust</strong> with libcurl, TLS and SQLite compiled into the binary, so there is no system curl to call and no system SSL library to go stale</span>
+                        </li>
+                    </ul>
+                </section>
+                <section id="secrets" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            02
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Secrets at rest
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Everything you create lives in one SQLite database in your user profile. Most of it is not sensitive: URLs, header names, collection trees. A few fields are, and those are encrypted before they are written.</p>
+                    <h3 class="text-sm font-bold text-textPrimary uppercase tracking-wider mt-6 mb-3 print-text-dark">What counts as a secret</h3>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">The credential in a request’s Auth tab, for HTTP and gRPC requests: the Basic password, the Bearer token, the API key value, or a custom scheme’s value. The username and the key’s name are not secrets: they say <em>how</em> to authenticate, not with what</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark">Environment variables you mark as <strong class="text-textPrimary font-semibold print-text-dark">secret</strong>. They are masked in the editor as well as encrypted</span>
+                        </li>
+                    </ul>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Header values, cookies in the cookie jar and ordinary variables are stored as plain text. Put credentials in the Auth tab or in a secret variable, and refer to it as <span class="font-mono text-xs">{{name}}</span> wherever it is needed.</p>
+                    <h3 class="text-sm font-bold text-textPrimary uppercase tracking-wider mt-6 mb-3 print-text-dark">How they are encrypted</h3>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">One data key</strong>: 32 random bytes from the operating system’s random source (through aws-lc), created the first time the app starts. It is held in the credential store, never in the database, and the app wipes its copy from memory when it is no longer needed</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">AES-256-GCM</strong> through aws-lc’s randomized-nonce key, so a fresh 12-byte nonce is drawn for every value and no code in the app ever picks one</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Each value is bound to where it lives.</strong> The table, the row id and the field name are the cipher’s associated data, so a value copied into another row or field fails to decrypt instead of quietly becoming that row’s secret</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Each value names its key.</strong> A 16-byte key id is stored with every value, so a value sealed under a key that has since gone is recognised as such rather than tried and misread</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Deleted data is overwritten.</strong> SQLite’s <span class="font-mono text-xs">secure_delete</span> is on, so a secret that is blanked or re-encrypted does not linger in the file’s free pages</span>
+                        </li>
+                    </ul>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">The stored form of one value:</p>
+                    <pre class="mb-4 overflow-x-auto rounded-xl border border-themeBorder bg-themeBg/80 p-4 font-mono text-xs text-textSecondary leading-relaxed print-text-dark">version (1 byte) | key id (16) | nonce (12) | ciphertext | tag (16)</pre>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">A copied, synced or backed-up database therefore carries no readable secrets. On another machine, or after the key is gone, everything else opens normally and each secret field loads empty, marked as needing to be entered again. A missing secret never stops a request, a collection or the app from loading.</p>
+                </section>
+                <section id="key-store" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            03
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Where the key lives
+                        </h2>
+                    </div>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Windows</strong>: one generic credential in Windows Credential Manager, named <span class="font-mono text-xs">data-key@io.github.zoran-php.responderhttp</span>, owned by your Windows account</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Linux</strong>: one item in your desktop keyring through the Secret Service, which is GNOME Keyring on Fedora Workstation or KWallet on KDE. It is labelled “ResponderHTTP data key”, and <span class="font-mono text-xs">secret-tool lookup service io.github.zoran-php.responderhttp username data-key</span> finds it. If the keyring is locked, the desktop asks you to unlock it</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Linux, Flatpak</strong> : the key is kept in an encrypted keyring file inside the app’s sandbox, whose own key comes from the desktop through the Secret portal</span>
+                        </li>
+                    </ul>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">There is no plain-text fallback.</strong> If the credential store cannot be reached, for example on a Linux session with no keyring running, the app runs normally but refuses to save secrets for that session and says so. It never writes one unencrypted instead.</p>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4"><strong class="text-textPrimary font-semibold print-text-dark">A key is only created when the store says there is none.</strong> Any other failure, such as access denied or a store that is not responding, leaves the session without a key rather than replacing it. A replacement would make every secret sealed under the old key unreadable, and the old key may be back after a restart.</p>
+                </section>
+                <section id="never-stored" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            04
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            What never keeps a secret
+                        </h2>
+                    </div>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">History and saved responses.</strong> A literal secret is blanked before the entry is stored. A value that is only a <span class="font-mono text-xs">{{placeholder}}</span> is kept, because it names a secret rather than containing one, and it lets a re-run work without typing it again. Saved response snapshots substitute non-secret variables only</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The log.</strong> The app never logs request or response bodies, auth headers, tokens, cookies, WebSocket or gRPC messages, gRPC metadata or stream events. Every log line from Rust and from the interface also passes one redactor, which blanks credential-like query parameters (<span class="font-mono text-xs">token</span>, <span class="font-mono text-xs">api_key</span>, <span class="font-mono text-xs">password</span> and the like), <span class="font-mono text-xs">Bearer</span>, <span class="font-mono text-xs">Basic</span> and <span class="font-mono text-xs">Digest</span> credentials, and cookie headers. The redactor is a safety net: the rule is not to log them in the first place</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The WebSocket and gRPC message logs.</strong> A message you typed with a secret variable is shown with the placeholder, not the resolved value</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">OpenAPI export.</strong> Credential-like query parameter values and <span class="font-mono text-xs">Authorization</span>, <span class="font-mono text-xs">Cookie</span> and <span class="font-mono text-xs">Proxy-Authorization</span> headers are left out of the exported file, at most a security scheme naming them is written, never the value, and the export lists what it left out, so a spec can be committed or shared without carrying a token</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Copy as cURL</strong> produces text for you to paste; the app never runs it</span>
+                        </li>
+                    </ul>
+                </section>
+                <section id="network" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            05
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            TLS and the network
+                        </h2>
+                    </div>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Verification is on by default</strong> for HTTP, WebSocket and gRPC alike: the certificate chain and the host name are both checked. Turning it off is a per-request setting you can see, meant for a local test server, and it applies to that request only</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Trusted roots come from the operating system</strong>: the Windows certificate store, or <span class="font-mono text-xs">/etc/pki</span> on Fedora. A root your organisation installs is trusted, and a root the OS distrusts is not, without the app shipping its own bundle to keep up to date</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">TLS is rustls</strong>, a TLS implementation in Rust, compiled into the binary. It offers TLS 1.2 and 1.3 only; a request can raise its minimum to 1.3</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Credentials stay on their host.</strong> When a redirect crosses to another host, the <span class="font-mono text-xs">Authorization</span> header is dropped unless you explicitly allow it for that request, which is how a token would otherwise reach a server that was never meant to see it</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Cookies follow RFC 6265</strong>: each is sent only to the domain, path and scheme it was set for, and a Secure cookie never goes over plain HTTP</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Nothing else goes out.</strong> The only network traffic is the requests you send. There is no update check, no analytics and no crash reporting</span>
+                        </li>
+                    </ul>
+                </section>
+                <section id="app" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            06
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            The app itself
+                        </h2>
+                    </div>
+                    <h3 class="text-sm font-bold text-textPrimary uppercase tracking-wider mt-6 mb-3 print-text-dark">The window</h3>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">The interface is a web page drawn by the system’s webview: WebView2 on Windows, WebKitGTK on Linux. The page itself is bundled into the app and never loaded from the internet. Because a script running in that page can call the app’s commands, it is treated as a privileged place, and content from outside is never rendered in it as HTML.</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Response bodies are text.</strong> An HTML, SVG or JavaScript response is shown in the code editor with syntax highlighting, never rendered or run</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Markdown documentation is sanitised</strong> against an explicit allowlist, because it may come from an imported OpenAPI file written by someone else. Scripts, styles, frames, embeds and forms are removed, links become inert text you can copy, and images do not load, so a remote image cannot act as a tracking beacon</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">The window can reach only the app’s own commands</strong> and the logger. No shell, file-system, HTTP or opener plugin is exposed to it. The engine reads only files you chose, such as a multipart attachment or a file you import</span>
+                        </li>
+                    </ul>
+                    <h3 class="text-sm font-bold text-textPrimary uppercase tracking-wider mt-6 mb-3 print-text-dark">The code</h3>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Rust and memory safety.</strong> <span class="font-mono text-xs">unsafe</span> code is forbidden everywhere except one file of hand-written libcurl WebSocket bindings. Each block there carries a written safety argument, and the compiler rejects <span class="font-mono text-xs">unsafe</span> in any other file</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">No SQL injection.</strong> Every query is parameterised, and SQL lives only in the persistence layer</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">No shelling out.</strong> libcurl runs inside the process. The app never starts a <span class="font-mono text-xs">curl</span> program or any other process to make a request</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Checked builds.</strong> Every release build is inspected for the libraries it links. The check fails if libcurl, OpenSSL or SQLite appears as a system library rather than compiled in, and on Linux it allows only the desktop’s own libraries: WebKitGTK, GTK, glib, D-Bus, zlib and the C runtime</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Pinned dependencies.</strong> Every Rust and JavaScript dependency is locked to an exact version in the repository’s lock files</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Bounded input.</strong> Streams, message logs and imported schema files have size limits, so a hostile or runaway server cannot fill memory without bound</span>
+                        </li>
+                    </ul>
+                </section>
+                <section id="limits" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            07
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            What it does not protect against
+                        </h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Honest limits, so you can judge the rest:</p>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Software running as you.</strong> Anything running under your own account can ask the credential store for the key, as the app does. This is true of every app that uses the OS credential store, including browsers’ saved passwords</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Secrets in memory.</strong> Encryption is for data at rest. While the app runs, a secret you are editing or sending is decrypted in memory and passes between the interface and the engine</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Plain-text fields.</strong> Header values, cookies and variables not marked secret are stored unencrypted. So are URLs, which is why an API key belongs in the Auth tab rather than typed into the query string</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">A missing Content Security Policy.</strong> The webview does not yet set one. Its defence today is that it renders no outside content as HTML, as described above. Adding one is an open item</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Unsigned direct downloads.</strong> The Windows NSIS and MSI installers and the Linux RPM, AppImage and Flatpak bundle are not signed yet, so Windows SmartScreen warns about the installers and <span class="font-mono text-xs">dnf</span> cannot check the RPM’s signature. Get them only from the project’s own release page. Packages from the Microsoft Store, and from Flathub once listed there, are signed by the store</span>
+                        </li>
+                    </ul>
+                </section>
+                <section id="removing" class="scroll-mt-24 print-card bg-themeCard/60 border border-themeBorder rounded-2xl p-6 sm:p-8 transition-all hover:border-themeBorderLight">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">
+                            08
+                        </span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">
+                            Removing everything
+                        </h2>
+                    </div>
+                    <ul class="space-y-3 text-sm sm:text-base text-textSecondary mb-4">
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Windows, installer</strong>: uninstalling with “Delete the application data” ticked removes the database, the logs and the Credential Manager entry together. An update never removes the key</span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Windows, Microsoft Store</strong>: uninstalling removes the database and logs, but a Store uninstall runs no clean-up of its own, so the Credential Manager entry stays. Remove it with <span class="font-mono text-xs">cmdkey /delete:data-key@io.github.zoran-php.responderhttp</span></span>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="p-1 rounded bg-brandAccentMuted text-brandAccent mr-3 mt-0.5 shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </div>
+                            <span class="print-text-dark"><strong class="text-textPrimary font-semibold print-text-dark">Linux, RPM</strong>: <span class="font-mono text-xs">sudo dnf remove responder-http</span> removes the program. Your data stays in your home folder: delete <span class="font-mono text-xs">~/.local/share/io.github.zoran-php.responderhttp/</span> and remove the key with <span class="font-mono text-xs">secret-tool clear service io.github.zoran-php.responderhttp username data-key</span></span>
+                        </li>
+                    </ul>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed print-text-dark mb-4">Deleting only the database is also safe: the key alone decrypts nothing, and a fresh database starts empty.</p>
+                </section>
+
+                <section id="report" class="scroll-mt-24 print-card bg-gradient-to-br from-themeCard to-themeBgAlt border border-brandAccentBorder rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+                    <div class="absolute -right-10 -bottom-10 w-40 h-40 rounded-full bg-brandAccent/5 blur-2xl pointer-events-none"></div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-brandAccentMuted text-brandAccent border border-brandAccentBorder">09</span>
+                        <h2 class="text-xl sm:text-2xl font-bold text-textPrimary print-text-dark">Reporting a vulnerability</h2>
+                    </div>
+                    <p class="text-textSecondary text-sm sm:text-base leading-relaxed mb-6 print-text-dark">
+                        If you find a security problem, please email it rather than opening a public issue, with the
+                        version, the operating system and the steps to reproduce it, and allow time for a fix to be
+                        released before describing the problem in public.
+                    </p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <a href="mailto:zorandavidovic@outlook.com?subject=ResponderHTTP%20security" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-themeBg border border-themeBorder hover:border-brandAccent text-textPrimary transition-all duration-150">
+                            <svg class="w-4 h-4 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            <span class="font-mono text-xs sm:text-sm font-medium">zorandavidovic@outlook.com</span>
+                        </a>
+                        <a href="privacy-policy.html" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-themeBg border border-themeBorder hover:border-brandAccent text-textPrimary transition-all duration-150">
+                            <svg class="w-4 h-4 text-brandAccent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                            <span class="text-xs sm:text-sm font-medium">Privacy policy</span>
+                        </a>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Page Footer -->
+    <footer class="border-t border-themeBorder/80 bg-themeBg/95 text-xs text-textMuted py-8 mt-12 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-6 h-6 rounded-md bg-themeCard border border-themeBorder flex items-center justify-center font-mono text-[10px] text-brandAccent font-bold">
+                    R
+                </div>
+                <span>&copy; 2026 Zoran Davidović. All rights reserved.</span>
+            </div>
+            <div class="flex items-center space-x-4 font-mono text-[11px]">
+                <a href="index.html" class="hover:text-brandAccent transition-colors">Overview</a>
+                <span>&bull;</span>
+                <a href="linux.html" class="hover:text-brandAccent transition-colors">Linux</a>
+                <span>&bull;</span>
+                <a href="security.html" class="hover:text-brandAccent transition-colors">Security</a>
+                <span>&bull;</span>
+                <a href="privacy-policy.html" class="hover:text-brandAccent transition-colors">Privacy</a>
+                <span>&bull;</span>
+                <a href="terms.html" class="hover:text-brandAccent transition-colors">Terms</a>
+                <span>&bull;</span>
+                <a href="https://github.com/zoran-php/responderhttp" class="hover:text-brandAccent transition-colors">GitHub</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Highlights the section the reader is in, as on the other pages.
+        document.addEventListener('DOMContentLoaded', () => {
+            const sections = document.querySelectorAll('section[id]');
+            const navLinks = document.querySelectorAll('.toc-item');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.getAttribute('id');
+                        navLinks.forEach(link => {
+                            if (link.getAttribute('href') === `#${id}`) {
+                                link.classList.add('active-toc-item');
+                            } else {
+                                link.classList.remove('active-toc-item');
+                            }
+                        });
+                    }
+                });
+            }, { rootMargin: '-10% 0px -70% 0px' });
+            sections.forEach(section => observer.observe(section));
+        });
+    </script>
+</body>
+</html>

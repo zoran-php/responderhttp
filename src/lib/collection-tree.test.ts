@@ -5,6 +5,8 @@ import { buildFolderTree, flattenFolders } from "@/lib/collection-tree";
 import type { CollectionContents, Folder, SavedRequest, SavedWebSocket } from "@/types/collections";
 import { AUTH_NONE, DEFAULT_SETTINGS } from "@/types/http";
 import { DEFAULT_WS_SETTINGS, EMPTY_WS_DRAFT } from "@/types/websocket";
+import { emptyGrpcDraft } from "@/lib/grpc-request";
+import type { SavedGrpcRequest } from "@/types/grpc";
 
 function folder(id: string, name: string, parentFolderId: string | null = null): Folder {
   return { id, collectionId: "col_1", parentFolderId, name };
@@ -40,7 +42,40 @@ function webSocket(id: string, name: string, folderId: string | null): SavedWebS
   };
 }
 
+function grpcRequest(id: string, name: string, folderId: string | null): SavedGrpcRequest {
+  return {
+    id,
+    collectionId: "col_1",
+    folderId,
+    name,
+    request: emptyGrpcDraft(),
+    secretState: "ok",
+  };
+}
+
 describe("buildFolderTree", () => {
+  it("groups gRPC requests by folder beside the other kinds, sorted by name", () => {
+    const contents: CollectionContents = {
+      folders: [folder("fld_a", "Alpha")],
+      requests: [request("req_1", "HTTP", "fld_a")],
+      examples: [],
+      webSockets: [webSocket("req_2", "Socket", "fld_a")],
+      grpcRequests: [
+        grpcRequest("req_4", "zeta", "fld_a"),
+        grpcRequest("req_3", "Get order", "fld_a"),
+        grpcRequest("req_5", "At root", null),
+        grpcRequest("req_6", "Orphan", "fld_missing"),
+      ],
+    };
+
+    const tree = buildFolderTree(contents);
+
+    expect(tree.rootGrpcRequests.map((g) => g.name)).toEqual(["At root", "Orphan"]);
+    expect(tree.rootFolders[0]?.grpcRequests.map((g) => g.name)).toEqual(["Get order", "zeta"]);
+    expect(tree.rootFolders[0]?.webSockets.map((w) => w.name)).toEqual(["Socket"]);
+    expect(tree.rootFolders[0]?.requests.map((r) => r.name)).toEqual(["HTTP"]);
+  });
+
   it("nests folders under their parent and sorts case-insensitively", () => {
     const contents: CollectionContents = {
       folders: [
@@ -50,6 +85,7 @@ describe("buildFolderTree", () => {
       ],
       requests: [],
       examples: [],
+      grpcRequests: [],
       webSockets: [],
     };
 
@@ -64,6 +100,7 @@ describe("buildFolderTree", () => {
       folders: [folder("fld_a", "Alpha")],
       requests: [request("req_1", "In folder", "fld_a"), request("req_2", "At root", null)],
       examples: [],
+      grpcRequests: [],
       webSockets: [],
     };
 
@@ -78,6 +115,7 @@ describe("buildFolderTree", () => {
       folders: [folder("fld_a", "Alpha")],
       requests: [request("req_1", "HTTP", "fld_a")],
       examples: [],
+      grpcRequests: [],
       webSockets: [
         webSocket("req_3", "zeta", "fld_a"),
         webSocket("req_2", "Alpha feed", "fld_a"),
@@ -98,6 +136,7 @@ describe("buildFolderTree", () => {
       folders: [],
       requests: [request("req_1", "Orphan", "fld_missing")],
       examples: [],
+      grpcRequests: [],
       webSockets: [],
     };
 
@@ -117,6 +156,7 @@ describe("flattenFolders", () => {
       ],
       requests: [],
       examples: [],
+      grpcRequests: [],
       webSockets: [],
     };
 
@@ -141,6 +181,7 @@ describe("examplesByRequestId", () => {
         { id: "exa_3", requestId: "req_1", name: "Not found", status: 404 },
       ],
       webSockets: [],
+      grpcRequests: [],
     };
 
     const { examplesByRequestId } = buildFolderTree(contents);
@@ -156,6 +197,7 @@ describe("examplesByRequestId", () => {
       folders: [],
       requests: [request("req_1", "List users", null)],
       examples: [],
+      grpcRequests: [],
       webSockets: [],
     };
 

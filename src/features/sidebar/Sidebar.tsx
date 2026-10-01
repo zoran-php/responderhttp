@@ -8,6 +8,7 @@ import { CollectionsSidebar } from "@/features/collections/CollectionsSidebar";
 import { EnvironmentsPanel } from "@/features/environments/EnvironmentsPanel";
 import { HistoryPanel } from "@/features/history/HistoryPanel";
 import type { SavedRequest, SavedWebSocket } from "@/types/collections";
+import type { SavedGrpcRequest } from "@/types/grpc";
 import type { DocsTarget } from "@/types/docs";
 import type { SendRequestInput } from "@/types/http";
 
@@ -21,6 +22,7 @@ interface SidebarProps {
   loadedRequestId: string | null;
   onOpenRequest: (saved: SavedRequest) => void;
   onOpenWebSocket: (saved: SavedWebSocket) => void;
+  onOpenGrpc: (saved: SavedGrpcRequest) => void;
   onOpenEnvironment: (environmentId: string) => void;
   onOpenExample: (exampleId: string) => void;
   onOpenHistoryEntry: (request: SendRequestInput) => void;
@@ -32,6 +34,7 @@ export function Sidebar({
   loadedRequestId,
   onOpenRequest,
   onOpenWebSocket,
+  onOpenGrpc,
   onOpenEnvironment,
   onOpenExample,
   onOpenHistoryEntry,
@@ -66,6 +69,7 @@ export function Sidebar({
           onOpenExample={onOpenExample}
           onOpenRequest={onOpenRequest}
           onOpenWebSocket={onOpenWebSocket}
+          onOpenGrpc={onOpenGrpc}
         />
       )}
       {panel === "Environments" && <EnvironmentsPanel onOpenEnvironment={onOpenEnvironment} />}

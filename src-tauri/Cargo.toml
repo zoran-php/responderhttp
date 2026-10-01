@@ -1,6 +1,6 @@
 [package]
 name = "responderhttp"
-version = "1.0.0"
+version = "1.1.0"
 description = "API client — single binary, libcurl statically linked, no system dependencies"
 edition = "2021"
 
@@ -83,11 +83,32 @@ serde-saphyr = { version = "1", default-features = false, features = [
 # vendored set can ever be read.
 boon = "0.6"
 
+# gRPC schemas at runtime (PLAN-GRPC.md 16b, decision D2). A gRPC request's
+# `.proto` files are only known once the user imports them or the server
+# answers reflection, so nothing can be generated at build time:
+# - protox compiles `.proto` sources in memory. It is a protobuf compiler in
+#   Rust, so the user never needs `protoc`, and it carries the well-known
+#   google/protobuf files itself.
+# - prost-reflect describes the compiled messages and converts them between
+#   the editor's JSON and protobuf bytes ("serde" is the JSON mapping).
+# - prost is the encoding they both sit on, and derives the five reflection
+#   protocol messages (proto/reflection.rs).
+# All three are pure Rust, Apache-2.0 OR MIT, with no system dependency.
+protox = "0.9"
+prost-reflect = { version = "0.16", features = ["serde"] }
+prost = "0.14"
+# Named only to read where a schema error is: protox reports the position
+# as a miette label (a byte offset), and proto/compile.rs turns it into
+# `file:line:column`. Already in the binary through protox, at the same
+# major version, so this line adds no code. Default features off: nothing
+# here renders miette's own reports.
+miette = { version = "7", default-features = false }
+
 # The credential store itself. keyring-core plus one explicit store, rather
 # than the `keyring` umbrella crate: a store chosen by feature flag is how a
-# build ends up on the mock store without anyone noticing. Windows only for
-# now — macOS and Linux are deferred (PLAN.md Phase 0), and until they get a
-# store of their own, secrets there report the store as unavailable. Both
+# build ends up on the mock store without anyone noticing. This block is
+# Windows; Linux has oo7 below (PLAN-LINUX.md 17c), and macOS is still
+# deferred, so secrets there report the store as unavailable. Both
 # talk to Credential Manager in advapi32, which is already on the static-link
 # allowlist.
 [target.'cfg(windows)'.dependencies]
@@ -99,6 +120,24 @@ windows-native-keyring-store = "1"
 # directly because that plugin exposes no toast buttons on Windows and this
 # notice needs two.
 tauri-winrt-notification = "0.8"
+
+# The data key's home on Linux (PLAN-LINUX.md 17c, decision D3): Secret
+# Service (GNOME Keyring, KWallet) over D-Bus on the host, and inside a
+# Flatpak an encrypted keyring file whose key comes from the Secret portal.
+# Pure Rust. It reuses the zbus, zvariant and tokio versions already linked
+# (zbus through tauri-plugin-single-instance), so there is no second D-Bus
+# stack. native_crypto, never openssl_crypto: that would link OpenSSL
+# dynamically, which CLAUDE.md section 11 rule 2 forbids.
+[target.'cfg(target_os = "linux")'.dependencies]
+oo7 = { version = "0.6", default-features = false, features = [
+  "tokio",
+  "native_crypto",
+] }
+# Asks the session bus whether a tray host is running before a tray icon is
+# made (desktop/tray.rs, PLAN-LINUX.md 17b). Already linked, at this version,
+# through tauri-plugin-single-instance and oo7, so it adds no code; named here
+# only because the app now calls it directly.
+zbus = { version = "5", default-features = false, features = ["blocking-api"] }
 
 # Native message dialog for the one moment there is no app handle: the
 # missing-webview check runs before the Tauri builder (desktop/webview.rs),
@@ -117,6 +156,15 @@ rfd = { version = "0.16", default-features = false, features = [
 # wiremock because its API is synchronous, matching the blocking HttpClient
 # trait — no async runtime just to drive a blocking client.
 httpmock = "0.7"
+# The local gRPC server for tests/grpc.rs (PLAN-GRPC.md 16d, D7 as
+# revised): a raw HTTP/2 server rather than a gRPC framework, so it can
+# misbehave on purpose and log the headers libcurl sent. Test-only, so none
+# of it reaches the release binary. tokio, http and bytes are already in the
+# tree through Tauri; h2 is the one new crate.
+h2 = "0.4"
+http = "1"
+bytes = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time"] }
 
 [profile.release]
 panic = "abort"
